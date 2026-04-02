@@ -1,0 +1,160 @@
+"use server"
+
+import { ZodError } from "zod"
+
+import {
+  parseFlightSearchForm,
+  parsePlaceSearchInput,
+  toFlightSearchCommand,
+} from "@/modules/flights/search/domain"
+import type {
+  FlightSearchCommand,
+  FlightSearchFormValues,
+  PlaceSuggestionOption,
+} from "@/modules/flights/search/domain"
+import {
+  actionFailure,
+  actionSuccess,
+  type ActionResult,
+} from "@/modules/flights/search/server/types"
+
+interface SearchPlacesDeps {
+  searchPlaces: (query: string) => Promise<PlaceSuggestionOption[]>
+  logError: (context: string, error: unknown) => void
+}
+
+interface SubmitFlightSearchDeps {
+  createRequestId: () => string
+  logFlightSearchRequest: (
+    requestId: string,
+    formValues: FlightSearchFormValues,
+    command: FlightSearchCommand
+  ) => void
+}
+
+export async function searchPlacesAction(
+  input: unknown
+): Promise<ActionResult<PlaceSuggestionOption[]>> {
+  return executeSearchPlacesAction(input)
+}
+
+export async function submitFlightSearchAction(
+  input: unknown
+): Promise<ActionResult<{ requestId: string }>> {
+  return executeSubmitFlightSearchAction(input)
+}
+
+export async function executeSearchPlacesAction(
+  input: unknown,
+  deps: SearchPlacesDeps = {
+    searchPlaces: defaultSearchPlaces,
+    logError: defaultLogError,
+  }
+): Promise<ActionResult<PlaceSuggestionOption[]>> {
+  const parsed = parsePlaceSearchInput(input)
+
+  if (!parsed.success) {
+    return actionFailure(
+      "VALIDATION_ERROR",
+      parsed.error.issues[0]?.message ?? "Invalid place search input"
+    )
+  }
+
+  try {
+    const suggestions = await deps.searchPlaces(parsed.data.query)
+    return actionSuccess(suggestions)
+  } catch (error) {
+    deps.logError("[flights/searchPlacesAction]", error)
+
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not search airports and cities right now."
+    )
+  }
+}
+
+export async function executeSubmitFlightSearchAction(
+  input: unknown,
+  deps: SubmitFlightSearchDeps = {
+    createRequestId: () => crypto.randomUUID(),
+    logFlightSearchRequest: defaultLogFlightSearchRequest,
+  }
+): Promise<ActionResult<{ requestId: string }>> {
+  const parsed = parseFlightSearchForm(input)
+
+  if (!parsed.success) {
+    return actionFailure("VALIDATION_ERROR", formatValidationErrors(parsed.error))
+  }
+
+  const requestId = deps.createRequestId()
+  const command = toFlightSearchCommand(parsed.data)
+
+  deps.logFlightSearchRequest(requestId, parsed.data, command)
+
+  return actionSuccess({ requestId })
+}
+
+function formatValidationErrors(error: ZodError) {
+  return error.issues
+    .map((issue) => {
+      const first = issue.path[0]
+      const second = issue.path[1]
+      const third = issue.path[2]
+
+      if (first === "slices" && typeof second === "number") {
+        const flightNumber = second + 1
+
+        if (third === "origin") {
+          return `Flight ${flightNumber}: origin is required.`
+        }
+
+        if (third === "destination") {
+          return `Flight ${flightNumber}: destination is required.`
+        }
+
+        if (third === "departureDate") {
+          return `Flight ${flightNumber}: ${issue.message}.`
+        }
+      }
+
+      if (first === "passengers") {
+        return `Passengers: ${issue.message}.`
+      }
+
+      return issue.message.endsWith(".") ? issue.message : `${issue.message}.`
+    })
+    .filter((message, index, all) => all.indexOf(message) === index)
+    .join(" ")
+}
+
+function defaultLogError(context: string, error: unknown) {
+  console.error(context, error)
+}
+
+async function defaultSearchPlaces(query: string) {
+  const { searchPlaceSuggestions } = await import(
+    "@/modules/flights/search/server/places"
+  )
+
+  return searchPlaceSuggestions(query)
+}
+
+function defaultLogFlightSearchRequest(
+  requestId: string,
+  formValues: FlightSearchFormValues,
+  command: FlightSearchCommand
+) {
+  console.log(
+    JSON.stringify(
+      {
+        event: "flight_search_submitted",
+        requestId,
+        submittedAt: new Date().toISOString(),
+        formValues,
+        command,
+      },
+      null,
+      2
+    )
+  )
+}
