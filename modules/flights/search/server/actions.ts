@@ -1,6 +1,6 @@
 "use server"
 
-import { ZodError } from "zod"
+import { ZodError, type ZodIssue } from "zod"
 
 import {
   parseFlightSearchForm,
@@ -15,6 +15,7 @@ import type {
 import {
   actionFailure,
   actionSuccess,
+  type ActionFieldErrors,
   type ActionResult,
 } from "@/modules/flights/search/server/types"
 
@@ -83,7 +84,13 @@ export async function executeSubmitFlightSearchAction(
   const parsed = parseFlightSearchForm(input)
 
   if (!parsed.success) {
-    return actionFailure("VALIDATION_ERROR", formatValidationErrors(parsed.error))
+    const fieldErrors = mapIssuesToFieldErrors(parsed.error)
+
+    return actionFailure(
+      "VALIDATION_ERROR",
+      formatValidationErrors(parsed.error),
+      fieldErrors
+    )
   }
 
   const requestId = deps.createRequestId()
@@ -96,35 +103,66 @@ export async function executeSubmitFlightSearchAction(
 
 function formatValidationErrors(error: ZodError) {
   return error.issues
-    .map((issue) => {
-      const first = issue.path[0]
-      const second = issue.path[1]
-      const third = issue.path[2]
-
-      if (first === "slices" && typeof second === "number") {
-        const flightNumber = second + 1
-
-        if (third === "origin") {
-          return `Flight ${flightNumber}: origin is required.`
-        }
-
-        if (third === "destination") {
-          return `Flight ${flightNumber}: destination is required.`
-        }
-
-        if (third === "departureDate") {
-          return `Flight ${flightNumber}: ${issue.message}.`
-        }
-      }
-
-      if (first === "passengers") {
-        return `Passengers: ${issue.message}.`
-      }
-
-      return issue.message.endsWith(".") ? issue.message : `${issue.message}.`
-    })
+    .map((issue) => formatIssueMessage(issue))
     .filter((message, index, all) => all.indexOf(message) === index)
     .join(" ")
+}
+
+function mapIssuesToFieldErrors(error: ZodError): ActionFieldErrors | undefined {
+  const fieldErrors: ActionFieldErrors = {}
+
+  for (const issue of error.issues) {
+    const fieldPath = toFieldPath(issue.path)
+
+    if (!fieldPath || fieldErrors[fieldPath]) {
+      continue
+    }
+
+    fieldErrors[fieldPath] = formatIssueMessage(issue)
+  }
+
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined
+}
+
+function toFieldPath(path: readonly (string | number | symbol)[]) {
+  const segments = path.filter(
+    (segment): segment is string | number =>
+      typeof segment === "string" || typeof segment === "number"
+  )
+
+  if (segments.length === 0) {
+    return null
+  }
+
+  return segments.map((segment) => String(segment)).join(".")
+}
+
+function formatIssueMessage(issue: ZodIssue) {
+  const first = issue.path[0]
+  const second = issue.path[1]
+  const third = issue.path[2]
+
+  if (first === "slices" && typeof second === "number") {
+    const flightNumber = second + 1
+
+    if (third === "origin") {
+      return `Flight ${flightNumber}: origin is required.`
+    }
+
+    if (third === "destination") {
+      return `Flight ${flightNumber}: destination is required.`
+    }
+
+    if (third === "departureDate") {
+      return `Flight ${flightNumber}: ${issue.message}.`
+    }
+  }
+
+  if (first === "passengers") {
+    return `Passengers: ${issue.message}.`
+  }
+
+  return issue.message.endsWith(".") ? issue.message : `${issue.message}.`
 }
 
 function defaultLogError(context: string, error: unknown) {

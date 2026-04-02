@@ -1,5 +1,4 @@
-import { test } from "node:test"
-import assert from "node:assert/strict"
+import { expect, test } from "vitest"
 
 import {
   executeSearchPlacesAction,
@@ -53,9 +52,27 @@ test("executeSearchPlacesAction returns validation error contract", async () => 
     }
   )
 
-  assert.equal(result.ok, false)
+  expect(result.ok).toBe(false)
   if (!result.ok) {
-    assert.equal(result.error.code, "VALIDATION_ERROR")
+    expect(result.error.code).toBe("VALIDATION_ERROR")
+  }
+})
+
+test("executeSubmitFlightSearchAction returns field-level errors for invalid payload", async () => {
+  const invalidInput = buildValidInput()
+  invalidInput.slices[0].origin = null
+
+  const result = await executeSubmitFlightSearchAction(invalidInput, {
+    createRequestId: () => "req_test_invalid",
+    logFlightSearchRequest: () => undefined,
+  })
+
+  expect(result.ok).toBe(false)
+  if (!result.ok) {
+    expect(result.error.code).toBe("VALIDATION_ERROR")
+    expect(result.error.fieldErrors?.["slices.0.origin"]).toBe(
+      "Flight 1: origin is required."
+    )
   }
 })
 
@@ -70,7 +87,7 @@ test("executeSearchPlacesAction returns success contract", async () => {
     }
   )
 
-  assert.deepEqual(result, {
+  expect(result).toEqual({
     ok: true,
     data: options,
   })
@@ -86,12 +103,12 @@ test("executeSubmitFlightSearchAction returns request id and logs payload", asyn
     },
   })
 
-  assert.deepEqual(result, {
+  expect(result).toEqual({
     ok: true,
     data: {
       requestId: "req_test_123",
     },
   })
 
-  assert.equal(loggedRequestId, "req_test_123")
+  expect(loggedRequestId).toBe("req_test_123")
 })

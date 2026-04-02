@@ -3,9 +3,12 @@ export type ActionErrorCode =
   | "UPSTREAM_ERROR"
   | "UNKNOWN_ERROR"
 
+export type ActionFieldErrors = Record<string, string>
+
 export interface ActionError {
   code: ActionErrorCode
   message: string
+  fieldErrors?: ActionFieldErrors
 }
 
 export type ActionResult<T> =
@@ -27,13 +30,15 @@ export function actionSuccess<T>(data: T): ActionResult<T> {
 
 export function actionFailure<T>(
   code: ActionErrorCode,
-  message: string
+  message: string,
+  fieldErrors?: ActionFieldErrors
 ): ActionResult<T> {
   return {
     ok: false,
     error: {
       code,
       message,
+      fieldErrors,
     },
   }
 }

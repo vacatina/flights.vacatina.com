@@ -1,5 +1,4 @@
-import { test } from "node:test"
-import assert from "node:assert/strict"
+import { expect, test } from "vitest"
 
 import {
   formatPassengerSummary,
@@ -34,17 +33,15 @@ const singaporeCity: PlaceSuggestionOption = {
 }
 
 test("formatPlaceDisplayName formats airport and city labels", () => {
-  assert.equal(
-    formatPlaceDisplayName(colomboAirport),
+  expect(formatPlaceDisplayName(colomboAirport)).toBe(
     "Colombo - Bandaranaike International (CMB)"
   )
-  assert.equal(formatPlaceDisplayName(singaporeCity), "Singapore (SIN)")
+  expect(formatPlaceDisplayName(singaporeCity)).toBe("Singapore (SIN)")
 })
 
 test("formatPassengerSummary creates a readable summary", () => {
-  assert.equal(formatPassengerSummary({ adults: 1, children: 0 }), "1 adult")
-  assert.equal(
-    formatPassengerSummary({ adults: 2, children: 2 }),
+  expect(formatPassengerSummary({ adults: 1, children: 0 })).toBe("1 adult")
+  expect(formatPassengerSummary({ adults: 2, children: 2 })).toBe(
     "2 adults, 2 children"
   )
 })
@@ -73,7 +70,7 @@ test("toFlightSearchCommand maps form values into command payload", () => {
 
   const command = toFlightSearchCommand(values)
 
-  assert.deepEqual(command, {
+  expect(command).toEqual({
     journeyType: "one_way",
     cabinClass: "business",
     passengers: {

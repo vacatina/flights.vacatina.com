@@ -1,5 +1,4 @@
-import { test } from "node:test"
-import assert from "node:assert/strict"
+import { expect, test } from "vitest"
 
 import { normalizePlaceSuggestion } from "@/modules/flights/search/server/place-normalizer"
 
@@ -32,7 +31,7 @@ const cityPlace = {
 test("normalizePlaceSuggestion maps airport data into UI option", () => {
   const result = normalizePlaceSuggestion(airportPlace)
 
-  assert.deepEqual(result, {
+  expect(result).toEqual({
     id: "arp_cmb_lk",
     type: "airport",
     iataCode: "CMB",
@@ -48,7 +47,7 @@ test("normalizePlaceSuggestion maps airport data into UI option", () => {
 test("normalizePlaceSuggestion maps city data into UI option", () => {
   const result = normalizePlaceSuggestion(cityPlace)
 
-  assert.deepEqual(result, {
+  expect(result).toEqual({
     id: "cit_dxb_ae",
     type: "city",
     iataCode: "DXB",
@@ -67,5 +66,5 @@ test("normalizePlaceSuggestion returns null for unsupported place types", () => 
     type: "train_station",
   } as never)
 
-  assert.equal(result, null)
+  expect(result).toBeNull()
 })

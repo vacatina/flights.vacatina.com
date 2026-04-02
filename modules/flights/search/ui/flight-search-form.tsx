@@ -54,9 +54,11 @@ export function FlightSearchForm() {
   })
 
   const {
+    clearErrors,
     control,
     getValues,
     handleSubmit,
+    setError,
     setValue,
     formState: { isSubmitted },
   } = form
@@ -104,6 +106,7 @@ export function FlightSearchForm() {
   const onSubmit = handleSubmit((values) => {
     setServerMessage(null)
     setServerError(null)
+    clearErrors()
 
     startTransition(() => {
       void submitSearch(values)
@@ -114,7 +117,20 @@ export function FlightSearchForm() {
     const result = await submitFlightSearchAction(values)
 
     if (!result.ok) {
-      setServerError(result.error.message)
+      const fieldErrors = result.error.fieldErrors
+      const hasFieldErrors =
+        fieldErrors !== undefined && Object.keys(fieldErrors).length > 0
+
+      if (fieldErrors) {
+        for (const [fieldPath, message] of Object.entries(fieldErrors)) {
+          setError(fieldPath as never, {
+            type: "server",
+            message,
+          })
+        }
+      }
+
+      setServerError(hasFieldErrors ? null : result.error.message)
       return
     }
 

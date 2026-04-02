@@ -1,5 +1,4 @@
-import { test } from "node:test"
-import assert from "node:assert/strict"
+import { expect, test } from "vitest"
 
 import {
   createDefaultFlightSearchValues,
@@ -34,7 +33,7 @@ test("flightSearchFormSchema accepts a valid one-way payload", () => {
 
   const result = parseFlightSearchForm(values)
 
-  assert.equal(result.success, true)
+  expect(result.success).toBe(true)
 })
 
 test("flightSearchFormSchema rejects return trips with invalid date order", () => {
@@ -60,8 +59,10 @@ test("flightSearchFormSchema rejects return trips with invalid date order", () =
 
   const result = parseFlightSearchForm(values)
 
-  assert.equal(result.success, false)
-  assert.match(JSON.stringify(result.error?.issues), /Return date must be on or after departure date/)
+  expect(result.success).toBe(false)
+  expect(JSON.stringify(result.error?.issues)).toMatch(
+    /Return date must be on or after departure date/
+  )
 })
 
 test("flightSearchFormSchema enforces multi-city slice limits", () => {
@@ -78,7 +79,7 @@ test("flightSearchFormSchema enforces multi-city slice limits", () => {
 
   const result = parseFlightSearchForm(values)
 
-  assert.equal(result.success, false)
+  expect(result.success).toBe(false)
 })
 
 test("flightSearchFormSchema rejects inverted time ranges", () => {
@@ -97,6 +98,6 @@ test("flightSearchFormSchema rejects inverted time ranges", () => {
 
   const result = parseFlightSearchForm(values)
 
-  assert.equal(result.success, false)
-  assert.match(JSON.stringify(result.error?.issues), /Invalid time range/)
+  expect(result.success).toBe(false)
+  expect(JSON.stringify(result.error?.issues)).toMatch(/Invalid time range/)
 })
