@@ -1,9 +1,15 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useState, useTransition } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CheckIcon, PlusIcon, XIcon } from "lucide-react"
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
+import {
+  Controller,
+  type Path,
+  useFieldArray,
+  useForm,
+  useWatch,
+} from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -73,36 +79,6 @@ export function FlightSearchForm() {
     name: "journeyType",
   })
 
-  const outboundOrigin = useWatch({
-    control,
-    name: "slices.0.origin",
-  })
-
-  const outboundDestination = useWatch({
-    control,
-    name: "slices.0.destination",
-  })
-
-  useEffect(() => {
-    if (journeyType !== "return") {
-      return
-    }
-
-    setValue("slices.1.origin", outboundDestination ?? null, {
-      shouldValidate: isSubmitted,
-    })
-
-    setValue("slices.1.destination", outboundOrigin ?? null, {
-      shouldValidate: isSubmitted,
-    })
-  }, [
-    outboundDestination,
-    outboundOrigin,
-    isSubmitted,
-    journeyType,
-    setValue,
-  ])
-
   const onSubmit = handleSubmit((values) => {
     setServerMessage(null)
     setServerError(null)
@@ -117,20 +93,8 @@ export function FlightSearchForm() {
     const result = await submitFlightSearchAction(values)
 
     if (!result.ok) {
-      const fieldErrors = result.error.fieldErrors
-      const hasFieldErrors =
-        fieldErrors !== undefined && Object.keys(fieldErrors).length > 0
-
-      if (fieldErrors) {
-        for (const [fieldPath, message] of Object.entries(fieldErrors)) {
-          setError(fieldPath as never, {
-            type: "server",
-            message,
-          })
-        }
-      }
-
-      setServerError(hasFieldErrors ? null : result.error.message)
+      const appliedFieldErrors = applyServerFieldErrors(result.error.fieldErrors)
+      setServerError(appliedFieldErrors > 0 ? null : result.error.message)
       return
     }
 
@@ -142,10 +106,13 @@ export function FlightSearchForm() {
     const adjusted = ensureSlicesForJourneyType(nextJourneyType, currentSlices)
 
     if (nextJourneyType === "return") {
+      const outboundSlice = adjusted[0]
+      const inboundSlice = adjusted[1]
+
       adjusted[1] = {
-        ...adjusted[1],
-        origin: adjusted[0].destination,
-        destination: adjusted[0].origin,
+        ...inboundSlice,
+        origin: inboundSlice.origin ?? outboundSlice.destination,
+        destination: inboundSlice.destination ?? outboundSlice.origin,
       }
     }
 
@@ -155,6 +122,30 @@ export function FlightSearchForm() {
     })
 
     replace(adjusted)
+  }
+
+  function applyServerFieldErrors(fieldErrors?: Record<string, string>) {
+    if (!fieldErrors) {
+      return 0
+    }
+
+    let appliedCount = 0
+
+    for (const [fieldPath, message] of Object.entries(fieldErrors)) {
+      const resolvedPath = toFormFieldPath(fieldPath)
+
+      if (!resolvedPath) {
+        continue
+      }
+
+      setError(resolvedPath, {
+        type: "server",
+        message,
+      })
+      appliedCount += 1
+    }
+
+    return appliedCount
   }
 
   const canAddMultiCitySlice =
@@ -394,4 +385,25 @@ export function FlightSearchForm() {
       </Button>
     </form>
   )
+}
+
+function toFormFieldPath(path: string): Path<FlightSearchFormValues> | null {
+  if (
+    path === "journeyType" ||
+    path === "cabinClass" ||
+    path === "passengers" ||
+    path === "passengers.adults" ||
+    path === "passengers.children"
+  ) {
+    return path as Path<FlightSearchFormValues>
+  }
+
+  const slicePathPattern =
+    /^slices\.\d+\.(origin|destination|departureDate|departureTime|arrivalTime)$/
+
+  if (slicePathPattern.test(path)) {
+    return path as Path<FlightSearchFormValues>
+  }
+
+  return null
 }

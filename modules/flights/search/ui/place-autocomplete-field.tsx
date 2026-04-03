@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import type { Control } from "react-hook-form"
 import { useController } from "react-hook-form"
 import { CheckIcon, LoaderCircleIcon, MapPinIcon } from "lucide-react"
@@ -43,12 +43,6 @@ export function PlaceAutocompleteField({
 
   const requestIdRef = useRef(0)
 
-  const selectedLabel = useMemo(() => field.value?.displayName ?? "", [field.value])
-
-  useEffect(() => {
-    setQuery(selectedLabel)
-  }, [selectedLabel])
-
   useEffect(() => {
     if (!open || disabled) {
       return
@@ -57,8 +51,6 @@ export function PlaceAutocompleteField({
     const trimmed = query.trim()
 
     if (trimmed.length < 2) {
-      setOptions([])
-      setSearchError(null)
       return
     }
 
@@ -99,15 +91,19 @@ export function PlaceAutocompleteField({
   }
 
   function handleInputBlur() {
-    window.setTimeout(() => {
-      setOpen(false)
-      setQuery(field.value?.displayName ?? "")
-    }, 120)
+    setOpen(false)
+    setQuery(field.value?.displayName ?? "")
   }
 
   function handleInputChange(value: string) {
     setQuery(value)
     setOpen(true)
+    const trimmed = value.trim()
+
+    if (trimmed.length < 2) {
+      setOptions([])
+      setSearchError(null)
+    }
 
     if (field.value && value !== field.value.displayName) {
       field.onChange(null)
@@ -155,9 +151,7 @@ export function PlaceAutocompleteField({
                       <CommandItem
                         key={option.id}
                         value={option.id}
-                        onClick={() => handleSelect(option)}
                         onMouseDown={(event) => event.preventDefault()}
-                        onPointerDown={(event) => event.preventDefault()}
                         onSelect={() => handleSelect(option)}
                         className="py-2"
                       >
