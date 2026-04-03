@@ -50,7 +50,12 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Slider } from "@/components/ui/slider"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import {
   applyOfferClientSorting,
   toResultsUrlSearchParams,
@@ -93,7 +98,9 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
       selected: patch.selected ?? data.state.selected,
     }
     const search = toResultsUrlSearchParams(nextState).toString()
-    router.replace(`/results/${data.partialOfferRequestId}/fare-options?${search}`)
+    router.replace(
+      `/results/${data.partialOfferRequestId}/fare-options?${search}`
+    )
   }
 
   function selectOffer(offerId: string) {
@@ -107,13 +114,17 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         after: undefined,
       }
       const search = toResultsUrlSearchParams(nextState).toString()
-      router.push(`/results/${data.partialOfferRequestId}/fare-options?${search}`)
+      router.push(
+        `/results/${data.partialOfferRequestId}/fare-options?${search}`
+      )
       return
     }
 
     const params = new URLSearchParams()
     params.set("selected", nextSelected.join(","))
-    router.push(`/results/${data.partialOfferRequestId}/review?${params.toString()}`)
+    router.push(
+      `/results/${data.partialOfferRequestId}/review?${params.toString()}`
+    )
   }
 
   function loadMore() {
@@ -155,8 +166,8 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   }
 
   return (
-    <main className="min-h-svh bg-muted/40 py-5 md:py-8">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 md:px-8">
+    <main className="min-h-svh bg-muted/40 py-7 md:py-10">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-7 px-4 md:px-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -164,7 +175,9 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>New order</BreadcrumbLink>
+              <BreadcrumbLink render={<Link href="/" />}>
+                New order
+              </BreadcrumbLink>
             </BreadcrumbItem>
             {data.breadcrumbs.map((breadcrumb, index) => (
               <div key={breadcrumb} className="contents">
@@ -201,23 +214,17 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
               <DialogHeader>
                 <DialogTitle>Filters and sorting</DialogTitle>
               </DialogHeader>
-              <FiltersSidebar
-                data={data}
-                onChange={updateQuery}
-              />
+              <FiltersSidebar data={data} onChange={updateQuery} />
             </DialogContent>
           </Dialog>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+        <div className="grid gap-7 lg:grid-cols-[320px_1fr]">
           <aside className="hidden lg:block">
-            <FiltersSidebar
-              data={data}
-              onChange={updateQuery}
-            />
+            <FiltersSidebar data={data} onChange={updateQuery} />
           </aside>
 
-          <section className="flex flex-col gap-4">
+          <section className="flex flex-col gap-6">
             {offers.length === 0 && (
               <Card className="rounded-2xl">
                 <CardContent className="p-8 text-center text-muted-foreground">
@@ -227,15 +234,18 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
             )}
 
             {offers.length > 0 && (
-              <Accordion multiple className="gap-4">
+              <Accordion multiple className="gap-5">
                 {offers.map((offer) => (
-                  <Card key={offer.id} className="overflow-hidden rounded-2xl border shadow-none">
+                  <Card
+                    key={offer.id}
+                    className="overflow-hidden rounded-2xl border shadow-none"
+                  >
                     <AccordionItem value={offer.id} className="border-b-0">
                       <CardHeader className="p-0">
-                        <AccordionTrigger className="w-full px-4 py-4 no-underline hover:no-underline md:px-8 md:py-6">
-                          <div className="grid w-full gap-6 text-left md:grid-cols-[1.3fr_1fr_1fr]">
-                            <div className="flex items-center gap-4">
-                              <div className="flex size-12 items-center justify-center rounded-md bg-primary/10 font-semibold text-primary">
+                        <AccordionTrigger className="w-full px-6 py-5 no-underline hover:no-underline md:px-8 md:py-5">
+                          <div className="grid w-full gap-8 text-left md:grid-cols-[1.3fr_1fr_1fr]">
+                            <div className="flex items-center gap-5">
+                              <div className="flex size-12 items-center justify-center rounded-md font-semibold text-primary">
                                 {offer.ownerLogoSymbolUrl ? (
                                   <Image
                                     src={offer.ownerLogoSymbolUrl}
@@ -243,7 +253,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                     width={32}
                                     height={32}
                                     unoptimized
-                                    className="size-8 object-contain"
+                                    className="size-12 object-contain"
                                   />
                                 ) : (
                                   offer.ownerCode
@@ -251,8 +261,10 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                               </div>
                               <div className="flex flex-col">
                                 <span className="text-base leading-tight font-semibold md:text-lg">
-                                  {offer.departureTimeLabel} - {offer.arrivalTimeLabel}
-                                  {offer.arrivalDayOffset > 0 && `+${offer.arrivalDayOffset}`}
+                                  {offer.departureTimeLabel} -{" "}
+                                  {offer.arrivalTimeLabel}
+                                  {offer.arrivalDayOffset > 0 &&
+                                    `+${offer.arrivalDayOffset}`}
                                 </span>
                                 <span className="text-sm text-muted-foreground md:text-base">
                                   {offer.flightNumbersLabel.includes(",")
@@ -283,9 +295,9 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                         </AccordionTrigger>
                       </CardHeader>
 
-                      <AccordionContent className="px-4 md:px-8">
-                        <div className="relative flex flex-col gap-2 pb-2 pl-10">
-                          <div className="absolute top-3 bottom-3 left-4 border-l border-dashed border-border" />
+                      <AccordionContent className="px-6 md:px-10">
+                        <div className="relative flex flex-col gap-6 pb-4 pl-11">
+                          <div className="absolute top-3 bottom-3 left-4 border-l border-dashed border-primary" />
                           {offer.timeline.map((event, eventIndex) => {
                             const isArrival = eventIndex % 2 === 1
                             const layover = isArrival
@@ -293,10 +305,10 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                               : null
 
                             return (
-                              <div key={event.id} className="relative py-2">
-                                <span className="absolute -left-7 top-3 size-4 rounded-full border bg-background" />
-                                <div className="flex flex-col gap-1">
-                                  <div className="grid gap-2 md:grid-cols-[260px_1fr]">
+                              <div key={event.id} className="relative py-3">
+                                <span className="absolute top-3 -left-9 size-4 rounded-full border border-primary bg-primary" />
+                                <div className="flex flex-col gap-3">
+                                  <div className="grid gap-3 md:grid-cols-[260px_1fr]">
                                     <strong className="text-base leading-tight md:text-lg">
                                       {event.dateTimeLabel}
                                     </strong>
@@ -306,14 +318,19 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                   </div>
                                   {event.segmentDurationLabel && (
                                     <p className="text-sm text-muted-foreground md:text-base">
-                                      Flight duration: {event.segmentDurationLabel}
+                                      Flight duration:{" "}
+                                      {event.segmentDurationLabel}
                                     </p>
                                   )}
                                   {event.meta.length > 0 && (
                                     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 text-sm text-muted-foreground">
                                       {event.meta.map((metaItem) => (
-                                        <span key={metaItem} className="inline-flex items-center gap-1.5">
-                                          {(metaItem.includes("carry-on") || metaItem.includes("checked")) && (
+                                        <span
+                                          key={metaItem}
+                                          className="inline-flex items-center gap-1.5"
+                                        >
+                                          {(metaItem.includes("carry-on") ||
+                                            metaItem.includes("checked")) && (
                                             <BriefcaseIcon className="size-3.5" />
                                           )}
                                           {metaItem}
@@ -321,12 +338,15 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                       ))}
                                     </div>
                                   )}
-                                  {layover && (
-                                    <Badge variant="outline" className="mt-2 w-fit">
-                                      {layover.label}
-                                    </Badge>
-                                  )}
                                 </div>
+                                {layover && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="mt-6 w-fit"
+                                  >
+                                    {layover.label}
+                                  </Badge>
+                                )}
                               </div>
                             )
                           })}
@@ -336,7 +356,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
                     <Separator />
 
-                    <CardFooter className="flex items-center justify-between px-4 py-4 md:px-8 md:py-5">
+                    <CardFooter className="flex items-center justify-between px-6 py-5 md:px-10 md:py-6">
                       <p
                         className={cn(
                           "text-sm text-muted-foreground",
@@ -356,11 +376,13 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                       {offer.isExpired ? (
                         <div className="inline-flex items-center gap-3 text-foreground">
                           <AlertCircleIcon className="size-5" />
-                          <span className="text-lg md:text-xl">Offer expired</span>
+                          <span className="text-lg md:text-xl">
+                            Offer expired
+                          </span>
                         </div>
                       ) : (
                         <Button
-                          className="rounded-xl px-7 text-xs"
+                          className="rounded-xl px-7 text-sm"
                           onClick={() => selectOffer(offer.id)}
                         >
                           Select
@@ -386,13 +408,15 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
             )}
 
             {isLoadingMore && (
-              <div className="grid gap-4">
+              <div className="grid gap-5">
                 <Skeleton className="h-32 rounded-2xl" />
                 <Skeleton className="h-32 rounded-2xl" />
               </div>
             )}
 
-            {loadMoreError && <p className="text-sm text-destructive">{loadMoreError}</p>}
+            {loadMoreError && (
+              <p className="text-sm text-destructive">{loadMoreError}</p>
+            )}
           </section>
         </div>
       </div>
@@ -412,11 +436,13 @@ function FiltersSidebar({
   ) => void
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <Card className="rounded-2xl bg-card/70 shadow-none">
-        <CardHeader className="gap-2 px-5 pt-5 pb-3">
+        <CardHeader className="gap-3 px-6 pt-6 pb-4">
           <CardTitle className="text-lg">{data.searchSummary.title}</CardTitle>
-          <p className="text-sm md:text-base">{data.searchSummary.routeLabel}</p>
+          <p className="text-sm md:text-base">
+            {data.searchSummary.routeLabel}
+          </p>
           <p className="text-sm text-muted-foreground md:text-base">
             {data.searchSummary.dateRangeLabel}
           </p>
@@ -424,7 +450,7 @@ function FiltersSidebar({
             {data.searchSummary.cabinLabel}
           </p>
         </CardHeader>
-        <CardContent className="px-5 pb-5">
+        <CardContent className="px-6 pb-6">
           <Button
             variant="outline"
             className="w-full rounded-xl"
@@ -435,18 +461,23 @@ function FiltersSidebar({
         </CardContent>
       </Card>
 
-      <FieldGroup className="gap-6">
+      <FieldGroup className="gap-8">
         <Field>
           <FieldLabel className="text-base font-semibold">Sort by</FieldLabel>
           <RadioGroup
             value={data.state.sort}
             onValueChange={(nextValue) =>
-              onChange({ sort: nextValue as FareOptionsPageData["state"]["sort"] })
+              onChange({
+                sort: nextValue as FareOptionsPageData["state"]["sort"],
+              })
             }
-            className="gap-3"
+            className="gap-4"
           >
             {SORT_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center gap-3 text-sm">
+              <label
+                key={option.value}
+                className="flex items-center gap-3 text-sm"
+              >
                 <RadioGroupItem value={option.value} />
                 {option.label}
               </label>
@@ -459,12 +490,17 @@ function FiltersSidebar({
           <RadioGroup
             value={data.state.stops}
             onValueChange={(nextValue) =>
-              onChange({ stops: nextValue as FareOptionsPageData["state"]["stops"] })
+              onChange({
+                stops: nextValue as FareOptionsPageData["state"]["stops"],
+              })
             }
-            className="gap-3"
+            className="gap-4"
           >
             {STOPS_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center gap-3 text-sm">
+              <label
+                key={option.value}
+                className="flex items-center gap-3 text-sm"
+              >
                 <RadioGroupItem value={option.value} />
                 {option.label}
               </label>
@@ -478,7 +514,8 @@ function FiltersSidebar({
             value={data.state.airline}
             onValueChange={(nextValue) =>
               onChange({
-                airline: !nextValue || nextValue === "all" ? undefined : nextValue,
+                airline:
+                  !nextValue || nextValue === "all" ? undefined : nextValue,
               })
             }
           >
@@ -497,7 +534,9 @@ function FiltersSidebar({
         </Field>
 
         <Field>
-          <FieldLabel className="text-base font-semibold">Flight number</FieldLabel>
+          <FieldLabel className="text-base font-semibold">
+            Flight number
+          </FieldLabel>
           <Input
             value={data.state.flightNumber ?? ""}
             onChange={(event) =>
@@ -508,7 +547,7 @@ function FiltersSidebar({
           />
         </Field>
 
-        <FieldGroup className="gap-5">
+        <FieldGroup className="gap-6">
           <Field>
             <FieldLabel className="text-base font-semibold">
               <PlaneTakeoffIcon data-icon="inline-start" />
