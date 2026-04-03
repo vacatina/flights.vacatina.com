@@ -38,6 +38,7 @@ export interface OfferCardViewModel {
   ownerName: string
   ownerLogoSymbolUrl: string | null
   ownerCode: string
+  isExpired?: boolean
   departureTimeLabel: string
   arrivalTimeLabel: string
   arrivalDayOffset: number

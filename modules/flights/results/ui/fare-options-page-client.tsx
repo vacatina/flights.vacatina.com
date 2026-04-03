@@ -4,7 +4,13 @@ import Link from "next/link"
 import Image from "next/image"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { FilterIcon, PlaneLandingIcon, PlaneTakeoffIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  BriefcaseIcon,
+  FilterIcon,
+  PlaneLandingIcon,
+  PlaneTakeoffIcon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import {
@@ -51,6 +57,7 @@ import {
   type FareOptionsPageData,
 } from "@/modules/flights/results/domain"
 import { loadMoreFareOptionsAction } from "@/modules/flights/results/server/actions"
+import { cn } from "@/lib/utils"
 
 const SORT_OPTIONS = [
   { value: "least_expensive", label: "Least expensive" },
@@ -243,30 +250,32 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                 )}
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-[1.7rem] leading-tight font-semibold md:text-2xl">
+                                <span className="text-base leading-tight font-semibold md:text-lg">
                                   {offer.departureTimeLabel} - {offer.arrivalTimeLabel}
                                   {offer.arrivalDayOffset > 0 && `+${offer.arrivalDayOffset}`}
                                 </span>
-                                <span className="text-xl text-muted-foreground md:text-base">
-                                  {offer.ownerName} · {offer.flightNumbersLabel}
+                                <span className="text-sm text-muted-foreground md:text-base">
+                                  {offer.flightNumbersLabel.includes(",")
+                                    ? `${offer.ownerName} · ${offer.flightNumbersLabel}`
+                                    : offer.ownerName}
                                 </span>
                               </div>
                             </div>
 
                             <div className="flex flex-col">
-                              <span className="text-[1.7rem] leading-tight font-semibold md:text-2xl">
+                              <span className="text-base leading-tight font-semibold md:text-lg">
                                 {offer.durationLabel}
                               </span>
-                              <span className="text-xl text-muted-foreground md:text-base">
+                              <span className="text-sm text-muted-foreground md:text-base">
                                 {offer.routeLabel}
                               </span>
                             </div>
 
                             <div className="flex flex-col">
-                              <span className="text-[1.7rem] leading-tight font-semibold md:text-2xl">
+                              <span className="text-base leading-tight font-semibold md:text-lg">
                                 {offer.stopsLabel}
                               </span>
-                              <span className="text-xl text-muted-foreground md:text-base">
+                              <span className="text-sm text-muted-foreground md:text-base">
                                 {offer.stopsDetails ?? "Direct flight"}
                               </span>
                             </div>
@@ -288,24 +297,27 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                 <span className="absolute -left-7 top-3 size-4 rounded-full border bg-background" />
                                 <div className="flex flex-col gap-1">
                                   <div className="grid gap-2 md:grid-cols-[260px_1fr]">
-                                    <strong className="text-[1.7rem] leading-tight md:text-[2rem]">
+                                    <strong className="text-base leading-tight md:text-lg">
                                       {event.dateTimeLabel}
                                     </strong>
-                                    <span className="text-[1.7rem] text-foreground md:text-2xl">
+                                    <span className="text-sm text-foreground md:text-base">
                                       {event.description}
                                     </span>
                                   </div>
                                   {event.segmentDurationLabel && (
-                                    <p className="text-xl text-muted-foreground md:text-base">
+                                    <p className="text-sm text-muted-foreground md:text-base">
                                       Flight duration: {event.segmentDurationLabel}
                                     </p>
                                   )}
                                   {event.meta.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 pt-1">
+                                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 text-sm text-muted-foreground">
                                       {event.meta.map((metaItem) => (
-                                        <Badge key={metaItem} variant="secondary">
+                                        <span key={metaItem} className="inline-flex items-center gap-1.5">
+                                          {(metaItem.includes("carry-on") || metaItem.includes("checked")) && (
+                                            <BriefcaseIcon className="size-3.5" />
+                                          )}
                                           {metaItem}
-                                        </Badge>
+                                        </span>
                                       ))}
                                     </div>
                                   )}
@@ -324,19 +336,36 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
                     <Separator />
 
-                    <CardFooter className="flex items-center justify-between px-4 py-4 md:px-8">
-                      <p className="text-xl text-muted-foreground md:text-base">
+                    <CardFooter className="flex items-center justify-between px-4 py-4 md:px-8 md:py-5">
+                      <p
+                        className={cn(
+                          "text-sm text-muted-foreground",
+                          offer.isExpired ? "opacity-80" : ""
+                        )}
+                      >
                         From{" "}
-                        <span className="text-[2.2rem] font-semibold text-foreground md:text-5xl">
+                        <span
+                          className={cn(
+                            "text-2xl font-semibold tracking-tight text-foreground md:text-3xl",
+                            offer.isExpired ? "text-muted-foreground" : ""
+                          )}
+                        >
                           {offer.totalAmountLabel}
                         </span>
                       </p>
-                      <Button
-                        className="rounded-xl px-7 text-[1.8rem] md:text-base"
-                        onClick={() => selectOffer(offer.id)}
-                      >
-                        Select
-                      </Button>
+                      {offer.isExpired ? (
+                        <div className="inline-flex items-center gap-3 text-foreground">
+                          <AlertCircleIcon className="size-5" />
+                          <span className="text-lg md:text-xl">Offer expired</span>
+                        </div>
+                      ) : (
+                        <Button
+                          className="rounded-xl px-7 text-xs"
+                          onClick={() => selectOffer(offer.id)}
+                        >
+                          Select
+                        </Button>
+                      )}
                     </CardFooter>
                   </Card>
                 ))}
@@ -386,12 +415,12 @@ function FiltersSidebar({
     <div className="flex flex-col gap-6">
       <Card className="rounded-2xl bg-card/70 shadow-none">
         <CardHeader className="gap-2 px-5 pt-5 pb-3">
-          <CardTitle className="text-4xl md:text-2xl">{data.searchSummary.title}</CardTitle>
-          <p className="text-[1.7rem] md:text-lg">{data.searchSummary.routeLabel}</p>
-          <p className="text-xl text-muted-foreground md:text-base">
+          <CardTitle className="text-lg">{data.searchSummary.title}</CardTitle>
+          <p className="text-sm md:text-base">{data.searchSummary.routeLabel}</p>
+          <p className="text-sm text-muted-foreground md:text-base">
             {data.searchSummary.dateRangeLabel}
           </p>
-          <p className="text-xl text-muted-foreground md:text-base">
+          <p className="text-sm text-muted-foreground md:text-base">
             {data.searchSummary.cabinLabel}
           </p>
         </CardHeader>
@@ -408,7 +437,7 @@ function FiltersSidebar({
 
       <FieldGroup className="gap-6">
         <Field>
-          <FieldLabel className="text-[1.8rem] font-semibold md:text-2xl">Sort by</FieldLabel>
+          <FieldLabel className="text-base font-semibold">Sort by</FieldLabel>
           <RadioGroup
             value={data.state.sort}
             onValueChange={(nextValue) =>
@@ -417,7 +446,7 @@ function FiltersSidebar({
             className="gap-3"
           >
             {SORT_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center gap-3 text-[1.7rem] md:text-lg">
+              <label key={option.value} className="flex items-center gap-3 text-sm">
                 <RadioGroupItem value={option.value} />
                 {option.label}
               </label>
@@ -426,7 +455,7 @@ function FiltersSidebar({
         </Field>
 
         <Field>
-          <FieldLabel className="text-[1.8rem] font-semibold md:text-2xl">Stops</FieldLabel>
+          <FieldLabel className="text-base font-semibold">Stops</FieldLabel>
           <RadioGroup
             value={data.state.stops}
             onValueChange={(nextValue) =>
@@ -435,7 +464,7 @@ function FiltersSidebar({
             className="gap-3"
           >
             {STOPS_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center gap-3 text-[1.7rem] md:text-lg">
+              <label key={option.value} className="flex items-center gap-3 text-sm">
                 <RadioGroupItem value={option.value} />
                 {option.label}
               </label>
@@ -444,21 +473,20 @@ function FiltersSidebar({
         </Field>
 
         <Field>
-          <FieldLabel className="text-[1.8rem] font-semibold md:text-2xl">Airlines</FieldLabel>
+          <FieldLabel className="text-base font-semibold">Airlines</FieldLabel>
           <Select
-            value={data.state.airline ?? "__all__"}
+            value={data.state.airline}
             onValueChange={(nextValue) =>
               onChange({
-                airline:
-                  !nextValue || nextValue === "__all__" ? undefined : nextValue,
+                airline: !nextValue || nextValue === "all" ? undefined : nextValue,
               })
             }
           >
             <SelectTrigger className="h-12 rounded-xl">
-              <SelectValue />
+              <SelectValue placeholder="All airlines" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All airlines</SelectItem>
+              <SelectItem value="all">All airlines</SelectItem>
               {data.airlines.map((airline) => (
                 <SelectItem key={airline} value={airline}>
                   {airline}
@@ -469,20 +497,20 @@ function FiltersSidebar({
         </Field>
 
         <Field>
-          <FieldLabel className="text-[1.8rem] font-semibold md:text-2xl">Flight number</FieldLabel>
+          <FieldLabel className="text-base font-semibold">Flight number</FieldLabel>
           <Input
             value={data.state.flightNumber ?? ""}
             onChange={(event) =>
               onChange({ flightNumber: event.target.value || undefined })
             }
-            className="h-12 rounded-xl text-[1.7rem] md:text-base"
+            className="h-12 rounded-xl text-sm"
             placeholder="e.g. AI0278"
           />
         </Field>
 
         <FieldGroup className="gap-5">
           <Field>
-            <FieldLabel className="text-[1.8rem] font-semibold md:text-2xl">
+            <FieldLabel className="text-base font-semibold">
               <PlaneTakeoffIcon data-icon="inline-start" />
               Take-off
             </FieldLabel>
@@ -506,7 +534,7 @@ function FiltersSidebar({
           </Field>
 
           <Field>
-            <FieldLabel className="text-[1.8rem] font-semibold md:text-2xl">
+            <FieldLabel className="text-base font-semibold">
               <PlaneLandingIcon data-icon="inline-start" />
               Landing
             </FieldLabel>

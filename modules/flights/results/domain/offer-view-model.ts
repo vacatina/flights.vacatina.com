@@ -53,6 +53,7 @@ export function normalizeOfferForLeg(
     id: offer.id,
     ownerName,
     ownerCode: offer.owner.iata_code ?? "",
+    isExpired: isOfferExpired(offer),
     ownerLogoSymbolUrl:
       airlineLogosByAirlineId[offer.owner.id] ??
       (offer.owner as { logo_symbol_url?: string | null }).logo_symbol_url ?? null,
@@ -265,4 +266,20 @@ function formatFlightCode(segment: Offer["slices"][number]["segments"][number]) 
   }
 
   return carrierCode || flightNumber || "Flight unavailable"
+}
+
+function isOfferExpired(offer: OfferLike) {
+  const expiresAt = (offer as { expires_at?: string | null }).expires_at
+
+  if (!expiresAt) {
+    return false
+  }
+
+  const expiresAtTime = Date.parse(expiresAt)
+
+  if (Number.isNaN(expiresAtTime)) {
+    return false
+  }
+
+  return expiresAtTime <= Date.now()
 }
