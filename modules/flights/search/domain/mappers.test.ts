@@ -40,8 +40,12 @@ test("formatPlaceDisplayName formats airport and city labels", () => {
 })
 
 test("formatPassengerSummary creates a readable summary", () => {
-  expect(formatPassengerSummary({ adults: 1, children: 0 })).toBe("1 adult")
-  expect(formatPassengerSummary({ adults: 2, children: 2 })).toBe(
+  expect(formatPassengerSummary({ adults: 1, children: 0, childrenAges: [] })).toBe(
+    "1 adult"
+  )
+  expect(
+    formatPassengerSummary({ adults: 2, children: 2, childrenAges: [6, 11] })
+  ).toBe(
     "2 adults, 2 children"
   )
 })
@@ -53,6 +57,7 @@ test("toFlightSearchCommand maps form values into command payload", () => {
     passengers: {
       adults: 2,
       children: 1,
+      childrenAges: [9],
     },
     slices: [
       {
@@ -76,6 +81,7 @@ test("toFlightSearchCommand maps form values into command payload", () => {
     passengers: {
       adults: 2,
       children: 1,
+      childrenAges: [9],
     },
     slices: [
       {
@@ -89,5 +95,43 @@ test("toFlightSearchCommand maps form values into command payload", () => {
         arrivalTime: null,
       },
     ],
+  })
+})
+
+test("toFlightSearchCommand infers inbound endpoints for return journeys", () => {
+  const values: FlightSearchFormValues = {
+    journeyType: "return",
+    cabinClass: "economy",
+    passengers: {
+      adults: 1,
+      children: 0,
+      childrenAges: [],
+    },
+    slices: [
+      {
+        origin: colomboAirport,
+        destination: singaporeCity,
+        departureDate: "2026-12-24",
+        departureTime: null,
+        arrivalTime: null,
+      },
+      {
+        origin: null,
+        destination: null,
+        departureDate: "2027-01-02",
+        departureTime: null,
+        arrivalTime: null,
+      },
+    ],
+  }
+
+  const command = toFlightSearchCommand(values)
+
+  expect(command.slices[1]).toEqual({
+    originIataCode: "SIN",
+    destinationIataCode: "CMB",
+    departureDate: "2027-01-02",
+    departureTime: null,
+    arrivalTime: null,
   })
 })

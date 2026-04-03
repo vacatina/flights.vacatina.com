@@ -38,6 +38,7 @@ export interface FlightSliceInput {
 export interface PassengerInput {
   adults: number
   children: number
+  childrenAges: number[]
 }
 
 export interface FlightSearchFormValues {

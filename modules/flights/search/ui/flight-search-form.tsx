@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CheckIcon, PlusIcon, XIcon } from "lucide-react"
 import {
@@ -46,11 +47,12 @@ import { PassengersPopover } from "@/modules/flights/search/ui/passengers-popove
 import { PlaceAutocompleteField } from "@/modules/flights/search/ui/place-autocomplete-field"
 import { TimeRangePopover } from "@/modules/flights/search/ui/time-range-popover"
 
-const JOURNEY_OPTIONS: JourneyType[] = ["one_way", "return", "multi_city"]
+const JOURNEY_OPTIONS: JourneyType[] = ["one_way", "return"]
+const CHILD_AGE_OPTIONS = Array.from({ length: 18 }, (_, index) => index)
 
 export function FlightSearchForm() {
+  const router = useRouter()
   const [isSubmitting, startTransition] = useTransition()
-  const [serverMessage, setServerMessage] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
 
   const form = useForm<FlightSearchFormValues>({
@@ -78,9 +80,41 @@ export function FlightSearchForm() {
     control,
     name: "journeyType",
   })
+  const outboundOrigin = useWatch({
+    control,
+    name: "slices.0.origin",
+  })
+  const outboundDestination = useWatch({
+    control,
+    name: "slices.0.destination",
+  })
+  const childrenCount = useWatch({
+    control,
+    name: "passengers.children",
+  })
+
+  useEffect(() => {
+    if (journeyType !== "return") {
+      return
+    }
+
+    setValue("slices.1.origin", outboundDestination ?? null, {
+      shouldDirty: false,
+      shouldValidate: isSubmitted,
+    })
+    setValue("slices.1.destination", outboundOrigin ?? null, {
+      shouldDirty: false,
+      shouldValidate: isSubmitted,
+    })
+  }, [
+    isSubmitted,
+    journeyType,
+    outboundDestination,
+    outboundOrigin,
+    setValue,
+  ])
 
   const onSubmit = handleSubmit((values) => {
-    setServerMessage(null)
     setServerError(null)
     clearErrors()
 
@@ -98,7 +132,7 @@ export function FlightSearchForm() {
       return
     }
 
-    setServerMessage(`Search request logged on server (${result.data.requestId}).`)
+    router.push(`/results/${result.data.partialOfferRequestId}/fare-options`)
   }
 
   function updateJourneyType(nextJourneyType: JourneyType) {
@@ -111,8 +145,8 @@ export function FlightSearchForm() {
 
       adjusted[1] = {
         ...inboundSlice,
-        origin: inboundSlice.origin ?? outboundSlice.destination,
-        destination: inboundSlice.destination ?? outboundSlice.origin,
+        origin: outboundSlice.destination ?? null,
+        destination: outboundSlice.origin ?? null,
       }
     }
 
@@ -363,6 +397,44 @@ export function FlightSearchForm() {
           />
         </div>
 
+        {childrenCount > 0 && (
+          <FieldGroup className="gap-4">
+            <FieldLabel>Children ages</FieldLabel>
+            <div className="grid gap-4 md:grid-cols-2">
+              {Array.from({ length: childrenCount }).map((_, index) => (
+                <Controller
+                  key={index}
+                  control={control}
+                  name={`passengers.childrenAges.${index}`}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid || undefined}>
+                      <FieldLabel>Child {index + 1}</FieldLabel>
+                      <Select
+                        value={String(field.value ?? 11)}
+                        onValueChange={(nextValue) => field.onChange(Number(nextValue))}
+                      >
+                        <SelectTrigger className="h-14 w-full rounded-xl px-6 text-[1.8rem] font-normal md:text-base">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="start" className="rounded-xl">
+                          <SelectGroup>
+                            {CHILD_AGE_OPTIONS.map((age) => (
+                              <SelectItem key={age} value={String(age)}>
+                                {age} years old
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <FieldError>{fieldState.error?.message}</FieldError>
+                    </Field>
+                  )}
+                />
+              ))}
+            </div>
+          </FieldGroup>
+        )}
+
         <Button
           type="button"
           variant="link"
@@ -373,8 +445,6 @@ export function FlightSearchForm() {
       </FieldGroup>
 
       {serverError && <p className="text-base text-destructive">{serverError}</p>}
-      {serverMessage && <p className="text-base text-emerald-600">{serverMessage}</p>}
-
       <Button
         type="submit"
         size="lg"
@@ -395,6 +465,12 @@ function toFormFieldPath(path: string): Path<FlightSearchFormValues> | null {
     path === "passengers.adults" ||
     path === "passengers.children"
   ) {
+    return path as Path<FlightSearchFormValues>
+  }
+
+  const childrenAgePathPattern = /^passengers\.childrenAges\.\d+$/
+
+  if (childrenAgePathPattern.test(path)) {
     return path as Path<FlightSearchFormValues>
   }
 

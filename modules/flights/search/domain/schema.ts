@@ -3,8 +3,10 @@ import { z } from "zod"
 import {
   CABIN_CLASSES,
   JOURNEY_TYPES,
+  MAX_CHILD_AGE,
   MAX_MULTI_CITY_SLICES,
   MAX_TOTAL_PASSENGERS,
+  MIN_CHILD_AGE,
   MIN_ADULTS,
   MIN_MULTI_CITY_SLICES,
 } from "@/modules/flights/search/domain/constants"
@@ -48,6 +50,14 @@ export const flightSearchFormSchema = z
     passengers: z.object({
       adults: z.number().int().min(MIN_ADULTS, "At least one adult is required"),
       children: z.number().int().min(0),
+      childrenAges: z
+        .array(
+          z
+            .number()
+            .int()
+            .min(MIN_CHILD_AGE, "Child age must be between 0 and 17")
+            .max(MAX_CHILD_AGE, "Child age must be between 0 and 17")
+        ),
     }),
     cabinClass: z.enum(CABIN_CLASSES),
   })
@@ -89,8 +99,21 @@ export const flightSearchFormSchema = z
       })
     }
 
+    if (value.passengers.childrenAges.length !== value.passengers.children) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide an age for each child passenger",
+        path: ["passengers", "childrenAges"],
+      })
+    }
+
     slices.forEach((slice, index) => {
-      if (!slice.origin) {
+      const shouldValidateEndpoints = !(
+        journeyType === "return" &&
+        index === 1
+      )
+
+      if (shouldValidateEndpoints && !slice.origin) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Origin is required",
@@ -98,7 +121,7 @@ export const flightSearchFormSchema = z
         })
       }
 
-      if (!slice.destination) {
+      if (shouldValidateEndpoints && !slice.destination) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Destination is required",
@@ -106,7 +129,12 @@ export const flightSearchFormSchema = z
         })
       }
 
-      if (slice.origin && slice.destination && slice.origin.id === slice.destination.id) {
+      if (
+        shouldValidateEndpoints &&
+        slice.origin &&
+        slice.destination &&
+        slice.origin.id === slice.destination.id
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Origin and destination must be different",

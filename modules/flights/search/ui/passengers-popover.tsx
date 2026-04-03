@@ -31,11 +31,22 @@ export function PassengersPopover({ control }: PassengersPopoverProps) {
 
   const canDecreaseAdults = value.adults > MIN_ADULTS
   const canIncreaseAdults = totalPassengers < MAX_TOTAL_PASSENGERS
-  const canDecreaseChildren = value.children > 0
-  const canIncreaseChildren = totalPassengers < MAX_TOTAL_PASSENGERS
+const canDecreaseChildren = value.children > 0
+const canIncreaseChildren = totalPassengers < MAX_TOTAL_PASSENGERS
 
   function update(adults: number, children: number) {
-    field.onChange({ adults, children })
+    const normalizedChildren = Math.max(children, 0)
+    const nextChildrenAges = value.childrenAges.slice(0, normalizedChildren)
+
+    while (nextChildrenAges.length < normalizedChildren) {
+      nextChildrenAges.push(11)
+    }
+
+    field.onChange({
+      adults,
+      children: normalizedChildren,
+      childrenAges: nextChildrenAges,
+    })
   }
 
   return (

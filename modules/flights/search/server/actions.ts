@@ -11,6 +11,7 @@ import type {
   FlightSearchCommand,
   FlightSearchFormValues,
   PlaceSuggestionOption,
+  TimeRangeInput,
 } from "@/modules/flights/search/domain"
 import {
   actionFailure,
@@ -25,12 +26,11 @@ interface SearchPlacesDeps {
 }
 
 interface SubmitFlightSearchDeps {
-  createRequestId: () => string
-  logFlightSearchRequest: (
-    requestId: string,
+  createPartialOfferRequest: (
     formValues: FlightSearchFormValues,
     command: FlightSearchCommand
-  ) => void
+  ) => Promise<{ partialOfferRequestId: string }>
+  logError: (context: string, error: unknown) => void
 }
 
 export async function searchPlacesAction(
@@ -41,7 +41,7 @@ export async function searchPlacesAction(
 
 export async function submitFlightSearchAction(
   input: unknown
-): Promise<ActionResult<{ requestId: string }>> {
+): Promise<ActionResult<{ partialOfferRequestId: string }>> {
   return executeSubmitFlightSearchAction(input)
 }
 
@@ -77,10 +77,10 @@ export async function executeSearchPlacesAction(
 export async function executeSubmitFlightSearchAction(
   input: unknown,
   deps: SubmitFlightSearchDeps = {
-    createRequestId: () => crypto.randomUUID(),
-    logFlightSearchRequest: defaultLogFlightSearchRequest,
+    createPartialOfferRequest: defaultCreatePartialOfferRequest,
+    logError: defaultLogError,
   }
-): Promise<ActionResult<{ requestId: string }>> {
+): Promise<ActionResult<{ partialOfferRequestId: string }>> {
   const parsed = parseFlightSearchForm(input)
 
   if (!parsed.success) {
@@ -93,12 +93,28 @@ export async function executeSubmitFlightSearchAction(
     )
   }
 
-  const requestId = deps.createRequestId()
+  if (parsed.data.journeyType === "multi_city") {
+    return actionFailure(
+      "VALIDATION_ERROR",
+      "Multi-city search is temporarily unavailable.",
+      {
+        journeyType: "Multi-city search is temporarily unavailable.",
+      }
+    )
+  }
+
   const command = toFlightSearchCommand(parsed.data)
+  try {
+    const result = await deps.createPartialOfferRequest(parsed.data, command)
+    return actionSuccess(result)
+  } catch (error) {
+    deps.logError("[flights/submitFlightSearchAction]", error)
 
-  deps.logFlightSearchRequest(requestId, parsed.data, command)
-
-  return actionSuccess({ requestId })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not start your flight search right now. Please try again."
+    )
+  }
 }
 
 function formatValidationErrors(error: ZodError) {
@@ -177,22 +193,46 @@ async function defaultSearchPlaces(query: string) {
   return searchPlaceSuggestions(query)
 }
 
-function defaultLogFlightSearchRequest(
-  requestId: string,
+async function defaultCreatePartialOfferRequest(
   formValues: FlightSearchFormValues,
   command: FlightSearchCommand
-) {
-  console.log(
-    JSON.stringify(
-      {
-        event: "flight_search_submitted",
-        requestId,
-        submittedAt: new Date().toISOString(),
-        formValues,
-        command,
-      },
-      null,
-      2
-    )
-  )
+): Promise<{ partialOfferRequestId: string }> {
+  const { getDuffelClient } = await import("@/lib/duffel")
+  const client = getDuffelClient()
+
+  const response = await client.partialOfferRequests.create({
+    cabin_class: command.cabinClass,
+    max_connections: 2,
+    supplier_timeout: 10_000,
+    passengers: toDuffelPassengers(formValues.passengers),
+    slices: command.slices.map((slice) => ({
+      origin: slice.originIataCode,
+      destination: slice.destinationIataCode,
+      departure_date: slice.departureDate,
+      departure_time: toDuffelTimeRange(slice.departureTime),
+      arrival_time: toDuffelTimeRange(slice.arrivalTime),
+    })),
+  })
+
+  return {
+    partialOfferRequestId: response.data.id,
+  }
+}
+
+function toDuffelPassengers(values: FlightSearchFormValues["passengers"]) {
+  const adults = Array.from({ length: values.adults }, () => ({ type: "adult" as const }))
+  const children = values.childrenAges.map((age) => ({ age }))
+
+  return [...adults, ...children]
+}
+
+function toDuffelTimeRange(value: TimeRangeInput | null) {
+  if (!value) {
+    return null
+  }
+
+  return {
+    from: value.from,
+    to: value.to,
+  }
 }

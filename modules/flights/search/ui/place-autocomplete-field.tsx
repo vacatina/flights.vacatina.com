@@ -42,6 +42,8 @@ export function PlaceAutocompleteField({
   const [options, setOptions] = useState<PlaceSuggestionOption[]>([])
 
   const requestIdRef = useRef(0)
+  const selectedDisplayName = field.value?.displayName ?? ""
+  const inputValue = open ? query : selectedDisplayName
 
   useEffect(() => {
     if (!open || disabled) {
@@ -92,7 +94,6 @@ export function PlaceAutocompleteField({
 
   function handleInputBlur() {
     setOpen(false)
-    setQuery(field.value?.displayName ?? "")
   }
 
   function handleInputChange(value: string) {
@@ -115,8 +116,11 @@ export function PlaceAutocompleteField({
       <FieldLabel>{label}</FieldLabel>
       <div className="relative flex flex-col">
         <Input
-          value={query}
-          onFocus={() => setOpen(true)}
+          value={inputValue}
+          onFocus={() => {
+            setQuery(selectedDisplayName)
+            setOpen(true)
+          }}
           onBlur={handleInputBlur}
           onChange={(event) => handleInputChange(event.target.value)}
           placeholder={placeholder}

@@ -20,11 +20,24 @@ export const JOURNEY_TYPE_LABELS = {
 } as const
 
 export function toFlightSearchCommand(values: FlightSearchFormValues): FlightSearchCommand {
+  const normalizedSlices = values.slices.map((slice) => ({ ...slice }))
+
+  if (values.journeyType === "return" && normalizedSlices.length >= 2) {
+    const outbound = normalizedSlices[0]
+    const inbound = normalizedSlices[1]
+
+    normalizedSlices[1] = {
+      ...inbound,
+      origin: inbound.origin ?? outbound.destination ?? null,
+      destination: inbound.destination ?? outbound.origin ?? null,
+    }
+  }
+
   return {
     journeyType: values.journeyType,
     cabinClass: values.cabinClass,
     passengers: values.passengers,
-    slices: values.slices.map((slice) => ({
+    slices: normalizedSlices.map((slice) => ({
       originIataCode: slice.origin?.iataCode ?? "",
       destinationIataCode: slice.destination?.iataCode ?? "",
       departureDate: slice.departureDate,

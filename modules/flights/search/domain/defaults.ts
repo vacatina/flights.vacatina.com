@@ -27,6 +27,7 @@ export function createDefaultFlightSearchValues(): FlightSearchFormValues {
     passengers: {
       adults: 1,
       children: 0,
+      childrenAges: [],
     },
     cabinClass: DEFAULT_CABIN_CLASS,
   }

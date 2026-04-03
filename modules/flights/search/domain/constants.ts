@@ -12,6 +12,8 @@ export const MAX_MULTI_CITY_SLICES = 6
 
 export const MIN_ADULTS = 1
 export const MAX_TOTAL_PASSENGERS = 9
+export const MIN_CHILD_AGE = 0
+export const MAX_CHILD_AGE = 17
 
 export const SLIDER_TIME_MIN = 0
 export const SLIDER_TIME_MAX = 23 * 60 + 59

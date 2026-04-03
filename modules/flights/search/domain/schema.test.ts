@@ -65,6 +65,32 @@ test("flightSearchFormSchema rejects return trips with invalid date order", () =
   )
 })
 
+test("flightSearchFormSchema accepts return trips when inbound endpoints are implicit", () => {
+  const values = createDefaultFlightSearchValues()
+
+  values.journeyType = "return"
+  values.slices = [
+    {
+      origin: place("CMB", "Colombo"),
+      destination: place("DOH", "Doha"),
+      departureDate: "2026-09-10",
+      departureTime: null,
+      arrivalTime: null,
+    },
+    {
+      origin: null,
+      destination: null,
+      departureDate: "2026-09-12",
+      departureTime: null,
+      arrivalTime: null,
+    },
+  ]
+
+  const result = parseFlightSearchForm(values)
+
+  expect(result.success).toBe(true)
+})
+
 test("flightSearchFormSchema enforces multi-city slice limits", () => {
   const values = createDefaultFlightSearchValues()
 
@@ -100,4 +126,28 @@ test("flightSearchFormSchema rejects inverted time ranges", () => {
 
   expect(result.success).toBe(false)
   expect(JSON.stringify(result.error?.issues)).toMatch(/Invalid time range/)
+})
+
+test("flightSearchFormSchema requires child ages for each child passenger", () => {
+  const values = createDefaultFlightSearchValues()
+
+  values.passengers = {
+    adults: 1,
+    children: 2,
+    childrenAges: [7],
+  }
+  values.slices[0] = {
+    origin: place("CMB", "Colombo"),
+    destination: place("DXB", "Dubai"),
+    departureDate: "2026-08-12",
+    departureTime: null,
+    arrivalTime: null,
+  }
+
+  const result = parseFlightSearchForm(values)
+
+  expect(result.success).toBe(false)
+  expect(JSON.stringify(result.error?.issues)).toMatch(
+    /Provide an age for each child passenger/
+  )
 })

@@ -30,6 +30,7 @@ function buildValidInput(): FlightSearchFormValues {
     passengers: {
       adults: 1,
       children: 0,
+      childrenAges: [],
     },
     slices: [
       {
@@ -63,8 +64,10 @@ test("executeSubmitFlightSearchAction returns field-level errors for invalid pay
   invalidInput.slices[0].origin = null
 
   const result = await executeSubmitFlightSearchAction(invalidInput, {
-    createRequestId: () => "req_test_invalid",
-    logFlightSearchRequest: () => undefined,
+    createPartialOfferRequest: async () => ({
+      partialOfferRequestId: "por_test_invalid",
+    }),
+    logError: () => undefined,
   })
 
   expect(result.ok).toBe(false)
@@ -93,22 +96,44 @@ test("executeSearchPlacesAction returns success contract", async () => {
   })
 })
 
-test("executeSubmitFlightSearchAction returns request id and logs payload", async () => {
-  let loggedRequestId: string | null = null
-
+test("executeSubmitFlightSearchAction returns partial offer request id", async () => {
   const result = await executeSubmitFlightSearchAction(buildValidInput(), {
-    createRequestId: () => "req_test_123",
-    logFlightSearchRequest: (requestId) => {
-      loggedRequestId = requestId
-    },
+    createPartialOfferRequest: async () => ({
+      partialOfferRequestId: "por_test_123",
+    }),
+    logError: () => undefined,
   })
 
   expect(result).toEqual({
     ok: true,
     data: {
-      requestId: "req_test_123",
+      partialOfferRequestId: "por_test_123",
     },
   })
+})
 
-  expect(loggedRequestId).toBe("req_test_123")
+test("executeSubmitFlightSearchAction blocks multi-city for now", async () => {
+  const input = buildValidInput()
+  input.journeyType = "multi_city"
+  input.slices.push({
+    origin: place("DXB", "Dubai"),
+    destination: place("CMB", "Colombo"),
+    departureDate: "2026-11-10",
+    departureTime: null,
+    arrivalTime: null,
+  })
+
+  const result = await executeSubmitFlightSearchAction(input, {
+    createPartialOfferRequest: async () => ({
+      partialOfferRequestId: "por_test_123",
+    }),
+    logError: () => undefined,
+  })
+
+  expect(result.ok).toBe(false)
+  if (!result.ok) {
+    expect(result.error.fieldErrors?.journeyType).toBe(
+      "Multi-city search is temporarily unavailable."
+    )
+  }
 })
