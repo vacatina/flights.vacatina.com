@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { FilterIcon, PlaneLandingIcon, PlaneTakeoffIcon } from "lucide-react"
@@ -228,7 +229,18 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                           <div className="grid w-full gap-6 text-left md:grid-cols-[1.3fr_1fr_1fr]">
                             <div className="flex items-center gap-4">
                               <div className="flex size-12 items-center justify-center rounded-md bg-primary/10 font-semibold text-primary">
-                                {offer.ownerCode}
+                                {offer.ownerLogoSymbolUrl ? (
+                                  <Image
+                                    src={offer.ownerLogoSymbolUrl}
+                                    alt={`${offer.ownerName} logo`}
+                                    width={32}
+                                    height={32}
+                                    unoptimized
+                                    className="size-8 object-contain"
+                                  />
+                                ) : (
+                                  offer.ownerCode
+                                )}
                               </div>
                               <div className="flex flex-col">
                                 <span className="text-[1.7rem] leading-tight font-semibold md:text-2xl">

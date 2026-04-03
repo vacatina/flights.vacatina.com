@@ -128,6 +128,9 @@ test("fetchFareOptionsData uses selected offers and returns normalized data", as
         selectedParam = selected
         return offerRequestFixture
       },
+      async getAirlineLogosByAirlineId() {
+        return {}
+      },
       async listOffers() {
         return {
           data: [offerFixture],
@@ -167,6 +170,9 @@ test("fetchFareOptionsData clamps leg into valid range", async () => {
       },
       async getOfferRequestBySelected() {
         return offerRequestFixture
+      },
+      async getAirlineLogosByAirlineId() {
+        return {}
       },
       async listOffers() {
         return {
@@ -210,6 +216,9 @@ test("fetchFareOptionsData omits undefined pagination cursor in list params", as
       async getOfferRequestBySelected() {
         return offerRequestFixture
       },
+      async getAirlineLogosByAirlineId() {
+        return {}
+      },
       async listOffers(params) {
         receivedListParams = params
         return {
@@ -221,4 +230,44 @@ test("fetchFareOptionsData omits undefined pagination cursor in list params", as
 
   expect(receivedListParams).not.toBeNull()
   expect(receivedListParams).not.toHaveProperty("after")
+})
+
+test("fetchFareOptionsData applies fetched airline logos", async () => {
+  const logoUrl = "https://assets.duffel.com/img/airlines/zz-symbol.png"
+
+  const result = await fetchFareOptionsData(
+    {
+      partialOfferRequestId: "por_123",
+      state: {
+        leg: 0,
+        selected: [],
+        sort: "least_expensive",
+        stops: "any",
+        takeoffFrom: 0,
+        takeoffTo: 1439,
+        landingFrom: 0,
+        landingTo: 1439,
+      },
+    },
+    {
+      async getBaseOfferRequest() {
+        return offerRequestFixture
+      },
+      async getOfferRequestBySelected() {
+        return offerRequestFixture
+      },
+      async getAirlineLogosByAirlineId() {
+        return {
+          air_zz: logoUrl,
+        }
+      },
+      async listOffers() {
+        return {
+          data: [offerFixture],
+        }
+      },
+    }
+  )
+
+  expect(result.offers[0]?.ownerLogoSymbolUrl).toBe(logoUrl)
 })

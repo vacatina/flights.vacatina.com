@@ -1,4 +1,4 @@
-import type { Offer, OfferRequest } from "@duffel/api/types"
+import type { Airline, Offer, OfferRequest } from "@duffel/api/types"
 
 import {
   applyOfferClientFilters,
@@ -24,6 +24,9 @@ interface FetchFareOptionsDeps {
     partialOfferRequestId: string,
     selectedPartialOffers: string[]
   ) => Promise<OfferRequest>
+  getAirlineLogosByAirlineId: (
+    airlineIds: string[]
+  ) => Promise<Record<string, string>>
   listOffers: (params: {
     offer_request_id: string
     after?: string
@@ -69,8 +72,11 @@ export async function fetchFareOptionsData(
         max_connections: toDuffelMaxConnections(input.state.stops),
       })
     : fallbackResponse
+  const airlineLogosByAirlineId = await deps.getAirlineLogosByAirlineId(
+    getAirlineIdsFromOffers(listResponse.data)
+  )
   const normalizedOffers = listResponse.data
-    .map((offer) => normalizeOfferForLeg(offer, leg))
+    .map((offer) => normalizeOfferForLeg(offer, leg, airlineLogosByAirlineId))
     .filter((offer): offer is NonNullable<typeof offer> => offer !== null)
   const filteredOffers = applyOfferClientFilters(normalizedOffers, safeState)
   const sortedOffers = applyOfferClientSorting(filteredOffers, safeState.sort)
@@ -130,6 +136,49 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
       )
     }
   },
+  async getAirlineLogosByAirlineId(airlineIds) {
+    const result: Record<string, string> = {}
+    const idsToFetch = airlineIds.filter((id) => !airlineLogoCache.has(id))
+
+    if (idsToFetch.length > 0) {
+      try {
+        const { getDuffelClient } = await import("@/lib/duffel")
+        const client = getDuffelClient()
+        const responses = await Promise.allSettled(
+          idsToFetch.map((airlineId) => client.airlines.get(airlineId))
+        )
+
+        for (let index = 0; index < responses.length; index += 1) {
+          const airlineId = idsToFetch[index]
+          const response = responses[index]
+
+          if (response.status === "fulfilled") {
+            const airline = response.value.data as Airline
+            const logoUrl = airline.logo_symbol_url ?? airline.logo_lockup_url ?? null
+            airlineLogoCache.set(airlineId, logoUrl)
+            continue
+          }
+
+          airlineLogoCache.set(airlineId, null)
+          logDuffelError("airlines.get failed", response.reason, { airlineId })
+        }
+      } catch (error) {
+        logDuffelError("airlines.get batch failed", error, {
+          airlineIds: idsToFetch,
+        })
+      }
+    }
+
+    for (const airlineId of airlineIds) {
+      const logoUrl = airlineLogoCache.get(airlineId)
+
+      if (logoUrl) {
+        result[airlineId] = logoUrl
+      }
+    }
+
+    return result
+  },
   async listOffers(params) {
     try {
       const { getDuffelClient } = await import("@/lib/duffel")
@@ -150,6 +199,18 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
       )
     }
   },
+}
+
+const airlineLogoCache = new Map<string, string | null>()
+
+function getAirlineIdsFromOffers(offers: Offer[]) {
+  return Array.from(
+    new Set(
+      offers
+        .map((offer) => offer.owner.id)
+        .filter((airlineId): airlineId is string => Boolean(airlineId))
+    )
+  )
 }
 
 function getOfferRequestIdFromOfferRequest(offerRequest: OfferRequest): string | null {

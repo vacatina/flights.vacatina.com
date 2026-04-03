@@ -13,7 +13,8 @@ type OfferLike = Pick<Offer, "id" | "owner" | "slices" | "total_amount" | "total
 
 export function normalizeOfferForLeg(
   offer: OfferLike,
-  leg: number
+  leg: number,
+  airlineLogosByAirlineId: Readonly<Record<string, string>> = {}
 ): OfferCardViewModel | null {
   const slice = offer.slices[leg] ?? offer.slices[0]
 
@@ -53,6 +54,7 @@ export function normalizeOfferForLeg(
     ownerName,
     ownerCode: offer.owner.iata_code ?? "",
     ownerLogoSymbolUrl:
+      airlineLogosByAirlineId[offer.owner.id] ??
       (offer.owner as { logo_symbol_url?: string | null }).logo_symbol_url ?? null,
     departureTimeLabel,
     arrivalTimeLabel,
