@@ -238,14 +238,14 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                 {offers.map((offer) => (
                   <Card
                     key={offer.id}
-                    className="overflow-hidden rounded-2xl border shadow-none"
+                    className="group/card overflow-hidden rounded-2xl border bg-card/95 transition-shadow duration-200 hover:shadow-md"
                   >
                     <AccordionItem value={offer.id} className="border-b-0">
                       <CardHeader className="p-0">
                         <AccordionTrigger className="w-full px-6 py-5 no-underline hover:no-underline md:px-8 md:py-5">
-                          <div className="grid w-full gap-8 text-left md:grid-cols-[1.3fr_1fr_1fr]">
+                          <div className="grid w-full gap-8 text-left md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_minmax(0,1fr)]">
                             <div className="flex items-center gap-5">
-                              <div className="flex size-12 items-center justify-center rounded-md font-semibold text-primary">
+                              <div className="flex size-18 items-center justify-center rounded-lg border bg-muted/50 font-semibold text-primary">
                                 {offer.ownerLogoSymbolUrl ? (
                                   <Image
                                     src={offer.ownerLogoSymbolUrl}
@@ -260,13 +260,13 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                 )}
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-base leading-tight font-semibold md:text-lg">
+                                <span className="text-lg leading-tight font-semibold tracking-tight md:text-xl">
                                   {offer.departureTimeLabel} -{" "}
                                   {offer.arrivalTimeLabel}
                                   {offer.arrivalDayOffset > 0 &&
                                     `+${offer.arrivalDayOffset}`}
                                 </span>
-                                <span className="text-sm text-muted-foreground md:text-base">
+                                <span className="text-sm text-muted-foreground">
                                   {offer.flightNumbersLabel.includes(",")
                                     ? `${offer.ownerName} · ${offer.flightNumbersLabel}`
                                     : offer.ownerName}
@@ -274,20 +274,26 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                               </div>
                             </div>
 
-                            <div className="flex flex-col">
-                              <span className="text-base leading-tight font-semibold md:text-lg">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                                Total duration
+                              </span>
+                              <span className="text-lg leading-tight font-semibold tracking-tight md:text-xl">
                                 {offer.durationLabel}
                               </span>
-                              <span className="text-sm text-muted-foreground md:text-base">
+                              <span className="text-sm text-muted-foreground">
                                 {offer.routeLabel}
                               </span>
                             </div>
 
-                            <div className="flex flex-col">
-                              <span className="text-base leading-tight font-semibold md:text-lg">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                                Stops
+                              </span>
+                              <span className="text-lg leading-tight font-semibold tracking-tight md:text-xl">
                                 {offer.stopsLabel}
                               </span>
-                              <span className="text-sm text-muted-foreground md:text-base">
+                              <span className="text-sm text-muted-foreground">
                                 {offer.stopsDetails ?? "Direct flight"}
                               </span>
                             </div>
@@ -296,53 +302,80 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                       </CardHeader>
 
                       <AccordionContent className="px-6 md:px-10">
-                        <div className="relative flex flex-col gap-6 pb-4 pl-11">
-                          <div className="absolute top-3 bottom-3 left-4 border-l border-dashed border-primary" />
-                          {offer.timeline.map((event, eventIndex) => {
-                            const isArrival = eventIndex % 2 === 1
-                            const layover = isArrival
-                              ? offer.layovers[Math.floor(eventIndex / 2)]
-                              : null
+                        <div className="pb-6">
+                          {offer.timeline.map((departureEvent, eventIndex) => {
+                            if (eventIndex % 2 === 1) {
+                              return null
+                            }
+
+                            const arrivalEvent = offer.timeline[eventIndex + 1]
+
+                            if (!arrivalEvent) {
+                              return null
+                            }
+
+                            const segmentIndex = Math.floor(eventIndex / 2)
+                            const layover = offer.layovers[segmentIndex]
 
                             return (
-                              <div key={event.id} className="relative py-3">
-                                <span className="absolute top-3 -left-9 size-4 rounded-full border border-primary bg-primary" />
-                                <div className="flex flex-col gap-3">
-                                  <div className="grid gap-3 md:grid-cols-[260px_1fr]">
-                                    <strong className="text-base leading-tight md:text-lg">
-                                      {event.dateTimeLabel}
-                                    </strong>
-                                    <span className="text-sm text-foreground md:text-base">
-                                      {event.description}
-                                    </span>
-                                  </div>
-                                  {event.segmentDurationLabel && (
-                                    <p className="text-sm text-muted-foreground md:text-base">
-                                      Flight duration:{" "}
-                                      {event.segmentDurationLabel}
-                                    </p>
-                                  )}
-                                  {event.meta.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 text-sm text-muted-foreground">
-                                      {event.meta.map((metaItem) => (
-                                        <span
-                                          key={metaItem}
-                                          className="inline-flex items-center gap-1.5"
-                                        >
-                                          {(metaItem.includes("carry-on") ||
-                                            metaItem.includes("checked")) && (
-                                            <BriefcaseIcon className="size-3.5" />
-                                          )}
-                                          {metaItem}
-                                        </span>
-                                      ))}
+                              <div
+                                key={`${departureEvent.id}-${arrivalEvent.id}`}
+                                className="pb-10 last:pb-2"
+                              >
+                                <div className="relative px-1 py-3 md:px-2">
+                                  <div className="absolute top-6 bottom-6 left-3 border-l border-dashed border-border" />
+                                  <span className="absolute top-0 left-0 size-6 rounded-full border-2 border-muted-foreground/35 bg-background" />
+                                  <span className="absolute bottom-0 left-0 size-6 rounded-full border-2 border-muted-foreground/35 bg-background" />
+
+                                  <div className="flex flex-col gap-5 pl-12">
+                                    <div className="grid items-start gap-3 md:grid-cols-[310px_1fr]">
+                                      <strong className="text-base leading-tight font-semibold md:text-lg">
+                                        {departureEvent.dateTimeLabel}
+                                      </strong>
+                                      <span className="text-sm text-foreground md:text-base">
+                                        {departureEvent.description}
+                                      </span>
                                     </div>
-                                  )}
+
+                                    {departureEvent.segmentDurationLabel && (
+                                      <p className="text-sm text-muted-foreground md:text-base">
+                                        Flight duration:{" "}
+                                        {departureEvent.segmentDurationLabel}
+                                      </p>
+                                    )}
+
+                                    <div className="grid items-start gap-3 pt-4 md:grid-cols-[310px_1fr]">
+                                      <strong className="text-base leading-tight font-semibold md:text-lg">
+                                        {arrivalEvent.dateTimeLabel}
+                                      </strong>
+                                      <span className="text-sm text-foreground md:text-base">
+                                        {arrivalEvent.description}
+                                      </span>
+                                    </div>
+
+                                    {arrivalEvent.meta.length > 0 && (
+                                      <div className="flex flex-wrap items-center gap-x-7 gap-y-2 text-sm text-muted-foreground md:text-base">
+                                        {arrivalEvent.meta.map((metaItem) => (
+                                          <span
+                                            key={metaItem}
+                                            className="inline-flex items-center gap-2"
+                                          >
+                                            {(metaItem.includes("carry-on") ||
+                                              metaItem.includes("checked")) && (
+                                              <BriefcaseIcon className="size-4" />
+                                            )}
+                                            {metaItem}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
+
                                 {layover && (
                                   <Badge
                                     variant="secondary"
-                                    className="mt-6 w-fit"
+                                    className="mt-5 ml-12 w-fit rounded-full px-5 py-1.5 text-sm font-normal md:text-base"
                                   >
                                     {layover.label}
                                   </Badge>
@@ -357,32 +390,39 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                     <Separator />
 
                     <CardFooter className="flex items-center justify-between px-6 py-5 md:px-10 md:py-6">
-                      <p
-                        className={cn(
-                          "text-sm text-muted-foreground",
-                          offer.isExpired ? "opacity-80" : ""
-                        )}
-                      >
-                        From{" "}
-                        <span
+                      <div className="flex flex-col">
+                        <p
                           className={cn(
-                            "text-2xl font-semibold tracking-tight text-foreground md:text-3xl",
-                            offer.isExpired ? "text-muted-foreground" : ""
+                            "text-sm text-muted-foreground",
+                            offer.isExpired ? "opacity-80" : ""
                           )}
                         >
-                          {offer.totalAmountLabel}
-                        </span>
-                      </p>
+                          From{" "}
+                          <span
+                            className={cn(
+                              "text-3xl font-semibold tracking-tight text-foreground md:text-4xl",
+                              offer.isExpired ? "text-muted-foreground" : ""
+                            )}
+                          >
+                            {offer.totalAmountLabel}
+                          </span>
+                        </p>
+                        {!offer.isExpired && (
+                          <span className="text-xs text-muted-foreground">
+                            Includes taxes and fees
+                          </span>
+                        )}
+                      </div>
                       {offer.isExpired ? (
-                        <div className="inline-flex items-center gap-3 text-foreground">
-                          <AlertCircleIcon className="size-5" />
-                          <span className="text-lg md:text-xl">
+                        <div className="inline-flex items-center gap-3 rounded-full bg-muted px-4 py-2 text-foreground">
+                          <AlertCircleIcon className="size-4" />
+                          <span className="text-sm md:text-base">
                             Offer expired
                           </span>
                         </div>
                       ) : (
                         <Button
-                          className="rounded-xl px-7 text-sm"
+                          className="h-11 rounded-xl px-7 text-sm"
                           onClick={() => selectOffer(offer.id)}
                         >
                           Select
