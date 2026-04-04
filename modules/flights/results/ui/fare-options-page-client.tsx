@@ -219,9 +219,11 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
           </Dialog>
         </div>
 
-        <div className="grid gap-7 lg:grid-cols-[320px_1fr]">
-          <aside className="hidden lg:block">
-            <FiltersSidebar data={data} onChange={updateQuery} />
+        <div className="grid items-start gap-7 lg:grid-cols-[320px_1fr]">
+          <aside className="hidden lg:sticky lg:top-6 lg:block lg:self-start">
+            <div className="max-h-[calc(100svh-3rem)] overflow-y-auto pr-2">
+              <FiltersSidebar data={data} onChange={updateQuery} />
+            </div>
           </aside>
 
           <section className="flex flex-col gap-6">
