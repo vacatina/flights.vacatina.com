@@ -197,13 +197,14 @@ async function defaultCreatePartialOfferRequest(
   formValues: FlightSearchFormValues,
   command: FlightSearchCommand
 ): Promise<{ partialOfferRequestId: string }> {
-  const { getDuffelClient } = await import("@/lib/duffel")
+  const { getDuffelClient, getDuffelFlightConfig } = await import("@/lib/duffel")
   const client = getDuffelClient()
+  const config = getDuffelFlightConfig()
 
   const response = await client.partialOfferRequests.create({
     cabin_class: command.cabinClass,
-    max_connections: 2,
-    supplier_timeout: 10_000,
+    max_connections: config.partialOfferCreateMaxConnections,
+    supplier_timeout: config.partialOfferCreateSupplierTimeoutMs,
     passengers: toDuffelPassengers(formValues.passengers),
     slices: command.slices.map((slice) => ({
       origin: slice.originIataCode,

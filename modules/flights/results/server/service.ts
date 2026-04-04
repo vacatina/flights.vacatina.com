@@ -1,5 +1,6 @@
 import type { Airline, Offer, OfferRequest } from "@duffel/api/types"
 
+import { getDuffelFlightConfig } from "@/lib/duffel/config"
 import {
   applyOfferClientFilters,
   applyOfferClientSorting,
@@ -16,7 +17,9 @@ import {
   mapDuffelErrorMessage,
 } from "@/modules/flights/results/server/error-map"
 
-const PAGE_SIZE = 20
+const duffelConfig = getDuffelFlightConfig()
+const INVALID_SELECTION_STATE_MESSAGE =
+  "Invalid fare selection state. Please reselect flights from the first leg."
 
 interface FetchFareOptionsDeps {
   getBaseOfferRequest: (partialOfferRequestId: string) => Promise<OfferRequest>
@@ -43,14 +46,28 @@ export async function fetchFareOptionsData(
   },
   deps: FetchFareOptionsDeps = defaultFetchFareOptionsDeps
 ): Promise<FareOptionsPageData> {
-  const selectedFromUrl = input.state.selected.filter(Boolean)
-  const selectedForLeg = selectedFromUrl.slice(0, Math.max(input.state.leg, 0))
+  const selectedFromUrl = normalizeSelectedOfferIds(input.state.selected)
+  const baseOfferRequest = await deps.getBaseOfferRequest(input.partialOfferRequestId)
+  const totalLegs = Math.max(baseOfferRequest.slices.length, 1)
+  const leg = Math.min(Math.max(input.state.leg, 0), totalLegs - 1)
+  const requiredSelectedCount = leg
 
+  if (new Set(selectedFromUrl).size !== selectedFromUrl.length) {
+    throw new Error(INVALID_SELECTION_STATE_MESSAGE)
+  }
+
+  if (selectedFromUrl.length < requiredSelectedCount) {
+    throw new Error(INVALID_SELECTION_STATE_MESSAGE)
+  }
+
+  if (selectedFromUrl.length > totalLegs - 1) {
+    throw new Error(INVALID_SELECTION_STATE_MESSAGE)
+  }
+
+  const selectedForLeg = selectedFromUrl.slice(0, requiredSelectedCount)
   const offerRequest = selectedForLeg.length
     ? await deps.getOfferRequestBySelected(input.partialOfferRequestId, selectedForLeg)
-    : await deps.getBaseOfferRequest(input.partialOfferRequestId)
-  const totalLegs = Math.max(offerRequest.slices.length, 1)
-  const leg = Math.min(Math.max(input.state.leg, 0), totalLegs - 1)
+    : baseOfferRequest
   const safeState: ResultsUrlState = {
     ...input.state,
     leg,
@@ -67,7 +84,7 @@ export async function fetchFareOptionsData(
     ? await deps.listOffers({
         offer_request_id: offerRequestId,
         ...(input.state.after ? { after: input.state.after } : {}),
-        limit: PAGE_SIZE,
+        limit: duffelConfig.resultsPageSize,
         sort: toDuffelListOffersSort(input.state.sort),
         max_connections: toDuffelMaxConnections(input.state.stops),
       })
@@ -138,7 +155,21 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
   },
   async getAirlineLogosByAirlineId(airlineIds) {
     const result: Record<string, string> = {}
-    const idsToFetch = airlineIds.filter((id) => !airlineLogoCache.has(id))
+    const now = Date.now()
+    const idsToFetch: string[] = []
+
+    for (const airlineId of airlineIds) {
+      const cachedLogo = getCachedAirlineLogo(airlineId, now)
+
+      if (cachedLogo === undefined) {
+        idsToFetch.push(airlineId)
+        continue
+      }
+
+      if (cachedLogo) {
+        result[airlineId] = cachedLogo
+      }
+    }
 
     if (idsToFetch.length > 0) {
       try {
@@ -155,11 +186,11 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
           if (response.status === "fulfilled") {
             const airline = response.value.data as Airline
             const logoUrl = airline.logo_symbol_url ?? airline.logo_lockup_url ?? null
-            airlineLogoCache.set(airlineId, logoUrl)
+            setCachedAirlineLogo(airlineId, logoUrl, now)
             continue
           }
 
-          airlineLogoCache.set(airlineId, null)
+          setCachedAirlineLogo(airlineId, null, now)
           logDuffelError("airlines.get failed", response.reason, { airlineId })
         }
       } catch (error) {
@@ -169,8 +200,8 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
       }
     }
 
-    for (const airlineId of airlineIds) {
-      const logoUrl = airlineLogoCache.get(airlineId)
+    for (const airlineId of idsToFetch) {
+      const logoUrl = getCachedAirlineLogo(airlineId, now)
 
       if (logoUrl) {
         result[airlineId] = logoUrl
@@ -201,7 +232,12 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
   },
 }
 
-const airlineLogoCache = new Map<string, string | null>()
+interface AirlineLogoCacheEntry {
+  expiresAt: number
+  logoUrl: string | null
+}
+
+const airlineLogoCache = new Map<string, AirlineLogoCacheEntry>()
 
 function getAirlineIdsFromOffers(offers: Offer[]) {
   return Array.from(
@@ -211,6 +247,48 @@ function getAirlineIdsFromOffers(offers: Offer[]) {
         .filter((airlineId): airlineId is string => Boolean(airlineId))
     )
   )
+}
+
+function normalizeSelectedOfferIds(selected: string[]) {
+  return selected
+    .map((offerId) => offerId.trim())
+    .filter((offerId) => offerId.length > 0)
+}
+
+function getCachedAirlineLogo(airlineId: string, now: number) {
+  const cached = airlineLogoCache.get(airlineId)
+
+  if (!cached) {
+    return undefined
+  }
+
+  if (cached.expiresAt <= now) {
+    airlineLogoCache.delete(airlineId)
+    return undefined
+  }
+
+  // Promote recently used entries by moving them to the end of insertion order.
+  airlineLogoCache.delete(airlineId)
+  airlineLogoCache.set(airlineId, cached)
+
+  return cached.logoUrl
+}
+
+function setCachedAirlineLogo(airlineId: string, logoUrl: string | null, now: number) {
+  airlineLogoCache.set(airlineId, {
+    logoUrl,
+    expiresAt: now + duffelConfig.airlineLogoCacheTtlMs,
+  })
+
+  while (airlineLogoCache.size > duffelConfig.airlineLogoCacheMaxEntries) {
+    const oldestKey = airlineLogoCache.keys().next().value as string | undefined
+
+    if (!oldestKey) {
+      break
+    }
+
+    airlineLogoCache.delete(oldestKey)
+  }
 }
 
 function getOfferRequestIdFromOfferRequest(offerRequest: OfferRequest): string | null {

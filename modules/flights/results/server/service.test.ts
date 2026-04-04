@@ -155,7 +155,7 @@ test("fetchFareOptionsData clamps leg into valid range", async () => {
       partialOfferRequestId: "por_123",
       state: {
         leg: 9,
-        selected: [],
+        selected: ["off_partial_1"],
         sort: "least_expensive",
         stops: "any",
         takeoffFrom: 0,
@@ -183,6 +183,114 @@ test("fetchFareOptionsData clamps leg into valid range", async () => {
   )
 
   expect(result.leg).toBe(1)
+})
+
+test("fetchFareOptionsData rejects missing selected offers for the requested leg", async () => {
+  await expect(
+    fetchFareOptionsData(
+      {
+        partialOfferRequestId: "por_123",
+        state: {
+          leg: 1,
+          selected: [],
+          sort: "least_expensive",
+          stops: "any",
+          takeoffFrom: 0,
+          takeoffTo: 1439,
+          landingFrom: 0,
+          landingTo: 1439,
+        },
+      },
+      {
+        async getBaseOfferRequest() {
+          return offerRequestFixture
+        },
+        async getOfferRequestBySelected() {
+          return offerRequestFixture
+        },
+        async getAirlineLogosByAirlineId() {
+          return {}
+        },
+        async listOffers() {
+          return {
+            data: [offerFixture],
+          }
+        },
+      }
+    )
+  ).rejects.toThrow(/Invalid fare selection state/)
+})
+
+test("fetchFareOptionsData rejects too many selected offers for the journey", async () => {
+  await expect(
+    fetchFareOptionsData(
+      {
+        partialOfferRequestId: "por_123",
+        state: {
+          leg: 0,
+          selected: ["off_partial_1", "off_partial_2"],
+          sort: "least_expensive",
+          stops: "any",
+          takeoffFrom: 0,
+          takeoffTo: 1439,
+          landingFrom: 0,
+          landingTo: 1439,
+        },
+      },
+      {
+        async getBaseOfferRequest() {
+          return offerRequestFixture
+        },
+        async getOfferRequestBySelected() {
+          return offerRequestFixture
+        },
+        async getAirlineLogosByAirlineId() {
+          return {}
+        },
+        async listOffers() {
+          return {
+            data: [offerFixture],
+          }
+        },
+      }
+    )
+  ).rejects.toThrow(/Invalid fare selection state/)
+})
+
+test("fetchFareOptionsData rejects duplicate selected offer IDs", async () => {
+  await expect(
+    fetchFareOptionsData(
+      {
+        partialOfferRequestId: "por_123",
+        state: {
+          leg: 1,
+          selected: ["off_partial_1", "off_partial_1"],
+          sort: "least_expensive",
+          stops: "any",
+          takeoffFrom: 0,
+          takeoffTo: 1439,
+          landingFrom: 0,
+          landingTo: 1439,
+        },
+      },
+      {
+        async getBaseOfferRequest() {
+          return offerRequestFixture
+        },
+        async getOfferRequestBySelected() {
+          return offerRequestFixture
+        },
+        async getAirlineLogosByAirlineId() {
+          return {}
+        },
+        async listOffers() {
+          return {
+            data: [offerFixture],
+          }
+        },
+      }
+    )
+  ).rejects.toThrow(/Invalid fare selection state/)
 })
 
 test("fetchFareOptionsData omits undefined pagination cursor in list params", async () => {
