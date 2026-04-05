@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 export default async function ResultsPage({
   params,
@@ -6,5 +7,8 @@ export default async function ResultsPage({
   params: Promise<{ partialOfferRequestId: string }>
 }) {
   const { partialOfferRequestId } = await params
+  logFlightFlow("resultsPage", "redirect_to_fare_options", {
+    partialOfferRequestId,
+  })
   redirect(`/results/${partialOfferRequestId}/fare-options`)
 }

@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRightIcon, BriefcaseIcon, CheckIcon } from "lucide-react"
 
@@ -21,11 +22,34 @@ import {
   toReviewUrlSearchParams,
   type ReviewPageData,
 } from "@/modules/flights/results/domain"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const router = useRouter()
 
+  useEffect(() => {
+    logFlightFlow("ReviewPageClient", "hydrated", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      totalLegs: data.totalLegs,
+      selectedCount: data.state.selected.length,
+      fareCount: data.state.fare.length,
+      checkoutEnabled: data.summary.checkoutEnabled,
+    })
+  }, [
+    data.partialOfferRequestId,
+    data.state.selected.length,
+    data.state.fare.length,
+    data.summary.checkoutEnabled,
+    data.totalLegs,
+  ])
+
   function onSelectFare(legIndex: number, fareKey: string) {
+    logFlightFlow("ReviewPageClient", "fare_selected", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      legIndex,
+      fareKey,
+      fareCountBefore: data.state.fare.length,
+    })
     const nextFare = [...data.state.fare.slice(0, legIndex), fareKey]
     const nextState = {
       ...data.state,
@@ -33,17 +57,39 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
     }
     const query = toReviewUrlSearchParams(nextState).toString()
 
+    logFlightFlow("ReviewPageClient", "navigate_with_fare_selection", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      legIndex,
+      nextFareCount: nextState.fare.length,
+      query,
+    })
+
     router.replace(`/results/${data.partialOfferRequestId}/review?${query}`)
   }
 
   function onGoToCheckout() {
+    logFlightFlow("ReviewPageClient", "checkout_clicked", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      checkoutEnabled: data.summary.checkoutEnabled,
+      finalOfferId: data.summary.finalOfferId,
+      selectedCount: data.state.selected.length,
+    })
+
     if (!data.summary.checkoutEnabled || !data.summary.finalOfferId) {
+      logFlightFlow("ReviewPageClient", "checkout_blocked_incomplete_state", {
+        partialOfferRequestId: data.partialOfferRequestId,
+      })
       return
     }
 
     const params = new URLSearchParams()
     params.set("offer", data.summary.finalOfferId)
     params.set("selected", data.state.selected.join(","))
+
+    logFlightFlow("ReviewPageClient", "navigate_checkout", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      query: params.toString(),
+    })
 
     router.push(`/results/${data.partialOfferRequestId}/checkout?${params.toString()}`)
   }

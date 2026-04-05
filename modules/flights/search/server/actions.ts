@@ -19,6 +19,10 @@ import {
   type ActionFieldErrors,
   type ActionResult,
 } from "@/modules/flights/search/server/types"
+import {
+  logFlightFlow,
+  logFlightFlowError,
+} from "@/modules/flights/shared/flow-debug"
 
 interface SearchPlacesDeps {
   searchPlaces: (query: string) => Promise<PlaceSuggestionOption[]>
@@ -52,19 +56,38 @@ export async function executeSearchPlacesAction(
     logError: defaultLogError,
   }
 ): Promise<ActionResult<PlaceSuggestionOption[]>> {
+  logFlightFlow("searchPlacesAction", "received_input", {
+    inputType: typeof input,
+  })
   const parsed = parsePlaceSearchInput(input)
 
   if (!parsed.success) {
+    logFlightFlow("searchPlacesAction", "validation_failed", {
+      issueCount: parsed.error.issues.length,
+      firstIssue: parsed.error.issues[0]?.message,
+    })
     return actionFailure(
       "VALIDATION_ERROR",
       parsed.error.issues[0]?.message ?? "Invalid place search input"
     )
   }
 
+  logFlightFlow("searchPlacesAction", "validated_input", {
+    query: parsed.data.query,
+    queryLength: parsed.data.query.length,
+  })
+
   try {
     const suggestions = await deps.searchPlaces(parsed.data.query)
+    logFlightFlow("searchPlacesAction", "search_success", {
+      query: parsed.data.query,
+      suggestionCount: suggestions.length,
+    })
     return actionSuccess(suggestions)
   } catch (error) {
+    logFlightFlowError("searchPlacesAction", "search_failed", error, {
+      query: parsed.data.query,
+    })
     deps.logError("[flights/searchPlacesAction]", error)
 
     return actionFailure(
@@ -81,10 +104,18 @@ export async function executeSubmitFlightSearchAction(
     logError: defaultLogError,
   }
 ): Promise<ActionResult<{ partialOfferRequestId: string }>> {
+  logFlightFlow("submitFlightSearchAction", "received_input", {
+    inputType: typeof input,
+  })
   const parsed = parseFlightSearchForm(input)
 
   if (!parsed.success) {
     const fieldErrors = mapIssuesToFieldErrors(parsed.error)
+    logFlightFlow("submitFlightSearchAction", "validation_failed", {
+      issueCount: parsed.error.issues.length,
+      firstIssue: parsed.error.issues[0]?.message,
+      fieldErrorCount: fieldErrors ? Object.keys(fieldErrors).length : 0,
+    })
 
     return actionFailure(
       "VALIDATION_ERROR",
@@ -94,6 +125,9 @@ export async function executeSubmitFlightSearchAction(
   }
 
   if (parsed.data.journeyType === "multi_city") {
+    logFlightFlow("submitFlightSearchAction", "blocked_multi_city", {
+      journeyType: parsed.data.journeyType,
+    })
     return actionFailure(
       "VALIDATION_ERROR",
       "Multi-city search is temporarily unavailable.",
@@ -104,10 +138,24 @@ export async function executeSubmitFlightSearchAction(
   }
 
   const command = toFlightSearchCommand(parsed.data)
+  logFlightFlow("submitFlightSearchAction", "mapped_command", {
+    journeyType: command.journeyType,
+    cabinClass: command.cabinClass,
+    sliceCount: command.slices.length,
+    passengerAdults: parsed.data.passengers.adults,
+    passengerChildren: parsed.data.passengers.children,
+  })
   try {
     const result = await deps.createPartialOfferRequest(parsed.data, command)
+    logFlightFlow("submitFlightSearchAction", "partial_offer_request_created", {
+      partialOfferRequestId: result.partialOfferRequestId,
+    })
     return actionSuccess(result)
   } catch (error) {
+    logFlightFlowError("submitFlightSearchAction", "partial_offer_request_failed", error, {
+      journeyType: command.journeyType,
+      sliceCount: command.slices.length,
+    })
     deps.logError("[flights/submitFlightSearchAction]", error)
 
     return actionFailure(
@@ -182,6 +230,7 @@ function formatIssueMessage(issue: ZodIssue) {
 }
 
 function defaultLogError(context: string, error: unknown) {
+  logFlightFlowError("search.server", "default_log_error", error, { context })
   console.error(context, error)
 }
 
@@ -201,18 +250,33 @@ async function defaultCreatePartialOfferRequest(
   const client = getDuffelClient()
   const config = getDuffelFlightConfig()
 
+  const passengers = toDuffelPassengers(formValues.passengers)
+  const slices = command.slices.map((slice) => ({
+    origin: slice.originIataCode,
+    destination: slice.destinationIataCode,
+    departure_date: slice.departureDate,
+    departure_time: toDuffelTimeRange(slice.departureTime),
+    arrival_time: toDuffelTimeRange(slice.arrivalTime),
+  }))
+
+  logFlightFlow("submitFlightSearchAction", "creating_partial_offer_request", {
+    cabinClass: command.cabinClass,
+    maxConnections: config.partialOfferCreateMaxConnections,
+    supplierTimeoutMs: config.partialOfferCreateSupplierTimeoutMs,
+    passengerCount: passengers.length,
+    sliceCount: slices.length,
+  })
+
   const response = await client.partialOfferRequests.create({
     cabin_class: command.cabinClass,
     max_connections: config.partialOfferCreateMaxConnections,
     supplier_timeout: config.partialOfferCreateSupplierTimeoutMs,
-    passengers: toDuffelPassengers(formValues.passengers),
-    slices: command.slices.map((slice) => ({
-      origin: slice.originIataCode,
-      destination: slice.destinationIataCode,
-      departure_date: slice.departureDate,
-      departure_time: toDuffelTimeRange(slice.departureTime),
-      arrival_time: toDuffelTimeRange(slice.arrivalTime),
-    })),
+    passengers,
+    slices,
+  })
+
+  logFlightFlow("submitFlightSearchAction", "created_partial_offer_request", {
+    partialOfferRequestId: response.data.id,
   })
 
   return {

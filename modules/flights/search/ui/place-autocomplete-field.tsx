@@ -17,6 +17,7 @@ import type {
   PlaceSuggestionOption,
 } from "@/modules/flights/search/domain"
 import { searchPlacesAction } from "@/modules/flights/search/server/actions"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 interface PlaceAutocompleteFieldProps {
   control: Control<FlightSearchFormValues>
@@ -58,23 +59,52 @@ export function PlaceAutocompleteField({
 
     const activeRequest = requestIdRef.current + 1
     requestIdRef.current = activeRequest
+    logFlightFlow("placeAutocompleteField", "search_debounced", {
+      field: name,
+      query: trimmed,
+      activeRequest,
+    })
 
     const timeout = window.setTimeout(() => {
       startTransition(async () => {
+        logFlightFlow("placeAutocompleteField", "search_request_started", {
+          field: name,
+          query: trimmed,
+          activeRequest,
+        })
         const result = await searchPlacesAction({
           query: trimmed,
         })
 
         if (requestIdRef.current !== activeRequest) {
+          logFlightFlow("placeAutocompleteField", "search_response_ignored_stale", {
+            field: name,
+            query: trimmed,
+            activeRequest,
+            latestRequest: requestIdRef.current,
+          })
           return
         }
 
         if (!result.ok) {
+          logFlightFlow("placeAutocompleteField", "search_request_failed", {
+            field: name,
+            query: trimmed,
+            activeRequest,
+            code: result.error.code,
+            message: result.error.message,
+          })
           setOptions([])
           setSearchError(result.error.message)
           return
         }
 
+        logFlightFlow("placeAutocompleteField", "search_request_succeeded", {
+          field: name,
+          query: trimmed,
+          activeRequest,
+          optionCount: result.data.length,
+        })
         setOptions(result.data)
         setSearchError(null)
       })
@@ -83,9 +113,15 @@ export function PlaceAutocompleteField({
     return () => {
       window.clearTimeout(timeout)
     }
-  }, [disabled, open, query])
+  }, [disabled, name, open, query])
 
   function handleSelect(option: PlaceSuggestionOption) {
+    logFlightFlow("placeAutocompleteField", "option_selected", {
+      field: name,
+      optionId: option.id,
+      optionDisplayName: option.displayName,
+      optionType: option.type,
+    })
     field.onChange(option)
     setQuery(option.displayName)
     setOpen(false)
@@ -93,10 +129,18 @@ export function PlaceAutocompleteField({
   }
 
   function handleInputBlur() {
+    logFlightFlow("placeAutocompleteField", "input_blurred", {
+      field: name,
+    })
     setOpen(false)
   }
 
   function handleInputChange(value: string) {
+    logFlightFlow("placeAutocompleteField", "input_changed", {
+      field: name,
+      value,
+      valueLength: value.length,
+    })
     setQuery(value)
     setOpen(true)
     const trimmed = value.trim()
@@ -107,6 +151,10 @@ export function PlaceAutocompleteField({
     }
 
     if (field.value && value !== field.value.displayName) {
+      logFlightFlow("placeAutocompleteField", "cleared_selected_value", {
+        field: name,
+        previousValue: field.value.displayName,
+      })
       field.onChange(null)
     }
   }
@@ -118,6 +166,9 @@ export function PlaceAutocompleteField({
         <Input
           value={inputValue}
           onFocus={() => {
+            logFlightFlow("placeAutocompleteField", "input_focused", {
+              field: name,
+            })
             setQuery(selectedDisplayName)
             setOpen(true)
           }}

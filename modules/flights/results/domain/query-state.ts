@@ -4,6 +4,7 @@ import {
   SLIDER_TIME_MAX,
   SLIDER_TIME_MIN,
 } from "@/modules/flights/search/domain"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import type {
   ResultsUrlState,
   StopsFilterOption,
@@ -79,6 +80,10 @@ const resultsQuerySchema = z
 type SearchParamInput = Record<string, string | string[] | undefined>
 
 export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrlState {
+  logFlightFlow("parseResultsUrlState", "received_search_params", {
+    keys: Object.keys(searchParams),
+  })
+
   const normalized = {
     leg: firstValue(searchParams.leg),
     selected: normalizeSelected(searchParams.selected),
@@ -96,6 +101,10 @@ export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrl
   const parsed = resultsQuerySchema.safeParse(normalized)
 
   if (!parsed.success) {
+    logFlightFlow("parseResultsUrlState", "parse_failed_using_defaults", {
+      issueCount: parsed.error.issues.length,
+      firstIssue: parsed.error.issues[0]?.message,
+    })
     return {
       leg: 0,
       selected: [],
@@ -108,7 +117,7 @@ export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrl
     }
   }
 
-  return {
+  const result = {
     ...parsed.data,
     airline: parsed.data.airline || undefined,
     flightNumber: parsed.data.flightNumber || undefined,
@@ -118,9 +127,27 @@ export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrl
       .filter(Boolean),
     after: parsed.data.after || undefined,
   }
+
+  logFlightFlow("parseResultsUrlState", "parse_succeeded", {
+    leg: result.leg,
+    selectedCount: result.selected.length,
+    sort: result.sort,
+    stops: result.stops,
+    hasAirlineFilter: Boolean(result.airline),
+    hasFlightNumberFilter: Boolean(result.flightNumber),
+    hasAfter: Boolean(result.after),
+  })
+
+  return result
 }
 
 export function toResultsUrlSearchParams(state: ResultsUrlState): URLSearchParams {
+  logFlightFlow("toResultsUrlSearchParams", "serializing_state", {
+    leg: state.leg,
+    selectedCount: state.selected.length,
+    sort: state.sort,
+    stops: state.stops,
+  })
   const params = new URLSearchParams()
 
   params.set("leg", String(Math.max(state.leg, 0)))
@@ -147,6 +174,9 @@ export function toResultsUrlSearchParams(state: ResultsUrlState): URLSearchParam
     params.set("after", state.after)
   }
 
+  logFlightFlow("toResultsUrlSearchParams", "serialized_state", {
+    query: params.toString(),
+  })
   return params
 }
 

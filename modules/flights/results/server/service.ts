@@ -20,6 +20,10 @@ import {
   getAirlineIdsFromOffers,
   getAirlineLogosByAirlineId,
 } from "@/modules/flights/results/server/airline-logos"
+import {
+  logFlightFlow,
+  logFlightFlowError,
+} from "@/modules/flights/shared/flow-debug"
 
 const duffelConfig = getDuffelFlightConfig()
 const INVALID_SELECTION_STATE_MESSAGE =
@@ -50,25 +54,61 @@ export async function fetchFareOptionsData(
   },
   deps: FetchFareOptionsDeps = defaultFetchFareOptionsDeps
 ): Promise<FareOptionsPageData> {
+  logFlightFlow("fetchFareOptionsData", "start", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    requestedLeg: input.state.leg,
+    selectedCount: input.state.selected.length,
+    sort: input.state.sort,
+    stops: input.state.stops,
+    after: input.state.after,
+  })
   const selectedFromUrl = normalizeSelectedOfferIds(input.state.selected)
   const baseOfferRequest = await deps.getBaseOfferRequest(input.partialOfferRequestId)
   const totalLegs = Math.max(baseOfferRequest.slices.length, 1)
   const leg = Math.min(Math.max(input.state.leg, 0), totalLegs - 1)
   const requiredSelectedCount = leg
 
+  logFlightFlow("fetchFareOptionsData", "base_offer_request_loaded", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    totalLegs,
+    requestedLeg: input.state.leg,
+    clampedLeg: leg,
+    selectedFromUrlCount: selectedFromUrl.length,
+  })
+
   if (new Set(selectedFromUrl).size !== selectedFromUrl.length) {
+    logFlightFlow("fetchFareOptionsData", "invalid_selection_duplicate_ids", {
+      partialOfferRequestId: input.partialOfferRequestId,
+      selectedFromUrl,
+    })
     throw new Error(INVALID_SELECTION_STATE_MESSAGE)
   }
 
   if (selectedFromUrl.length < requiredSelectedCount) {
+    logFlightFlow("fetchFareOptionsData", "invalid_selection_too_few", {
+      partialOfferRequestId: input.partialOfferRequestId,
+      selectedFromUrlCount: selectedFromUrl.length,
+      requiredSelectedCount,
+    })
     throw new Error(INVALID_SELECTION_STATE_MESSAGE)
   }
 
   if (selectedFromUrl.length > totalLegs - 1) {
+    logFlightFlow("fetchFareOptionsData", "invalid_selection_too_many", {
+      partialOfferRequestId: input.partialOfferRequestId,
+      selectedFromUrlCount: selectedFromUrl.length,
+      maxAllowed: totalLegs - 1,
+    })
     throw new Error(INVALID_SELECTION_STATE_MESSAGE)
   }
 
   const selectedForLeg = selectedFromUrl.slice(0, requiredSelectedCount)
+  logFlightFlow("fetchFareOptionsData", "selected_for_leg_computed", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    requiredSelectedCount,
+    selectedForLeg,
+  })
+
   const offerRequest = selectedForLeg.length
     ? await deps.getOfferRequestBySelected(input.partialOfferRequestId, selectedForLeg)
     : baseOfferRequest
@@ -77,6 +117,14 @@ export async function fetchFareOptionsData(
     leg,
     selected: selectedForLeg,
   }
+  logFlightFlow("fetchFareOptionsData", "safe_state_built", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    leg: safeState.leg,
+    selectedCount: safeState.selected.length,
+    sort: safeState.sort,
+    stops: safeState.stops,
+  })
+
   const offerRequestId = getOfferRequestIdFromOfferRequest(offerRequest)
   const fallbackResponse = {
     data: offerRequest.offers as unknown as Offer[],
@@ -93,9 +141,25 @@ export async function fetchFareOptionsData(
         max_connections: toDuffelMaxConnections(input.state.stops),
       })
     : fallbackResponse
+
+  logFlightFlow("fetchFareOptionsData", "offers_list_loaded", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    offerRequestId,
+    usedFallbackOffers: !offerRequestId,
+    upstreamOfferCount: listResponse.data.length,
+    nextAfter: listResponse.meta?.after ?? null,
+  })
+
+  const airlineIds = getAirlineIdsFromOffers(listResponse.data)
   const airlineLogosByAirlineId = await deps.getAirlineLogosByAirlineId(
-    getAirlineIdsFromOffers(listResponse.data)
+    airlineIds
   )
+  logFlightFlow("fetchFareOptionsData", "airline_logos_resolved", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    airlineIdsCount: airlineIds.length,
+    logoCount: Object.keys(airlineLogosByAirlineId).length,
+  })
+
   const normalizedOffers = listResponse.data
     .map((offer) => normalizeOfferForLeg(offer, leg, airlineLogosByAirlineId))
     .filter((offer): offer is NonNullable<typeof offer> => offer !== null)
@@ -105,7 +169,15 @@ export async function fetchFareOptionsData(
     (left, right) => left.localeCompare(right)
   )
 
-  return {
+  logFlightFlow("fetchFareOptionsData", "offers_processed", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    normalizedCount: normalizedOffers.length,
+    filteredCount: filteredOffers.length,
+    sortedCount: sortedOffers.length,
+    airlinesCount: airlines.length,
+  })
+
+  const response = {
     partialOfferRequestId: input.partialOfferRequestId,
     leg,
     totalLegs,
@@ -117,16 +189,40 @@ export async function fetchFareOptionsData(
     after: listResponse.meta?.after ?? null,
     state: safeState,
   }
+
+  logFlightFlow("fetchFareOptionsData", "completed", {
+    partialOfferRequestId: response.partialOfferRequestId,
+    leg: response.leg,
+    totalLegs: response.totalLegs,
+    offerCount: response.offers.length,
+    after: response.after,
+  })
+
+  return response
 }
 
 const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
   async getBaseOfferRequest(partialOfferRequestId) {
     try {
+      logFlightFlow("fetchFareOptionsData.getBaseOfferRequest", "request_started", {
+        partialOfferRequestId,
+      })
       const { getDuffelClient } = await import("@/lib/duffel")
       const client = getDuffelClient()
       const response = await client.partialOfferRequests.get(partialOfferRequestId)
+      logFlightFlow("fetchFareOptionsData.getBaseOfferRequest", "request_succeeded", {
+        partialOfferRequestId,
+        offerCount: response.data.offers.length,
+        sliceCount: response.data.slices.length,
+      })
       return response.data as OfferRequest
     } catch (error) {
+      logFlightFlowError(
+        "fetchFareOptionsData.getBaseOfferRequest",
+        "request_failed",
+        error,
+        { partialOfferRequestId }
+      )
       logDuffelError("partialOfferRequests.get failed", error, {
         partialOfferRequestId,
       })
@@ -137,6 +233,14 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
   },
   async getOfferRequestBySelected(partialOfferRequestId, selectedPartialOffers) {
     try {
+      logFlightFlow(
+        "fetchFareOptionsData.getOfferRequestBySelected",
+        "request_started",
+        {
+          partialOfferRequestId,
+          selectedPartialOffers,
+        }
+      )
       const { getDuffelClient } = await import("@/lib/duffel")
       const client = getDuffelClient()
       const response = await client.partialOfferRequests.get(
@@ -146,8 +250,27 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
         }
       )
 
+      logFlightFlow(
+        "fetchFareOptionsData.getOfferRequestBySelected",
+        "request_succeeded",
+        {
+          partialOfferRequestId,
+          selectedCount: selectedPartialOffers.length,
+          offerCount: response.data.offers.length,
+          sliceCount: response.data.slices.length,
+        }
+      )
       return response.data as OfferRequest
     } catch (error) {
+      logFlightFlowError(
+        "fetchFareOptionsData.getOfferRequestBySelected",
+        "request_failed",
+        error,
+        {
+          partialOfferRequestId,
+          selectedPartialOffers,
+        }
+      )
       logDuffelError("partialOfferRequests.get with selected offers failed", error, {
         partialOfferRequestId,
         selectedPartialOffers,
@@ -162,12 +285,32 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
   },
   async listOffers(params) {
     try {
+      logFlightFlow("fetchFareOptionsData.listOffers", "request_started", {
+        offerRequestId: params.offer_request_id,
+        after: params.after,
+        limit: params.limit,
+        sort: params.sort,
+        maxConnections: params.max_connections,
+      })
       const { getDuffelClient } = await import("@/lib/duffel")
       const client = getDuffelClient()
       const response = await client.offers.list(params)
 
+      logFlightFlow("fetchFareOptionsData.listOffers", "request_succeeded", {
+        offerRequestId: params.offer_request_id,
+        offerCount: response.data.length,
+        nextAfter: response.meta?.after ?? null,
+      })
+
       return response as { data: Offer[]; meta?: { after?: string | null } }
     } catch (error) {
+      logFlightFlowError("fetchFareOptionsData.listOffers", "request_failed", error, {
+        offerRequestId: params.offer_request_id,
+        after: params.after,
+        limit: params.limit,
+        sort: params.sort,
+        maxConnections: params.max_connections,
+      })
       logDuffelError("offers.list failed", error, {
         offerRequestId: params.offer_request_id,
         after: params.after,

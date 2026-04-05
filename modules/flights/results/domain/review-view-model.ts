@@ -12,6 +12,7 @@ import {
   formatMinutesDuration,
   toDurationMinutes,
 } from "@/modules/flights/results/domain/offer-view-model"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import type {
   ReviewFareOptionLine,
   ReviewFareOptionViewModel,
@@ -55,6 +56,12 @@ export function buildReviewPageModel({
   requestedFare,
   airlineLogosByAirlineId = {},
 }: BuildReviewPageModelInput): BuildReviewPageModelResult {
+  logFlightFlow("buildReviewPageModel", "start", {
+    selectedCount: selected.length,
+    requestedFareCount: requestedFare.length,
+    offerCount: offerRequest.offers.length,
+    sliceCount: offerRequest.slices.length,
+  })
   const offers = (offerRequest.offers as Offer[]).filter(
     (offer) => offer.slices.length > 0
   )
@@ -77,6 +84,12 @@ export function buildReviewPageModel({
     })
 
     if (isLocked || legOffers.length === 0) {
+      logFlightFlow("buildReviewPageModel", "leg_locked_or_empty", {
+        legIndex,
+        isLocked,
+        legOffersCount: legOffers.length,
+        normalizedFareCount: normalizedFare.length,
+      })
       legs.push({
         legIndex,
         title: header.title,
@@ -105,6 +118,11 @@ export function buildReviewPageModel({
     if (selectedKey) {
       normalizedFare.push(selectedKey)
       candidateOffers = groups.get(selectedKey)?.offers ?? []
+      logFlightFlow("buildReviewPageModel", "leg_selected", {
+        legIndex,
+        selectedKey,
+        candidateOffersCount: candidateOffers.length,
+      })
     }
 
     const options: ReviewFareOptionViewModel[] = optionGroups.map((group) => ({
@@ -133,7 +151,7 @@ export function buildReviewPageModel({
   const summaryOffers = candidateOffers.length > 0 ? candidateOffers : offers
   const summary = createSummaryViewModel(summaryOffers, normalizedFare.length, totalLegs)
 
-  return {
+  const result = {
     breadcrumbs,
     totalLegs,
     state: {
@@ -143,6 +161,16 @@ export function buildReviewPageModel({
     legs,
     summary,
   }
+
+  logFlightFlow("buildReviewPageModel", "completed", {
+    totalLegs: result.totalLegs,
+    normalizedFareCount: result.state.fare.length,
+    legSectionCount: result.legs.length,
+    checkoutEnabled: result.summary.checkoutEnabled,
+    finalOfferId: result.summary.finalOfferId,
+  })
+
+  return result
 }
 
 function createLegHeaderViewModel({

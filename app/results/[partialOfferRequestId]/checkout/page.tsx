@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 interface CheckoutPlaceholderPageProps {
   params: Promise<{
@@ -29,6 +30,12 @@ export default async function CheckoutPlaceholderPage({
           .map((item) => item.trim())
           .filter(Boolean)
       : []
+
+  logFlightFlow("CheckoutPlaceholderPage", "rendered", {
+    partialOfferRequestId: resolvedParams.partialOfferRequestId,
+    selectedOfferId: selectedOfferId ?? null,
+    selectedPartialOfferCount: selectedPartialOffers.length,
+  })
 
   return (
     <main className="min-h-svh bg-muted/40 py-10">

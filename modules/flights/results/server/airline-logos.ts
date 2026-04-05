@@ -2,6 +2,10 @@ import type { Airline, Offer } from "@duffel/api/types"
 
 import { getDuffelFlightConfig } from "@/lib/duffel/config"
 import { logDuffelError } from "@/modules/flights/results/server/error-map"
+import {
+  logFlightFlow,
+  logFlightFlowError,
+} from "@/modules/flights/shared/flow-debug"
 
 interface AirlineLogoCacheEntry {
   expiresAt: number
@@ -12,9 +16,13 @@ const duffelConfig = getDuffelFlightConfig()
 const airlineLogoCache = new Map<string, AirlineLogoCacheEntry>()
 
 export async function getAirlineLogosByAirlineId(airlineIds: string[]) {
+  logFlightFlow("getAirlineLogosByAirlineId", "start", {
+    requestedAirlineIdsCount: airlineIds.length,
+  })
   const result: Record<string, string> = {}
   const now = Date.now()
   const idsToFetch: string[] = []
+  let cacheHitCount = 0
 
   for (const airlineId of airlineIds) {
     const cachedLogo = getCachedAirlineLogo(airlineId, now)
@@ -27,7 +35,15 @@ export async function getAirlineLogosByAirlineId(airlineIds: string[]) {
     if (cachedLogo) {
       result[airlineId] = cachedLogo
     }
+
+    cacheHitCount += 1
   }
+
+  logFlightFlow("getAirlineLogosByAirlineId", "cache_checked", {
+    requestedAirlineIdsCount: airlineIds.length,
+    cacheHitCount,
+    idsToFetchCount: idsToFetch.length,
+  })
 
   if (idsToFetch.length > 0) {
     try {
@@ -36,6 +52,11 @@ export async function getAirlineLogosByAirlineId(airlineIds: string[]) {
       const responses = await Promise.allSettled(
         idsToFetch.map((airlineId) => client.airlines.get(airlineId))
       )
+
+      logFlightFlow("getAirlineLogosByAirlineId", "upstream_batch_completed", {
+        idsToFetchCount: idsToFetch.length,
+        resultCount: responses.length,
+      })
 
       for (let index = 0; index < responses.length; index += 1) {
         const airlineId = idsToFetch[index]
@@ -49,9 +70,18 @@ export async function getAirlineLogosByAirlineId(airlineIds: string[]) {
         }
 
         setCachedAirlineLogo(airlineId, null, now)
+        logFlightFlowError(
+          "getAirlineLogosByAirlineId",
+          "upstream_logo_lookup_failed",
+          response.reason,
+          { airlineId }
+        )
         logDuffelError("airlines.get failed", response.reason, { airlineId })
       }
     } catch (error) {
+      logFlightFlowError("getAirlineLogosByAirlineId", "upstream_batch_failed", error, {
+        airlineIds: idsToFetch,
+      })
       logDuffelError("airlines.get batch failed", error, {
         airlineIds: idsToFetch,
       })
@@ -66,17 +96,29 @@ export async function getAirlineLogosByAirlineId(airlineIds: string[]) {
     }
   }
 
+  logFlightFlow("getAirlineLogosByAirlineId", "completed", {
+    requestedAirlineIdsCount: airlineIds.length,
+    resolvedLogoCount: Object.keys(result).length,
+  })
+
   return result
 }
 
 export function getAirlineIdsFromOffers(offers: Offer[]) {
-  return Array.from(
+  const airlineIds = Array.from(
     new Set(
       offers
         .map((offer) => offer.owner.id)
         .filter((airlineId): airlineId is string => Boolean(airlineId))
     )
   )
+
+  logFlightFlow("getAirlineIdsFromOffers", "computed", {
+    offersCount: offers.length,
+    airlineIdsCount: airlineIds.length,
+  })
+
+  return airlineIds
 }
 
 function getCachedAirlineLogo(airlineId: string, now: number) {

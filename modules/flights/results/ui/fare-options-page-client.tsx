@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertCircleIcon,
@@ -62,6 +62,7 @@ import {
   type FareOptionsPageData,
 } from "@/modules/flights/results/domain"
 import { loadMoreFareOptionsAction } from "@/modules/flights/results/server/actions"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import { cn } from "@/lib/utils"
 
 const SORT_OPTIONS = [
@@ -86,11 +87,33 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   const [isFilterDialogOpen, setFilterDialogOpen] = useState(false)
   const [isLoadingMore, startLoadingMore] = useTransition()
 
+  useEffect(() => {
+    logFlightFlow("FareOptionsPageClient", "hydrated", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      leg: data.leg,
+      totalLegs: data.totalLegs,
+      selectedCount: data.selected.length,
+      initialOfferCount: data.offers.length,
+      hasNextAfter: Boolean(data.after),
+    })
+  }, [
+    data.after,
+    data.leg,
+    data.offers.length,
+    data.partialOfferRequestId,
+    data.selected.length,
+    data.totalLegs,
+  ])
+
   function updateQuery(
     patch: Partial<Omit<FareOptionsPageData["state"], "selected">> & {
       selected?: string[]
     }
   ) {
+    logFlightFlow("FareOptionsPageClient", "update_query_requested", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      patchKeys: Object.keys(patch),
+    })
     const nextState = {
       ...data.state,
       ...patch,
@@ -98,12 +121,22 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
       selected: patch.selected ?? data.state.selected,
     }
     const search = toResultsUrlSearchParams(nextState).toString()
+    logFlightFlow("FareOptionsPageClient", "update_query_navigate", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      query: search,
+    })
     router.replace(
       `/results/${data.partialOfferRequestId}/fare-options?${search}`
     )
   }
 
   function selectOffer(offerId: string) {
+    logFlightFlow("FareOptionsPageClient", "offer_selected", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      leg: data.leg,
+      offerId,
+      selectedCountBefore: data.selected.length,
+    })
     const nextSelected = [...data.selected, offerId]
 
     if (data.leg < data.totalLegs - 1) {
@@ -114,6 +147,12 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         after: undefined,
       }
       const search = toResultsUrlSearchParams(nextState).toString()
+      logFlightFlow("FareOptionsPageClient", "navigate_next_leg", {
+        partialOfferRequestId: data.partialOfferRequestId,
+        nextLeg: nextState.leg,
+        selectedCount: nextSelected.length,
+        query: search,
+      })
       router.push(
         `/results/${data.partialOfferRequestId}/fare-options?${search}`
       )
@@ -122,6 +161,11 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
     const params = new URLSearchParams()
     params.set("selected", nextSelected.join(","))
+    logFlightFlow("FareOptionsPageClient", "navigate_review", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      selectedCount: nextSelected.length,
+      query: params.toString(),
+    })
     router.push(
       `/results/${data.partialOfferRequestId}/review?${params.toString()}`
     )
@@ -129,9 +173,17 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
   function loadMore() {
     if (!nextAfter) {
+      logFlightFlow("FareOptionsPageClient", "load_more_skipped_no_cursor", {
+        partialOfferRequestId: data.partialOfferRequestId,
+      })
       return
     }
 
+    logFlightFlow("FareOptionsPageClient", "load_more_requested", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      after: nextAfter,
+      currentOfferCount: offers.length,
+    })
     startLoadingMore(() => {
       void (async () => {
         const result = await loadMoreFareOptionsAction({
@@ -143,10 +195,21 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         })
 
         if (!result.ok) {
+          logFlightFlow("FareOptionsPageClient", "load_more_failed", {
+            partialOfferRequestId: data.partialOfferRequestId,
+            after: nextAfter,
+            code: result.error.code,
+            message: result.error.message,
+          })
           setLoadMoreError(result.error.message)
           return
         }
 
+        logFlightFlow("FareOptionsPageClient", "load_more_succeeded", {
+          partialOfferRequestId: data.partialOfferRequestId,
+          loadedOfferCount: result.data.offers.length,
+          nextAfter: result.data.after,
+        })
         setOffers((current) => {
           const deduped = new Map(current.map((offer) => [offer.id, offer]))
 

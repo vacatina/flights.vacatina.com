@@ -9,6 +9,10 @@ import {
 } from "@/modules/flights/search/server/types"
 import { fetchFareOptionsData } from "@/modules/flights/results/server/service"
 import type { OfferCardViewModel } from "@/modules/flights/results/domain"
+import {
+  logFlightFlow,
+  logFlightFlowError,
+} from "@/modules/flights/shared/flow-debug"
 
 const loadMoreFareOptionsSchema = z.object({
   partialOfferRequestId: z.string().min(1),
@@ -35,16 +39,35 @@ const loadMoreFareOptionsSchema = z.object({
 export async function loadMoreFareOptionsAction(
   input: unknown
 ): Promise<ActionResult<{ offers: OfferCardViewModel[]; after: string | null }>> {
+  logFlightFlow("loadMoreFareOptionsAction", "received_input", {
+    inputType: typeof input,
+  })
   const parsed = loadMoreFareOptionsSchema.safeParse(input)
 
   if (!parsed.success) {
+    logFlightFlow("loadMoreFareOptionsAction", "validation_failed", {
+      issueCount: parsed.error.issues.length,
+      firstIssue: parsed.error.issues[0]?.message,
+    })
     return actionFailure("VALIDATION_ERROR", "Invalid load-more request")
   }
 
   try {
+    logFlightFlow("loadMoreFareOptionsAction", "fetch_started", {
+      partialOfferRequestId: parsed.data.partialOfferRequestId,
+      leg: parsed.data.state.leg,
+      selectedCount: parsed.data.state.selected.length,
+      after: parsed.data.state.after,
+    })
     const result = await fetchFareOptionsData({
       partialOfferRequestId: parsed.data.partialOfferRequestId,
       state: parsed.data.state,
+    })
+
+    logFlightFlow("loadMoreFareOptionsAction", "fetch_succeeded", {
+      partialOfferRequestId: parsed.data.partialOfferRequestId,
+      offerCount: result.offers.length,
+      after: result.after,
     })
 
     return actionSuccess({
@@ -52,6 +75,10 @@ export async function loadMoreFareOptionsAction(
       after: result.after,
     })
   } catch (error) {
+    logFlightFlowError("loadMoreFareOptionsAction", "fetch_failed", error, {
+      partialOfferRequestId: parsed.data.partialOfferRequestId,
+      leg: parsed.data.state.leg,
+    })
     return actionFailure(
       "UPSTREAM_ERROR",
       error instanceof Error
