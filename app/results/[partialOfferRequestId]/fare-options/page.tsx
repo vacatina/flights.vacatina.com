@@ -64,7 +64,7 @@ export default async function FareOptionsPage({
   if (!result.ok) {
     logFlightFlow("FareOptionsPage", "render_error_state", {
       partialOfferRequestId: resolvedParams.partialOfferRequestId,
-      message: result.message,
+      hasMessage: Boolean(result.message),
     })
     return (
       <main className="min-h-svh bg-muted/40 py-10">

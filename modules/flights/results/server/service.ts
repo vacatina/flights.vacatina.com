@@ -79,7 +79,7 @@ export async function fetchFareOptionsData(
   if (new Set(selectedFromUrl).size !== selectedFromUrl.length) {
     logFlightFlow("fetchFareOptionsData", "invalid_selection_duplicate_ids", {
       partialOfferRequestId: input.partialOfferRequestId,
-      selectedFromUrl,
+      selectedFromUrlCount: selectedFromUrl.length,
     })
     throw new Error(INVALID_SELECTION_STATE_MESSAGE)
   }
@@ -106,7 +106,7 @@ export async function fetchFareOptionsData(
   logFlightFlow("fetchFareOptionsData", "selected_for_leg_computed", {
     partialOfferRequestId: input.partialOfferRequestId,
     requiredSelectedCount,
-    selectedForLeg,
+    selectedForLegCount: selectedForLeg.length,
   })
 
   const offerRequest = selectedForLeg.length
@@ -238,7 +238,7 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
         "request_started",
         {
           partialOfferRequestId,
-          selectedPartialOffers,
+          selectedCount: selectedPartialOffers.length,
         }
       )
       const { getDuffelClient } = await import("@/lib/duffel")
@@ -268,7 +268,7 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
         error,
         {
           partialOfferRequestId,
-          selectedPartialOffers,
+          selectedCount: selectedPartialOffers.length,
         }
       )
       logDuffelError("partialOfferRequests.get with selected offers failed", error, {

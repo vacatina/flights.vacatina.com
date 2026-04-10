@@ -69,3 +69,48 @@ test("toResultsUrlSearchParams serializes state", () => {
   expect(params.get("airline")).toBe("Air India")
   expect(params.get("after")).toBe("cursor_1")
 })
+
+test("parseResultsUrlState preserves valid fields when one field is invalid", () => {
+  const state = parseResultsUrlState({
+    leg: "1",
+    selected: "off_1,off_2",
+    sort: "shortest_duration",
+    stops: "max_1",
+    takeoffFrom: "360",
+    takeoffTo: "invalid",
+    landingFrom: "600",
+    landingTo: "1200",
+  })
+
+  expect(state).toEqual({
+    leg: 1,
+    selected: ["off_1", "off_2"],
+    sort: "shortest_duration",
+    stops: "max_1",
+    takeoffFrom: 360,
+    takeoffTo: 1439,
+    landingFrom: 600,
+    landingTo: 1200,
+  })
+})
+
+test("parseResultsUrlState defaults only invalid range endpoint when range is reversed", () => {
+  const state = parseResultsUrlState({
+    takeoffFrom: "900",
+    takeoffTo: "300",
+    landingFrom: "400",
+    landingTo: "1000",
+    sort: "most_expensive",
+  })
+
+  expect(state).toEqual({
+    leg: 0,
+    selected: [],
+    sort: "most_expensive",
+    stops: "any",
+    takeoffFrom: 900,
+    takeoffTo: 1439,
+    landingFrom: 400,
+    landingTo: 1000,
+  })
+})

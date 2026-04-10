@@ -47,13 +47,13 @@ export async function fetchReviewPageData(
   const selectedPartialOffers = normalizeSelectedOfferIds(input.state.selected)
   logFlightFlow("fetchReviewPageData", "selected_normalized", {
     partialOfferRequestId: input.partialOfferRequestId,
-    selectedPartialOffers,
+    selectedCount: selectedPartialOffers.length,
   })
 
   if (new Set(selectedPartialOffers).size !== selectedPartialOffers.length) {
     logFlightFlow("fetchReviewPageData", "invalid_state_duplicate_selected", {
       partialOfferRequestId: input.partialOfferRequestId,
-      selectedPartialOffers,
+      selectedCount: selectedPartialOffers.length,
     })
     throw new Error(INVALID_REVIEW_STATE_MESSAGE)
   }
@@ -173,7 +173,7 @@ const defaultFetchReviewPageDeps: FetchReviewPageDeps = {
         "request_started",
         {
           partialOfferRequestId,
-          selectedPartialOffers,
+          selectedCount: selectedPartialOffers.length,
         }
       )
       const { getDuffelClient } = await import("@/lib/duffel")
@@ -203,7 +203,7 @@ const defaultFetchReviewPageDeps: FetchReviewPageDeps = {
         error,
         {
           partialOfferRequestId,
-          selectedPartialOffers,
+          selectedCount: selectedPartialOffers.length,
         }
       )
       logDuffelError("review.partialOfferRequests.getFaresById failed", error, {

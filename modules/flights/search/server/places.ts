@@ -7,7 +7,6 @@ import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow
 
 export async function searchPlaceSuggestions(query: string) {
   logFlightFlow("searchPlaceSuggestions", "start", {
-    query,
     queryLength: query.length,
   })
 
@@ -32,7 +31,9 @@ export async function searchPlaceSuggestions(query: string) {
 
     return deduped
   } catch (error) {
-    logFlightFlowError("searchPlaceSuggestions", "failed", error, { query })
+    logFlightFlowError("searchPlaceSuggestions", "failed", error, {
+      queryLength: query.length,
+    })
     throw error
   }
 }

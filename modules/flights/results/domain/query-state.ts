@@ -25,57 +25,12 @@ const STOPS_FILTER_OPTIONS: StopsFilterOption[] = [
   "any",
 ]
 
-const resultsQuerySchema = z
-  .object({
-    leg: z.coerce.number().int().min(0).default(0),
-    selected: z.string().optional().default(""),
-    sort: z.enum(RESULTS_SORT_OPTIONS).default("least_expensive"),
-    stops: z.enum(STOPS_FILTER_OPTIONS).default("any"),
-    airline: z.string().trim().optional(),
-    flightNumber: z.string().trim().optional(),
-    takeoffFrom: z
-      .coerce.number()
-      .int()
-      .min(SLIDER_TIME_MIN)
-      .max(SLIDER_TIME_MAX)
-      .default(SLIDER_TIME_MIN),
-    takeoffTo: z
-      .coerce.number()
-      .int()
-      .min(SLIDER_TIME_MIN)
-      .max(SLIDER_TIME_MAX)
-      .default(SLIDER_TIME_MAX),
-    landingFrom: z
-      .coerce.number()
-      .int()
-      .min(SLIDER_TIME_MIN)
-      .max(SLIDER_TIME_MAX)
-      .default(SLIDER_TIME_MIN),
-    landingTo: z
-      .coerce.number()
-      .int()
-      .min(SLIDER_TIME_MIN)
-      .max(SLIDER_TIME_MAX)
-      .default(SLIDER_TIME_MAX),
-    after: z.string().trim().optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.takeoffFrom > value.takeoffTo) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["takeoffTo"],
-        message: "Take-off range is invalid",
-      })
-    }
-
-    if (value.landingFrom > value.landingTo) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["landingTo"],
-        message: "Landing range is invalid",
-      })
-    }
-  })
+const legSchema = z.coerce.number().int().min(0)
+const selectedSchema = z.string()
+const sortSchema = z.enum(RESULTS_SORT_OPTIONS)
+const stopsSchema = z.enum(STOPS_FILTER_OPTIONS)
+const timePointSchema = z.coerce.number().int().min(SLIDER_TIME_MIN).max(SLIDER_TIME_MAX)
+const optionalTextSchema = z.string().trim()
 
 type SearchParamInput = Record<string, string | string[] | undefined>
 
@@ -98,34 +53,34 @@ export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrl
     after: firstValue(searchParams.after),
   }
 
-  const parsed = resultsQuerySchema.safeParse(normalized)
-
-  if (!parsed.success) {
-    logFlightFlow("parseResultsUrlState", "parse_failed_using_defaults", {
-      issueCount: parsed.error.issues.length,
-      firstIssue: parsed.error.issues[0]?.message,
-    })
-    return {
-      leg: 0,
-      selected: [],
-      sort: "least_expensive",
-      stops: "any",
-      takeoffFrom: SLIDER_TIME_MIN,
-      takeoffTo: SLIDER_TIME_MAX,
-      landingFrom: SLIDER_TIME_MIN,
-      landingTo: SLIDER_TIME_MAX,
-    }
+  const result: ResultsUrlState = {
+    leg: parseField(legSchema, normalized.leg, 0),
+    selected: parseSelected(normalized.selected),
+    sort: parseField(sortSchema, normalized.sort, "least_expensive"),
+    stops: parseField(stopsSchema, normalized.stops, "any"),
+    airline: parseOptionalText(normalized.airline),
+    flightNumber: parseOptionalText(normalized.flightNumber),
+    takeoffFrom: parseField(timePointSchema, normalized.takeoffFrom, SLIDER_TIME_MIN),
+    takeoffTo: parseField(timePointSchema, normalized.takeoffTo, SLIDER_TIME_MAX),
+    landingFrom: parseField(timePointSchema, normalized.landingFrom, SLIDER_TIME_MIN),
+    landingTo: parseField(timePointSchema, normalized.landingTo, SLIDER_TIME_MAX),
+    after: parseOptionalText(normalized.after),
   }
 
-  const result = {
-    ...parsed.data,
-    airline: parsed.data.airline || undefined,
-    flightNumber: parsed.data.flightNumber || undefined,
-    selected: parsed.data.selected
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-    after: parsed.data.after || undefined,
+  if (result.takeoffFrom > result.takeoffTo) {
+    logFlightFlow("parseResultsUrlState", "invalid_takeoff_range_defaulting_takeoffTo", {
+      takeoffFrom: result.takeoffFrom,
+      takeoffTo: result.takeoffTo,
+    })
+    result.takeoffTo = SLIDER_TIME_MAX
+  }
+
+  if (result.landingFrom > result.landingTo) {
+    logFlightFlow("parseResultsUrlState", "invalid_landing_range_defaulting_landingTo", {
+      landingFrom: result.landingFrom,
+      landingTo: result.landingTo,
+    })
+    result.landingTo = SLIDER_TIME_MAX
   }
 
   logFlightFlow("parseResultsUrlState", "parse_succeeded", {
@@ -175,7 +130,9 @@ export function toResultsUrlSearchParams(state: ResultsUrlState): URLSearchParam
   }
 
   logFlightFlow("toResultsUrlSearchParams", "serialized_state", {
-    query: params.toString(),
+    paramCount: Array.from(params.keys()).length,
+    hasSelected: params.has("selected"),
+    hasAfter: params.has("after"),
   })
   return params
 }
@@ -194,4 +151,41 @@ function normalizeSelected(value: string | string[] | undefined) {
   }
 
   return value
+}
+
+function parseField<T>(
+  schema: z.ZodType<T>,
+  value: string | undefined,
+  fallback: T
+): T {
+  const parsed = schema.safeParse(value)
+
+  if (!parsed.success) {
+    return fallback
+  }
+
+  return parsed.data
+}
+
+function parseOptionalText(value: string | undefined) {
+  const parsed = optionalTextSchema.safeParse(value)
+
+  if (!parsed.success) {
+    return undefined
+  }
+
+  return parsed.data.length > 0 ? parsed.data : undefined
+}
+
+function parseSelected(value: string | undefined) {
+  const parsed = selectedSchema.safeParse(value ?? "")
+
+  if (!parsed.success) {
+    return []
+  }
+
+  return parsed.data
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
 }

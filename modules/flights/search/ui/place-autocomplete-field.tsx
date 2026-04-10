@@ -61,7 +61,7 @@ export function PlaceAutocompleteField({
     requestIdRef.current = activeRequest
     logFlightFlow("placeAutocompleteField", "search_debounced", {
       field: name,
-      query: trimmed,
+      queryLength: trimmed.length,
       activeRequest,
     })
 
@@ -69,7 +69,7 @@ export function PlaceAutocompleteField({
       startTransition(async () => {
         logFlightFlow("placeAutocompleteField", "search_request_started", {
           field: name,
-          query: trimmed,
+          queryLength: trimmed.length,
           activeRequest,
         })
         const result = await searchPlacesAction({
@@ -79,7 +79,7 @@ export function PlaceAutocompleteField({
         if (requestIdRef.current !== activeRequest) {
           logFlightFlow("placeAutocompleteField", "search_response_ignored_stale", {
             field: name,
-            query: trimmed,
+            queryLength: trimmed.length,
             activeRequest,
             latestRequest: requestIdRef.current,
           })
@@ -89,10 +89,9 @@ export function PlaceAutocompleteField({
         if (!result.ok) {
           logFlightFlow("placeAutocompleteField", "search_request_failed", {
             field: name,
-            query: trimmed,
+            queryLength: trimmed.length,
             activeRequest,
             code: result.error.code,
-            message: result.error.message,
           })
           setOptions([])
           setSearchError(result.error.message)
@@ -101,7 +100,7 @@ export function PlaceAutocompleteField({
 
         logFlightFlow("placeAutocompleteField", "search_request_succeeded", {
           field: name,
-          query: trimmed,
+          queryLength: trimmed.length,
           activeRequest,
           optionCount: result.data.length,
         })
@@ -119,7 +118,6 @@ export function PlaceAutocompleteField({
     logFlightFlow("placeAutocompleteField", "option_selected", {
       field: name,
       optionId: option.id,
-      optionDisplayName: option.displayName,
       optionType: option.type,
     })
     field.onChange(option)
@@ -138,7 +136,6 @@ export function PlaceAutocompleteField({
   function handleInputChange(value: string) {
     logFlightFlow("placeAutocompleteField", "input_changed", {
       field: name,
-      value,
       valueLength: value.length,
     })
     setQuery(value)
@@ -153,7 +150,7 @@ export function PlaceAutocompleteField({
     if (field.value && value !== field.value.displayName) {
       logFlightFlow("placeAutocompleteField", "cleared_selected_value", {
         field: name,
-        previousValue: field.value.displayName,
+        previousValueId: field.value.id,
       })
       field.onChange(null)
     }

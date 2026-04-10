@@ -152,7 +152,6 @@ export function FlightSearchForm() {
       const appliedFieldErrors = applyServerFieldErrors(result.error.fieldErrors)
       logFlightFlow("flightSearchForm", "submit_failed", {
         code: result.error.code,
-        message: result.error.message,
         fieldErrorCount: appliedFieldErrors,
       })
       setServerError(appliedFieldErrors > 0 ? null : result.error.message)

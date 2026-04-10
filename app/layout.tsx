@@ -2,7 +2,6 @@ import {
   Figtree,
   Geist_Mono,
   Inter,
-  Google_Sans_Flex as Google_Sans,
 } from "next/font/google"
 
 import "./globals.css"

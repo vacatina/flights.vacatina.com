@@ -66,7 +66,9 @@ export function toReviewUrlSearchParams(state: ReviewUrlState): URLSearchParams 
   }
 
   logFlightFlow("toReviewUrlSearchParams", "serialized_state", {
-    query: params.toString(),
+    paramCount: Array.from(params.keys()).length,
+    hasSelected: params.has("selected"),
+    fareParamCount: params.getAll("fare").length,
   })
   return params
 }

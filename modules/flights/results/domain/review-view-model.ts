@@ -464,7 +464,7 @@ function formatRefundCondition(
   }
 
   if (!condition.allowed) {
-    return "No data on refunds"
+    return "Refunds not allowed"
   }
 
   const penalty = toPenaltyLabel(condition.penalty_amount, condition.penalty_currency)

@@ -61,7 +61,6 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
       partialOfferRequestId: data.partialOfferRequestId,
       legIndex,
       nextFareCount: nextState.fare.length,
-      query,
     })
 
     router.replace(`/results/${data.partialOfferRequestId}/review?${query}`)
@@ -88,7 +87,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
     logFlightFlow("ReviewPageClient", "navigate_checkout", {
       partialOfferRequestId: data.partialOfferRequestId,
-      query: params.toString(),
+      selectedCount: data.state.selected.length,
     })
 
     router.push(`/results/${data.partialOfferRequestId}/checkout?${params.toString()}`)

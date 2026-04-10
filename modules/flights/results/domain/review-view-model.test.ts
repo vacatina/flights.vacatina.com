@@ -147,7 +147,7 @@ test("buildReviewPageModel maps fare condition lines", () => {
   const comfortOptionLines = comfortOption?.lines.map((line) => line.label)
 
   expect(comfortOptionLines).toContain("Changes not allowed")
-  expect(comfortOptionLines).toContain("No data on refunds")
+  expect(comfortOptionLines).toContain("Refunds not allowed")
 })
 
 function createOffer(input: {

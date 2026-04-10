@@ -73,20 +73,19 @@ export async function executeSearchPlacesAction(
   }
 
   logFlightFlow("searchPlacesAction", "validated_input", {
-    query: parsed.data.query,
     queryLength: parsed.data.query.length,
   })
 
   try {
     const suggestions = await deps.searchPlaces(parsed.data.query)
     logFlightFlow("searchPlacesAction", "search_success", {
-      query: parsed.data.query,
+      queryLength: parsed.data.query.length,
       suggestionCount: suggestions.length,
     })
     return actionSuccess(suggestions)
   } catch (error) {
     logFlightFlowError("searchPlacesAction", "search_failed", error, {
-      query: parsed.data.query,
+      queryLength: parsed.data.query.length,
     })
     deps.logError("[flights/searchPlacesAction]", error)
 
