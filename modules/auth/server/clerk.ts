@@ -50,6 +50,12 @@ export async function verifyClerkWebhookRequest(request: NextRequest) {
     throw new Error("Clerk is not configured.")
   }
 
+  if (!config.clerkWebhookSigningSecretConfigured) {
+    throw new Error(
+      "Missing CLERK_WEBHOOK_SIGNING_SECRET environment variable."
+    )
+  }
+
   logFlightFlow("auth.clerk", "verify_webhook_started")
   const event = await verifyWebhook(request)
   logFlightFlow("auth.clerk", "verify_webhook_succeeded", {

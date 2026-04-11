@@ -4,6 +4,7 @@ const DEFAULT_GUEST_SESSION_SECRET = "local-guest-session-secret"
 
 export interface AuthServerConfig {
   clerkEnabled: boolean
+  clerkWebhookSigningSecretConfigured: boolean
   guestSessionCookieName: string
   guestSessionTtlMs: number
   guestSessionSecret: string
@@ -30,6 +31,7 @@ export function getAuthServerConfig(): AuthServerConfig {
 
   cachedConfig = {
     clerkEnabled: isClerkConfigured(),
+    clerkWebhookSigningSecretConfigured: isClerkWebhookSigningSecretConfigured(),
     guestSessionCookieName,
     guestSessionTtlMs,
     guestSessionSecret,
@@ -43,6 +45,10 @@ export function isClerkConfigured() {
   const secret = process.env.CLERK_SECRET_KEY
 
   return Boolean(publishable && secret)
+}
+
+export function isClerkWebhookSigningSecretConfigured() {
+  return Boolean(process.env.CLERK_WEBHOOK_SIGNING_SECRET)
 }
 
 function resolveGuestSessionSecret() {
