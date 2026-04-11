@@ -4,6 +4,7 @@ import {
   Inter,
 } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
+import { Suspense } from "react"
 
 import "./globals.css"
 import { AuthHeaderControls } from "@/components/auth/auth-header-controls"
@@ -42,7 +43,9 @@ export default function RootLayout({
         {clerkEnabled ? (
           <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
             <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-end px-4 md:px-8">
-              <AuthHeaderControls />
+              <Suspense fallback={<div className="h-8" />}>
+                <AuthHeaderControls />
+              </Suspense>
             </div>
           </header>
         ) : null}
