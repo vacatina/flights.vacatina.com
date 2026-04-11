@@ -52,6 +52,17 @@ export default async function CheckoutPlaceholderPage({
           partialOfferRequestId: resolvedParams.partialOfferRequestId,
           offerId: selectedOfferId,
           selectedPartialOffers,
+          owner:
+            actor.type === "user"
+              ? {
+                  userId: actor.appUserId,
+                  guestId: null,
+                }
+              : {
+                  userId: null,
+                  guestId:
+                    actor.guestId !== "guest_unavailable" ? actor.guestId : null,
+                },
         })
       : null
 
@@ -168,6 +179,7 @@ function toQuoteFailureMessage(reason: string | null) {
     case "partial_offer_request_mismatch":
     case "offer_mismatch":
     case "selected_mismatch":
+    case "owner_mismatch":
       return "The quote does not match the selected fare state. Please regenerate from review."
     default:
       return "The checkout quote is invalid. Please generate a fresh quote."

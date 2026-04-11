@@ -143,6 +143,106 @@ test("validatePricedQuote expires stale quote", async () => {
   expect(getPricingMetricValue("quote_expired_total")).toBe(1)
 })
 
+test("validatePricedQuote enforces user owner when provided", async () => {
+  const deps = createDeps({
+    now: new Date("2026-04-11T00:00:00.000Z"),
+    rules: [],
+  })
+
+  const quote = await createPricedQuote(
+    {
+      partialOfferRequestId: "prq_1",
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      ownerUserId: "usr_123",
+      pricing: {
+        offerId: "off_1",
+        currency: "USD",
+        netAmount: 100,
+        sellAmount: 105,
+        appliedRuleId: null,
+        appliedRuleSpecificity: null,
+      },
+    },
+    deps
+  )
+
+  const okValidation = await validatePricedQuote(
+    {
+      quoteId: quote.id,
+      partialOfferRequestId: "prq_1",
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      owner: {
+        userId: "usr_123",
+        guestId: null,
+      },
+    },
+    deps
+  )
+
+  expect(okValidation.ok).toBe(true)
+
+  const mismatchValidation = await validatePricedQuote(
+    {
+      quoteId: quote.id,
+      partialOfferRequestId: "prq_1",
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      owner: {
+        userId: "usr_other",
+        guestId: null,
+      },
+    },
+    deps
+  )
+
+  expect(mismatchValidation.ok).toBe(false)
+  expect(mismatchValidation.reason).toBe("owner_mismatch")
+})
+
+test("validatePricedQuote enforces guest owner when provided", async () => {
+  const deps = createDeps({
+    now: new Date("2026-04-11T00:00:00.000Z"),
+    rules: [],
+  })
+
+  const quote = await createPricedQuote(
+    {
+      partialOfferRequestId: "prq_1",
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      ownerGuestId: "gst_123",
+      pricing: {
+        offerId: "off_1",
+        currency: "USD",
+        netAmount: 100,
+        sellAmount: 105,
+        appliedRuleId: null,
+        appliedRuleSpecificity: null,
+      },
+    },
+    deps
+  )
+
+  const mismatchValidation = await validatePricedQuote(
+    {
+      quoteId: quote.id,
+      partialOfferRequestId: "prq_1",
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      owner: {
+        userId: null,
+        guestId: "gst_other",
+      },
+    },
+    deps
+  )
+
+  expect(mismatchValidation.ok).toBe(false)
+  expect(mismatchValidation.reason).toBe("owner_mismatch")
+})
+
 test("formatCurrencyAmount respects currency minor units", () => {
   expect(formatCurrencyAmount(110, "JPY")).toContain("110")
   expect(formatCurrencyAmount(110, "JPY")).not.toContain(".")

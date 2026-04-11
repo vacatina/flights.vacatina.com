@@ -44,6 +44,10 @@ interface ValidatePricedQuoteInput {
   partialOfferRequestId: string
   offerId: string
   selectedPartialOffers: string[]
+  owner?: {
+    userId: string | null
+    guestId: string | null
+  }
 }
 
 interface PricedQuoteValidationResult {
@@ -56,6 +60,7 @@ interface PricedQuoteValidationResult {
     | "partial_offer_request_mismatch"
     | "offer_mismatch"
     | "selected_mismatch"
+    | "owner_mismatch"
     | null
 }
 
@@ -229,6 +234,12 @@ export async function validatePricedQuote(
     return failQuoteValidation("selected_mismatch", quote)
   }
 
+  if (input.owner) {
+    if (!doesQuoteOwnerMatch(quote, input.owner)) {
+      return failQuoteValidation("owner_mismatch", quote)
+    }
+  }
+
   return {
     ok: true,
     quote,
@@ -275,7 +286,10 @@ export function createPricingContextFromOffer(offer: Offer): PricingContext {
 }
 
 function failQuoteValidation(
-  reason: Exclude<PricedQuoteValidationResult["reason"], null | "not_found" | "expired" | "not_active">,
+  reason: Exclude<
+    PricedQuoteValidationResult["reason"],
+    null | "not_found" | "expired" | "not_active"
+  >,
   quote: PricedQuoteRecord
 ): PricedQuoteValidationResult {
   incrementPricingMetric("quote_validation_failed_total", {
@@ -291,6 +305,21 @@ function failQuoteValidation(
     quote,
     reason,
   }
+}
+
+function doesQuoteOwnerMatch(
+  quote: Pick<PricedQuoteRecord, "ownerUserId" | "ownerGuestId">,
+  owner: { userId: string | null; guestId: string | null }
+) {
+  if (owner.userId) {
+    return quote.ownerUserId === owner.userId
+  }
+
+  if (owner.guestId) {
+    return quote.ownerGuestId === owner.guestId
+  }
+
+  return false
 }
 
 function toOfferAmount(value: string) {
