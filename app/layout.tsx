@@ -3,10 +3,13 @@ import {
   Geist_Mono,
   Inter,
 } from "next/font/google"
+import { ClerkProvider } from "@clerk/nextjs"
 
 import "./globals.css"
+import { AuthHeaderControls } from "@/components/auth/auth-header-controls"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
+import { isClerkConfigured } from "@/modules/auth/server/config"
 import type { Metadata } from "next"
 
 const figtreeHeading = Figtree({
@@ -31,6 +34,23 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const clerkEnabled = isClerkConfigured()
+
+  const appShell = (
+    <ThemeProvider>
+      <div className="min-h-svh">
+        {clerkEnabled ? (
+          <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+            <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-end px-4 md:px-8">
+              <AuthHeaderControls />
+            </div>
+          </header>
+        ) : null}
+        {children}
+      </div>
+    </ThemeProvider>
+  )
+
   return (
     <html
       lang="en"
@@ -44,7 +64,7 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        {clerkEnabled ? <ClerkProvider>{appShell}</ClerkProvider> : appShell}
       </body>
     </html>
   )

@@ -50,6 +50,12 @@ test("executeCreateCheckoutQuoteAction creates quote from selected offer", async
           expiresAt: new Date("2026-04-11T12:00:00.000Z"),
         }
       },
+      async getActorContext() {
+        return {
+          type: "guest" as const,
+          guestId: "gst_test",
+        }
+      },
     }
   )
 
@@ -76,6 +82,12 @@ test("executeCreateCheckoutQuoteAction rejects missing selected offer", async ()
       },
       async createPricedQuote() {
         throw new Error("should not be called")
+      },
+      async getActorContext() {
+        return {
+          type: "guest" as const,
+          guestId: "gst_test",
+        }
       },
     }
   )

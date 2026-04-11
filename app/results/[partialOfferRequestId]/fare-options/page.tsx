@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getActorContext } from "@/modules/auth/server"
 import { parseResultsUrlState } from "@/modules/flights/results/domain"
 import { fetchFareOptionsData } from "@/modules/flights/results/server"
 import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
@@ -22,10 +23,14 @@ export default async function FareOptionsPage({
     params,
     searchParams,
   ])
+  const actor = await getActorContext({
+    ensureGuestSession: false,
+  })
 
   logFlightFlow("FareOptionsPage", "request_received", {
     partialOfferRequestId: resolvedParams.partialOfferRequestId,
     searchParamKeys: Object.keys(resolvedSearchParams),
+    actorType: actor.type,
   })
   const state = parseResultsUrlState(resolvedSearchParams)
   logFlightFlow("FareOptionsPage", "state_parsed", {

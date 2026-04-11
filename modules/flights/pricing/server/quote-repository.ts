@@ -12,6 +12,9 @@ interface CreateQuoteInput {
   partialOfferRequestId: string
   offerId: string
   selectedPartialOffers: string[]
+  ownerUserId?: string | null
+  ownerGuestId?: string | null
+  ownerOrgId?: string | null
   currency: string
   netAmount: number
   sellAmount: number
@@ -39,6 +42,9 @@ export const defaultPricedQuoteRepository: PricedQuoteRepository = {
         partialOfferRequestId: input.partialOfferRequestId,
         offerId: input.offerId,
         selectedPartialOffers: input.selectedPartialOffers,
+        ownerUserId: input.ownerUserId ?? null,
+        ownerGuestId: input.ownerGuestId ?? null,
+        ownerOrgId: input.ownerOrgId ?? null,
         currency: input.currency,
         netAmount: input.netAmount,
         sellAmount: input.sellAmount,
@@ -66,6 +72,9 @@ export const defaultPricedQuoteRepository: PricedQuoteRepository = {
         partialOfferRequestId: input.partialOfferRequestId,
         offerId: input.offerId,
         selectedPartialOffers: input.selectedPartialOffers,
+        ownerUserId: input.ownerUserId ?? null,
+        ownerGuestId: input.ownerGuestId ?? null,
+        ownerOrgId: input.ownerOrgId ?? null,
         currency: input.currency,
         netAmount: toDbNumeric(input.netAmount),
         sellAmount: toDbNumeric(input.sellAmount),
@@ -134,6 +143,9 @@ function toQuoteRecord(row: typeof pricedQuotes.$inferSelect): PricedQuoteRecord
     partialOfferRequestId: row.partialOfferRequestId,
     offerId: row.offerId,
     selectedPartialOffers: normalizeSelectedPartialOffers(row.selectedPartialOffers),
+    ownerUserId: row.ownerUserId,
+    ownerGuestId: row.ownerGuestId,
+    ownerOrgId: row.ownerOrgId,
     currency: row.currency,
     netAmount: toNumeric(row.netAmount),
     sellAmount: toNumeric(row.sellAmount),

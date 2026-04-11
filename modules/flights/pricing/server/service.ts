@@ -33,6 +33,9 @@ interface CreatePricedQuoteInput {
   partialOfferRequestId: string
   offerId: string
   selectedPartialOffers: string[]
+  ownerUserId?: string | null
+  ownerGuestId?: string | null
+  ownerOrgId?: string | null
   pricing: OfferPriceRecord
 }
 
@@ -130,6 +133,9 @@ export async function createPricedQuote(
     partialOfferRequestId: input.partialOfferRequestId,
     offerId: input.offerId,
     selectedPartialOffers: normalizeSelected(input.selectedPartialOffers),
+    ownerUserId: input.ownerUserId ?? null,
+    ownerGuestId: input.ownerGuestId ?? null,
+    ownerOrgId: input.ownerOrgId ?? null,
     currency: input.pricing.currency,
     netAmount: input.pricing.netAmount,
     sellAmount: input.pricing.sellAmount,
@@ -147,6 +153,8 @@ export async function createPricedQuote(
     offerId: input.offerId,
     partialOfferRequestId: input.partialOfferRequestId,
     selectedCount: input.selectedPartialOffers.length,
+    ownerUserId: input.ownerUserId ?? null,
+    ownerGuestId: input.ownerGuestId ?? null,
     expiresAt: quote.expiresAt.toISOString(),
     ...toPriceBreakdown(input.pricing.netAmount, input.pricing.sellAmount, input.pricing.currency),
   })

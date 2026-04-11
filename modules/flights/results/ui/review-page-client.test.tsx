@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
+import type { ReactNode } from "react"
 
 import type { ReviewPageData } from "@/modules/flights/results/domain"
 import { ReviewPageClient } from "@/modules/flights/results/ui/review-page-client"
@@ -28,10 +29,17 @@ vi.mock("next/navigation", () => ({
     replace: replaceMock,
     push: pushMock,
   }),
+  usePathname: () => "/results/prq_1/review",
+  useSearchParams: () =>
+    new URLSearchParams("selected=off_partial_1%2Coff_partial_2"),
 }))
 
 vi.mock("@/modules/flights/results/server/actions", () => ({
   createCheckoutQuoteAction: (input: unknown) => createCheckoutQuoteActionMock(input),
+}))
+
+vi.mock("@clerk/nextjs", () => ({
+  Show: ({ children }: { children: ReactNode }) => children,
 }))
 
 test("ReviewPageClient keeps inbound leg locked before outbound selection", () => {
