@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import type { Offer } from "@duffel/api/types"
 
-import { matchRule, priceOffer } from "@/modules/flights/pricing/domain"
+import { currencyMinorUnit, matchRule, priceOffer } from "@/modules/flights/pricing/domain"
 import type {
   OfferPriceRecord,
   PricingContext,
@@ -236,15 +236,18 @@ export async function markPricedQuoteConsumed(
 }
 
 export function formatCurrencyAmount(amount: number, currency: string) {
+  const normalizedCurrency = currency.trim().toUpperCase()
+  const digits = currencyMinorUnit(normalizedCurrency)
+
   try {
     return new Intl.NumberFormat("en-GB", {
       style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      currency: normalizedCurrency,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
     }).format(amount)
   } catch {
-    return `${currency.toUpperCase()}${amount.toFixed(2)}`
+    return `${normalizedCurrency}${amount.toFixed(digits)}`
   }
 }
 
@@ -318,27 +321,56 @@ function normalizeSelected(selected: string[]) {
 
 export function summarizeOfferPricing(pricingByOfferId: Record<string, OfferPriceRecord>) {
   const records = Object.values(pricingByOfferId)
-  let totalNetAmount = 0
-  let totalSellAmount = 0
-  const currencies = new Set<string>()
+  const totalsByCurrencyMap = new Map<
+    string,
+    {
+      netAmount: number
+      sellAmount: number
+    }
+  >()
 
   for (const record of records) {
-    totalNetAmount += record.netAmount
-    totalSellAmount += record.sellAmount
-    currencies.add(record.currency)
+    const current = totalsByCurrencyMap.get(record.currency) ?? {
+      netAmount: 0,
+      sellAmount: 0,
+    }
+
+    current.netAmount += record.netAmount
+    current.sellAmount += record.sellAmount
+    totalsByCurrencyMap.set(record.currency, current)
   }
 
-  const totalMarkupAmount = totalSellAmount - totalNetAmount
-  const averageMarkupPercent =
-    totalNetAmount > 0 ? Number(((totalMarkupAmount / totalNetAmount) * 100).toFixed(4)) : null
+  const totalsByCurrency = Array.from(totalsByCurrencyMap.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, totals]) => {
+      const markupAmount = totals.sellAmount - totals.netAmount
+      const markupPercent =
+        totals.netAmount > 0
+          ? Number(((markupAmount / totals.netAmount) * 100).toFixed(4))
+          : null
+
+      return {
+        currency,
+        netAmount: roundAmount(totals.netAmount),
+        sellAmount: roundAmount(totals.sellAmount),
+        markupAmount: roundAmount(markupAmount),
+        markupPercent,
+      }
+    })
+
+  const isMultiCurrency = totalsByCurrency.length > 1
+
+  const singleCurrencyTotals = !isMultiCurrency ? totalsByCurrency[0] : null
 
   return {
     pricedOffersCount: records.length,
-    totalNetAmount: roundAmount(totalNetAmount),
-    totalSellAmount: roundAmount(totalSellAmount),
-    totalMarkupAmount: roundAmount(totalMarkupAmount),
-    averageMarkupPercent,
-    currencies: Array.from(currencies).sort((left, right) => left.localeCompare(right)),
+    isMultiCurrency,
+    currencies: totalsByCurrency.map((totals) => totals.currency),
+    totalsByCurrency,
+    totalNetAmount: singleCurrencyTotals?.netAmount ?? null,
+    totalSellAmount: singleCurrencyTotals?.sellAmount ?? null,
+    totalMarkupAmount: singleCurrencyTotals?.markupAmount ?? null,
+    averageMarkupPercent: singleCurrencyTotals?.markupPercent ?? null,
   }
 }
 

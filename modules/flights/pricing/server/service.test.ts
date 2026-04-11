@@ -17,7 +17,9 @@ import type {
 } from "@/modules/flights/pricing/server/rule-repository"
 import {
   createPricedQuote,
+  formatCurrencyAmount,
   getOfferPricingMap,
+  summarizeOfferPricing,
   validatePricedQuote,
 } from "@/modules/flights/pricing/server/service"
 
@@ -139,6 +141,40 @@ test("validatePricedQuote expires stale quote", async () => {
   expect(validation.ok).toBe(false)
   expect(validation.reason).toBe("expired")
   expect(getPricingMetricValue("quote_expired_total")).toBe(1)
+})
+
+test("formatCurrencyAmount respects currency minor units", () => {
+  expect(formatCurrencyAmount(110, "JPY")).toContain("110")
+  expect(formatCurrencyAmount(110, "JPY")).not.toContain(".")
+  expect(formatCurrencyAmount(110.123, "BHD")).toContain("110.123")
+})
+
+test("summarizeOfferPricing does not aggregate mixed-currency totals", () => {
+  const summary = summarizeOfferPricing({
+    off_usd_1: {
+      offerId: "off_usd_1",
+      currency: "USD",
+      netAmount: 100,
+      sellAmount: 110,
+      appliedRuleId: "rule_1",
+      appliedRuleSpecificity: 1,
+    },
+    off_jpy_1: {
+      offerId: "off_jpy_1",
+      currency: "JPY",
+      netAmount: 1000,
+      sellAmount: 1100,
+      appliedRuleId: "rule_1",
+      appliedRuleSpecificity: 1,
+    },
+  })
+
+  expect(summary.isMultiCurrency).toBe(true)
+  expect(summary.totalNetAmount).toBeNull()
+  expect(summary.totalSellAmount).toBeNull()
+  expect(summary.totalMarkupAmount).toBeNull()
+  expect(summary.currencies).toEqual(["JPY", "USD"])
+  expect(summary.totalsByCurrency).toHaveLength(2)
 })
 
 function createDeps(input: { now: Date; rules: PricingRule[] }) {

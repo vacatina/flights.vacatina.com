@@ -12,6 +12,7 @@ import {
   formatMinutesDuration,
   toDurationMinutes,
 } from "@/modules/flights/results/domain/offer-view-model"
+import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
 import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import type {
   ReviewFareOptionLine,
@@ -612,14 +613,17 @@ function toOfferAmount(
 }
 
 export function formatCurrencyAmount(amount: number, currency: string) {
+  const normalizedCurrency = currency.trim().toUpperCase()
+  const digits = currencyMinorUnit(normalizedCurrency)
+
   try {
     return new Intl.NumberFormat("en-GB", {
       style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      currency: normalizedCurrency,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
     }).format(amount)
   } catch {
-    return `${currency}${amount.toFixed(2)}`
+    return `${normalizedCurrency}${amount.toFixed(digits)}`
   }
 }
