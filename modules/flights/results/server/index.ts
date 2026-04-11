@@ -1,3 +1,5 @@
 export * from "@/modules/flights/results/server/actions"
+export * from "@/modules/flights/results/server/airline-logos"
 export * from "@/modules/flights/results/server/error-map"
+export * from "@/modules/flights/results/server/review-service"
 export * from "@/modules/flights/results/server/service"

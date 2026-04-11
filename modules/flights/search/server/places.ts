@@ -3,14 +3,37 @@ import {
   dedupeSuggestionsById,
   normalizePlaceSuggestion,
 } from "@/modules/flights/search/server/place-normalizer"
+import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
 
 export async function searchPlaceSuggestions(query: string) {
+  logFlightFlow("searchPlaceSuggestions", "start", {
+    queryLength: query.length,
+  })
+
   const client = getDuffelClient()
-  const response = await client.suggestions.list({ query })
+  try {
+    const response = await client.suggestions.list({ query })
 
-  const normalized = response.data
-    .map(normalizePlaceSuggestion)
-    .filter((option): option is NonNullable<typeof option> => option !== null)
+    logFlightFlow("searchPlaceSuggestions", "upstream_response", {
+      rawSuggestionCount: response.data.length,
+    })
 
-  return dedupeSuggestionsById(normalized)
+    const normalized = response.data
+      .map(normalizePlaceSuggestion)
+      .filter((option): option is NonNullable<typeof option> => option !== null)
+
+    const deduped = dedupeSuggestionsById(normalized)
+
+    logFlightFlow("searchPlaceSuggestions", "success", {
+      normalizedCount: normalized.length,
+      dedupedCount: deduped.length,
+    })
+
+    return deduped
+  } catch (error) {
+    logFlightFlowError("searchPlaceSuggestions", "failed", error, {
+      queryLength: query.length,
+    })
+    throw error
+  }
 }

@@ -149,6 +149,55 @@ test("fetchFareOptionsData uses selected offers and returns normalized data", as
   expect(result.after).toBe("cursor_2")
 })
 
+test("fetchFareOptionsData applies priced sell amount to offer cards", async () => {
+  const result = await fetchFareOptionsData(
+    {
+      partialOfferRequestId: "por_123",
+      state: {
+        leg: 0,
+        selected: [],
+        sort: "least_expensive",
+        stops: "any",
+        takeoffFrom: 0,
+        takeoffTo: 1439,
+        landingFrom: 0,
+        landingTo: 1439,
+      },
+    },
+    {
+      async getBaseOfferRequest() {
+        return offerRequestFixture
+      },
+      async getOfferRequestBySelected() {
+        return offerRequestFixture
+      },
+      async getAirlineLogosByAirlineId() {
+        return {}
+      },
+      async getOfferPricingMap() {
+        return {
+          off_1: {
+            offerId: "off_1",
+            netAmount: 352.85,
+            sellAmount: 399.99,
+            currency: "USD",
+            appliedRuleId: "rule_1",
+            appliedRuleSpecificity: 2,
+          },
+        }
+      },
+      async listOffers() {
+        return {
+          data: [offerFixture],
+        }
+      },
+    }
+  )
+
+  expect(result.offers[0]?.totalAmountValue).toBe(399.99)
+  expect(result.offers[0]?.totalAmountLabel).toBe("US$399.99")
+})
+
 test("fetchFareOptionsData clamps leg into valid range", async () => {
   const result = await fetchFareOptionsData(
     {

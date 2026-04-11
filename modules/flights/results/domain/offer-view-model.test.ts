@@ -1,10 +1,11 @@
 import { expect, test } from "vitest"
 
 import {
+  createSearchSummary,
   normalizeOfferForLeg,
   toDurationMinutes,
 } from "@/modules/flights/results/domain"
-import type { Offer } from "@duffel/api/types"
+import type { Offer, OfferRequest } from "@duffel/api/types"
 
 const baseOffer = {
   id: "off_test_1",
@@ -169,4 +170,52 @@ test("normalizeOfferForLeg handles missing aircraft details", () => {
 
   expect(normalized).not.toBeNull()
   expect(normalized?.timeline[1]?.meta).not.toContain("Airbus A321")
+})
+
+test("normalizeOfferForLeg returns null for invalid segment date-times without throwing", () => {
+  const malformedOffer = {
+    ...baseOffer,
+    slices: [
+      {
+        ...baseOffer.slices[0],
+        segments: [
+          {
+            ...baseOffer.slices[0].segments[0],
+            departing_at: "not-a-date",
+            arriving_at: "still-not-a-date",
+          },
+        ],
+      },
+    ],
+  } as unknown as Offer
+
+  expect(() => normalizeOfferForLeg(malformedOffer, 0)).not.toThrow()
+  expect(normalizeOfferForLeg(malformedOffer, 0)).toBeNull()
+})
+
+test("createSearchSummary formats date-only labels without timezone shifting", () => {
+  const offerRequest = {
+    id: "orq_1",
+    created_at: "2026-04-01T00:00:00Z",
+    live_mode: false,
+    cabin_class: "economy",
+    passengers: [{ id: "pas_1", type: "adult" }],
+    slices: [
+      {
+        origin: { iata_code: "CMB" },
+        destination: { iata_code: "DXB" },
+        departure_date: "2026-04-04",
+      },
+      {
+        origin: { iata_code: "DXB" },
+        destination: { iata_code: "CMB" },
+        departure_date: "2026-04-07",
+      },
+    ],
+    offers: [],
+  } as unknown as OfferRequest
+
+  const summary = createSearchSummary(offerRequest, 0)
+
+  expect(summary.dateRangeLabel).toBe("04 Apr - 07 Apr · 1 passenger")
 })

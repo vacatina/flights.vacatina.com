@@ -1,6 +1,13 @@
-import { differenceInCalendarDays, differenceInMinutes, format, parseISO } from "date-fns"
+import {
+  differenceInCalendarDays,
+  differenceInMinutes,
+  format,
+  isValid,
+  parseISO,
+} from "date-fns"
 
 import { clockTimeToMinutes } from "@/modules/flights/search/domain"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import type {
   OfferCardLayover,
   OfferCardTimelineEvent,
@@ -24,8 +31,19 @@ export function normalizeOfferForLeg(
 
   const firstSegment = slice.segments[0]
   const lastSegment = slice.segments[slice.segments.length - 1]
-  const departureAt = parseISO(firstSegment.departing_at)
-  const arrivalAt = parseISO(lastSegment.arriving_at)
+  const departureAt = parseDateTime(firstSegment.departing_at)
+  const arrivalAt = parseDateTime(lastSegment.arriving_at)
+
+  if (!departureAt || !arrivalAt) {
+    logFlightFlow("normalizeOfferForLeg", "skipped_invalid_slice_times", {
+      offerId: offer.id,
+      leg,
+      firstSegmentId: firstSegment.id,
+      lastSegmentId: lastSegment.id,
+    })
+    return null
+  }
+
   const departureTimeLabel = format(departureAt, "HH:mm")
   const arrivalTimeLabel = format(arrivalAt, "HH:mm")
   const arrivalDayOffset = Math.max(
@@ -127,8 +145,8 @@ export function createSearchSummary(
   const title = offerRequest.slices.length > 1 ? "Round trip" : "One way"
   const dateRangeLabel =
     offerRequest.slices.length > 1
-      ? `${format(parseISO(`${firstSlice.departure_date}T00:00:00Z`), "dd MMM")} - ${format(parseISO(`${lastSlice.departure_date}T00:00:00Z`), "dd MMM")}`
-      : format(parseISO(`${firstSlice.departure_date}T00:00:00Z`), "dd MMM")
+      ? `${formatDateOnly(firstSlice.departure_date)} - ${formatDateOnly(lastSlice.departure_date)}`
+      : formatDateOnly(firstSlice.departure_date)
   const passengerCount = offerRequest.passengers.length
 
   return {
@@ -160,13 +178,15 @@ function createTimeline(
   const timeline: OfferCardTimelineEvent[] = []
 
   for (const segment of segments) {
-    const departureAt = parseISO(segment.departing_at)
-    const arrivalAt = parseISO(segment.arriving_at)
+    const departureAt = parseDateTime(segment.departing_at)
+    const arrivalAt = parseDateTime(segment.arriving_at)
     const segmentDuration = toDurationMinutes(segment.duration)
 
     timeline.push({
       id: `${segment.id}-depart`,
-      dateTimeLabel: format(departureAt, "EEE, dd MMM yyyy, HH:mm"),
+      dateTimeLabel: departureAt
+        ? format(departureAt, "EEE, dd MMM yyyy, HH:mm")
+        : "Date unavailable",
       description: withTerminal(
         `Depart from ${segment.origin.name} (${segment.origin.iata_code})`,
         segment.origin_terminal
@@ -178,7 +198,9 @@ function createTimeline(
 
     timeline.push({
       id: `${segment.id}-arrive`,
-      dateTimeLabel: format(arrivalAt, "EEE, dd MMM yyyy, HH:mm"),
+      dateTimeLabel: arrivalAt
+        ? format(arrivalAt, "EEE, dd MMM yyyy, HH:mm")
+        : "Date unavailable",
       description: withTerminal(
         `Arrive at ${segment.destination.name} (${segment.destination.iata_code})`,
         segment.destination_terminal
@@ -202,10 +224,12 @@ function createLayovers(
   for (let index = 1; index < segments.length; index += 1) {
     const previous = segments[index - 1]
     const current = segments[index]
-    const layoverMinutes = Math.max(
-      0,
-      differenceInMinutes(parseISO(current.departing_at), parseISO(previous.arriving_at))
-    )
+    const currentDepartureAt = parseDateTime(current.departing_at)
+    const previousArrivalAt = parseDateTime(previous.arriving_at)
+    const layoverMinutes =
+      currentDepartureAt && previousArrivalAt
+        ? Math.max(0, differenceInMinutes(currentDepartureAt, previousArrivalAt))
+        : 0
 
     layovers.push({
       id: `${previous.id}-${current.id}-layover`,
@@ -282,4 +306,23 @@ function isOfferExpired(offer: OfferLike) {
   }
 
   return expiresAtTime <= Date.now()
+}
+
+function parseDateTime(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null
+  }
+
+  const parsed = parseISO(value)
+  return isValid(parsed) ? parsed : null
+}
+
+function formatDateOnly(value: string): string {
+  const parsed = parseDateTime(value)
+
+  if (!parsed) {
+    return value
+  }
+
+  return format(parsed, "dd MMM")
 }

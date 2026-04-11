@@ -42,6 +42,7 @@ import {
   type JourneyType,
 } from "@/modules/flights/search/domain"
 import { submitFlightSearchAction } from "@/modules/flights/search/server/actions"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import { DatePickerField } from "@/modules/flights/search/ui/date-picker-field"
 import { PassengersPopover } from "@/modules/flights/search/ui/passengers-popover"
 import { PlaceAutocompleteField } from "@/modules/flights/search/ui/place-autocomplete-field"
@@ -94,6 +95,12 @@ export function FlightSearchForm() {
   })
 
   useEffect(() => {
+    logFlightFlow("flightSearchForm", "mounted", {
+      defaultJourneyType: form.getValues("journeyType"),
+    })
+  }, [form])
+
+  useEffect(() => {
     if (journeyType !== "return") {
       return
     }
@@ -106,6 +113,10 @@ export function FlightSearchForm() {
       shouldDirty: false,
       shouldValidate: isSubmitted,
     })
+    logFlightFlow("flightSearchForm", "synced_return_leg_from_outbound", {
+      outboundOrigin: outboundOrigin?.iataCode,
+      outboundDestination: outboundDestination?.iataCode,
+    })
   }, [
     isSubmitted,
     journeyType,
@@ -115,6 +126,13 @@ export function FlightSearchForm() {
   ])
 
   const onSubmit = handleSubmit((values) => {
+    logFlightFlow("flightSearchForm", "submit_clicked", {
+      journeyType: values.journeyType,
+      cabinClass: values.cabinClass,
+      sliceCount: values.slices.length,
+      adults: values.passengers.adults,
+      children: values.passengers.children,
+    })
     setServerError(null)
     clearErrors()
 
@@ -124,14 +142,25 @@ export function FlightSearchForm() {
   })
 
   async function submitSearch(values: FlightSearchFormValues) {
+    logFlightFlow("flightSearchForm", "submit_started", {
+      journeyType: values.journeyType,
+      sliceCount: values.slices.length,
+    })
     const result = await submitFlightSearchAction(values)
 
     if (!result.ok) {
       const appliedFieldErrors = applyServerFieldErrors(result.error.fieldErrors)
+      logFlightFlow("flightSearchForm", "submit_failed", {
+        code: result.error.code,
+        fieldErrorCount: appliedFieldErrors,
+      })
       setServerError(appliedFieldErrors > 0 ? null : result.error.message)
       return
     }
 
+    logFlightFlow("flightSearchForm", "submit_succeeded", {
+      partialOfferRequestId: result.data.partialOfferRequestId,
+    })
     router.push(`/results/${result.data.partialOfferRequestId}/fare-options`)
   }
 
@@ -156,6 +185,10 @@ export function FlightSearchForm() {
     })
 
     replace(adjusted)
+    logFlightFlow("flightSearchForm", "journey_type_changed", {
+      nextJourneyType,
+      sliceCount: adjusted.length,
+    })
   }
 
   function applyServerFieldErrors(fieldErrors?: Record<string, string>) {
@@ -177,6 +210,12 @@ export function FlightSearchForm() {
         message,
       })
       appliedCount += 1
+    }
+
+    if (appliedCount > 0) {
+      logFlightFlow("flightSearchForm", "applied_server_field_errors", {
+        appliedCount,
+      })
     }
 
     return appliedCount

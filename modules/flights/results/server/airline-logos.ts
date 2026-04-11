@@ -1,0 +1,157 @@
+import type { Airline, Offer } from "@duffel/api/types"
+
+import { getDuffelFlightConfig } from "@/lib/duffel/config"
+import { logDuffelError } from "@/modules/flights/results/server/error-map"
+import {
+  logFlightFlow,
+  logFlightFlowError,
+} from "@/modules/flights/shared/flow-debug"
+
+interface AirlineLogoCacheEntry {
+  expiresAt: number
+  logoUrl: string | null
+}
+
+const duffelConfig = getDuffelFlightConfig()
+const airlineLogoCache = new Map<string, AirlineLogoCacheEntry>()
+
+export async function getAirlineLogosByAirlineId(airlineIds: string[]) {
+  logFlightFlow("getAirlineLogosByAirlineId", "start", {
+    requestedAirlineIdsCount: airlineIds.length,
+  })
+  const result: Record<string, string> = {}
+  const now = Date.now()
+  const idsToFetch: string[] = []
+  let cacheHitCount = 0
+
+  for (const airlineId of airlineIds) {
+    const cachedLogo = getCachedAirlineLogo(airlineId, now)
+
+    if (cachedLogo === undefined) {
+      idsToFetch.push(airlineId)
+      continue
+    }
+
+    if (cachedLogo) {
+      result[airlineId] = cachedLogo
+    }
+
+    cacheHitCount += 1
+  }
+
+  logFlightFlow("getAirlineLogosByAirlineId", "cache_checked", {
+    requestedAirlineIdsCount: airlineIds.length,
+    cacheHitCount,
+    idsToFetchCount: idsToFetch.length,
+  })
+
+  if (idsToFetch.length > 0) {
+    try {
+      const { getDuffelClient } = await import("@/lib/duffel")
+      const client = getDuffelClient()
+      const responses = await Promise.allSettled(
+        idsToFetch.map((airlineId) => client.airlines.get(airlineId))
+      )
+
+      logFlightFlow("getAirlineLogosByAirlineId", "upstream_batch_completed", {
+        idsToFetchCount: idsToFetch.length,
+        resultCount: responses.length,
+      })
+
+      for (let index = 0; index < responses.length; index += 1) {
+        const airlineId = idsToFetch[index]
+        const response = responses[index]
+
+        if (response.status === "fulfilled") {
+          const airline = response.value.data as Airline
+          const logoUrl = airline.logo_symbol_url ?? airline.logo_lockup_url ?? null
+          setCachedAirlineLogo(airlineId, logoUrl, now)
+          continue
+        }
+
+        setCachedAirlineLogo(airlineId, null, now)
+        logFlightFlowError(
+          "getAirlineLogosByAirlineId",
+          "upstream_logo_lookup_failed",
+          response.reason,
+          { airlineId }
+        )
+        logDuffelError("airlines.get failed", response.reason, { airlineId })
+      }
+    } catch (error) {
+      logFlightFlowError("getAirlineLogosByAirlineId", "upstream_batch_failed", error, {
+        airlineIds: idsToFetch,
+      })
+      logDuffelError("airlines.get batch failed", error, {
+        airlineIds: idsToFetch,
+      })
+    }
+  }
+
+  for (const airlineId of idsToFetch) {
+    const logoUrl = getCachedAirlineLogo(airlineId, now)
+
+    if (logoUrl) {
+      result[airlineId] = logoUrl
+    }
+  }
+
+  logFlightFlow("getAirlineLogosByAirlineId", "completed", {
+    requestedAirlineIdsCount: airlineIds.length,
+    resolvedLogoCount: Object.keys(result).length,
+  })
+
+  return result
+}
+
+export function getAirlineIdsFromOffers(offers: Offer[]) {
+  const airlineIds = Array.from(
+    new Set(
+      offers
+        .map((offer) => offer.owner.id)
+        .filter((airlineId): airlineId is string => Boolean(airlineId))
+    )
+  )
+
+  logFlightFlow("getAirlineIdsFromOffers", "computed", {
+    offersCount: offers.length,
+    airlineIdsCount: airlineIds.length,
+  })
+
+  return airlineIds
+}
+
+function getCachedAirlineLogo(airlineId: string, now: number) {
+  const cached = airlineLogoCache.get(airlineId)
+
+  if (!cached) {
+    return undefined
+  }
+
+  if (cached.expiresAt <= now) {
+    airlineLogoCache.delete(airlineId)
+    return undefined
+  }
+
+  airlineLogoCache.delete(airlineId)
+  airlineLogoCache.set(airlineId, cached)
+
+  return cached.logoUrl
+}
+
+function setCachedAirlineLogo(airlineId: string, logoUrl: string | null, now: number) {
+  airlineLogoCache.set(airlineId, {
+    logoUrl,
+    expiresAt: now + duffelConfig.airlineLogoCacheTtlMs,
+  })
+
+  while (airlineLogoCache.size > duffelConfig.airlineLogoCacheMaxEntries) {
+    const oldestKey = airlineLogoCache.keys().next().value as string | undefined
+
+    if (!oldestKey) {
+      break
+    }
+
+    airlineLogoCache.delete(oldestKey)
+  }
+}

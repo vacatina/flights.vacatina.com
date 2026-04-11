@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState, useTransition } from "react"
+import { useCallback, useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertCircleIcon,
@@ -62,6 +62,7 @@ import {
   type FareOptionsPageData,
 } from "@/modules/flights/results/domain"
 import { loadMoreFareOptionsAction } from "@/modules/flights/results/server/actions"
+import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 import { cn } from "@/lib/utils"
 
 const SORT_OPTIONS = [
@@ -77,6 +78,7 @@ const STOPS_OPTIONS = [
   { value: "max_2", label: "2 stops at most" },
   { value: "any", label: "Any number of stops" },
 ] as const
+const FILTER_DEBOUNCE_MS = 300
 
 export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   const router = useRouter()
@@ -85,12 +87,45 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [isFilterDialogOpen, setFilterDialogOpen] = useState(false)
   const [isLoadingMore, startLoadingMore] = useTransition()
+  const [draftFlightNumber, setDraftFlightNumber] = useState(
+    data.state.flightNumber ?? ""
+  )
+  const [draftTakeoffRange, setDraftTakeoffRange] = useState<[number, number]>([
+    data.state.takeoffFrom,
+    data.state.takeoffTo,
+  ])
+  const [draftLandingRange, setDraftLandingRange] = useState<[number, number]>([
+    data.state.landingFrom,
+    data.state.landingTo,
+  ])
 
-  function updateQuery(
+  useEffect(() => {
+    logFlightFlow("FareOptionsPageClient", "hydrated", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      leg: data.leg,
+      totalLegs: data.totalLegs,
+      selectedCount: data.selected.length,
+      initialOfferCount: data.offers.length,
+      hasNextAfter: Boolean(data.after),
+    })
+  }, [
+    data.after,
+    data.leg,
+    data.offers.length,
+    data.partialOfferRequestId,
+    data.selected.length,
+    data.totalLegs,
+  ])
+
+  const updateQuery = useCallback(function updateQuery(
     patch: Partial<Omit<FareOptionsPageData["state"], "selected">> & {
       selected?: string[]
     }
   ) {
+    logFlightFlow("FareOptionsPageClient", "update_query_requested", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      patchKeys: Object.keys(patch),
+    })
     const nextState = {
       ...data.state,
       ...patch,
@@ -98,12 +133,88 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
       selected: patch.selected ?? data.state.selected,
     }
     const search = toResultsUrlSearchParams(nextState).toString()
+    logFlightFlow("FareOptionsPageClient", "update_query_navigate", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      nextLeg: nextState.leg,
+      selectedCount: nextState.selected.length,
+      hasAfter: Boolean(nextState.after),
+    })
     router.replace(
       `/results/${data.partialOfferRequestId}/fare-options?${search}`
     )
-  }
+  }, [data.partialOfferRequestId, data.state, router])
+
+  useEffect(() => {
+    const normalizedDraft = draftFlightNumber.trim() || undefined
+
+    if (normalizedDraft === data.state.flightNumber) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      updateQuery({ flightNumber: normalizedDraft })
+    }, FILTER_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [data.state.flightNumber, draftFlightNumber, updateQuery])
+
+  useEffect(() => {
+    if (
+      sameRange(draftTakeoffRange, [data.state.takeoffFrom, data.state.takeoffTo])
+    ) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      updateQuery({
+        takeoffFrom: draftTakeoffRange[0],
+        takeoffTo: draftTakeoffRange[1],
+      })
+    }, FILTER_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [
+    data.state.takeoffFrom,
+    data.state.takeoffTo,
+    draftTakeoffRange,
+    updateQuery,
+  ])
+
+  useEffect(() => {
+    if (
+      sameRange(draftLandingRange, [data.state.landingFrom, data.state.landingTo])
+    ) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      updateQuery({
+        landingFrom: draftLandingRange[0],
+        landingTo: draftLandingRange[1],
+      })
+    }, FILTER_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [
+    data.state.landingFrom,
+    data.state.landingTo,
+    draftLandingRange,
+    updateQuery,
+  ])
 
   function selectOffer(offerId: string) {
+    logFlightFlow("FareOptionsPageClient", "offer_selected", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      leg: data.leg,
+      offerId,
+      selectedCountBefore: data.selected.length,
+    })
     const nextSelected = [...data.selected, offerId]
 
     if (data.leg < data.totalLegs - 1) {
@@ -114,6 +225,11 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         after: undefined,
       }
       const search = toResultsUrlSearchParams(nextState).toString()
+      logFlightFlow("FareOptionsPageClient", "navigate_next_leg", {
+        partialOfferRequestId: data.partialOfferRequestId,
+        nextLeg: nextState.leg,
+        selectedCount: nextSelected.length,
+      })
       router.push(
         `/results/${data.partialOfferRequestId}/fare-options?${search}`
       )
@@ -122,6 +238,10 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
     const params = new URLSearchParams()
     params.set("selected", nextSelected.join(","))
+    logFlightFlow("FareOptionsPageClient", "navigate_review", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      selectedCount: nextSelected.length,
+    })
     router.push(
       `/results/${data.partialOfferRequestId}/review?${params.toString()}`
     )
@@ -129,9 +249,17 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
   function loadMore() {
     if (!nextAfter) {
+      logFlightFlow("FareOptionsPageClient", "load_more_skipped_no_cursor", {
+        partialOfferRequestId: data.partialOfferRequestId,
+      })
       return
     }
 
+    logFlightFlow("FareOptionsPageClient", "load_more_requested", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      after: nextAfter,
+      currentOfferCount: offers.length,
+    })
     startLoadingMore(() => {
       void (async () => {
         const result = await loadMoreFareOptionsAction({
@@ -143,10 +271,20 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         })
 
         if (!result.ok) {
+          logFlightFlow("FareOptionsPageClient", "load_more_failed", {
+            partialOfferRequestId: data.partialOfferRequestId,
+            after: nextAfter,
+            code: result.error.code,
+          })
           setLoadMoreError(result.error.message)
           return
         }
 
+        logFlightFlow("FareOptionsPageClient", "load_more_succeeded", {
+          partialOfferRequestId: data.partialOfferRequestId,
+          loadedOfferCount: result.data.offers.length,
+          nextAfter: result.data.after,
+        })
         setOffers((current) => {
           const deduped = new Map(current.map((offer) => [offer.id, offer]))
 
@@ -214,7 +352,16 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
               <DialogHeader>
                 <DialogTitle>Filters and sorting</DialogTitle>
               </DialogHeader>
-              <FiltersSidebar data={data} onChange={updateQuery} />
+              <FiltersSidebar
+                data={data}
+                onChange={updateQuery}
+                flightNumberValue={draftFlightNumber}
+                onFlightNumberChange={setDraftFlightNumber}
+                takeoffRange={draftTakeoffRange}
+                onTakeoffRangeChange={setDraftTakeoffRange}
+                landingRange={draftLandingRange}
+                onLandingRangeChange={setDraftLandingRange}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -222,7 +369,16 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         <div className="grid items-start gap-7 lg:grid-cols-[320px_1fr]">
           <aside className="hidden lg:sticky lg:top-6 lg:block lg:self-start">
             <div className="max-h-[calc(100svh-3rem)] overflow-y-auto pr-2">
-              <FiltersSidebar data={data} onChange={updateQuery} />
+              <FiltersSidebar
+                data={data}
+                onChange={updateQuery}
+                flightNumberValue={draftFlightNumber}
+                onFlightNumberChange={setDraftFlightNumber}
+                takeoffRange={draftTakeoffRange}
+                onTakeoffRangeChange={setDraftTakeoffRange}
+                landingRange={draftLandingRange}
+                onLandingRangeChange={setDraftLandingRange}
+              />
             </div>
           </aside>
 
@@ -469,6 +625,12 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 function FiltersSidebar({
   data,
   onChange,
+  flightNumberValue,
+  onFlightNumberChange,
+  takeoffRange,
+  onTakeoffRangeChange,
+  landingRange,
+  onLandingRangeChange,
 }: {
   data: FareOptionsPageData
   onChange: (
@@ -476,6 +638,12 @@ function FiltersSidebar({
       selected?: string[]
     }
   ) => void
+  flightNumberValue: string
+  onFlightNumberChange: (value: string) => void
+  takeoffRange: [number, number]
+  onTakeoffRangeChange: (value: [number, number]) => void
+  landingRange: [number, number]
+  onLandingRangeChange: (value: [number, number]) => void
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -580,10 +748,8 @@ function FiltersSidebar({
             Flight number
           </FieldLabel>
           <Input
-            value={data.state.flightNumber ?? ""}
-            onChange={(event) =>
-              onChange({ flightNumber: event.target.value || undefined })
-            }
+            value={flightNumberValue}
+            onChange={(event) => onFlightNumberChange(event.target.value)}
             className="h-12 rounded-xl text-sm"
             placeholder="e.g. AI0278"
           />
@@ -599,18 +765,14 @@ function FiltersSidebar({
               min={0}
               max={1439}
               step={15}
-              value={[data.state.takeoffFrom, data.state.takeoffTo]}
+              value={takeoffRange}
               onValueChange={(nextValue) => {
-                const [from, to] = toSliderRange(nextValue)
-                onChange({
-                  takeoffFrom: from,
-                  takeoffTo: to,
-                })
+                onTakeoffRangeChange(toSliderRange(nextValue))
               }}
             />
             <div className="mt-2 flex justify-between text-sm text-muted-foreground">
-              <span>{formatMinutes(data.state.takeoffFrom)}</span>
-              <span>{formatMinutes(data.state.takeoffTo)}</span>
+              <span>{formatMinutes(takeoffRange[0])}</span>
+              <span>{formatMinutes(takeoffRange[1])}</span>
             </div>
           </Field>
 
@@ -623,18 +785,14 @@ function FiltersSidebar({
               min={0}
               max={1439}
               step={15}
-              value={[data.state.landingFrom, data.state.landingTo]}
+              value={landingRange}
               onValueChange={(nextValue) => {
-                const [from, to] = toSliderRange(nextValue)
-                onChange({
-                  landingFrom: from,
-                  landingTo: to,
-                })
+                onLandingRangeChange(toSliderRange(nextValue))
               }}
             />
             <div className="mt-2 flex justify-between text-sm text-muted-foreground">
-              <span>{formatMinutes(data.state.landingFrom)}</span>
-              <span>{formatMinutes(data.state.landingTo)}</span>
+              <span>{formatMinutes(landingRange[0])}</span>
+              <span>{formatMinutes(landingRange[1])}</span>
             </div>
           </Field>
         </FieldGroup>
@@ -656,4 +814,11 @@ function toSliderRange(value: number | readonly number[]): [number, number] {
   }
 
   return [value[0] ?? 0, value[1] ?? 1439]
+}
+
+function sameRange(
+  left: readonly [number, number],
+  right: readonly [number, number]
+) {
+  return left[0] === right[0] && left[1] === right[1]
 }
