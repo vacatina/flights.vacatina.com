@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 
 import type { ReviewPageData } from "@/modules/flights/results/domain"
@@ -6,11 +6,21 @@ import { ReviewPageClient } from "@/modules/flights/results/ui/review-page-clien
 
 const replaceMock = vi.fn()
 const pushMock = vi.fn()
+const createCheckoutQuoteActionMock = vi.fn<
+  (input: unknown) => Promise<{ ok: true; data: { quoteId: string; expiresAt: string } }>
+>(async () => ({
+  ok: true as const,
+  data: {
+    quoteId: "pqt_1",
+    expiresAt: "2026-04-11T10:00:00.000Z",
+  },
+}))
 
 afterEach(() => {
   cleanup()
   replaceMock.mockClear()
   pushMock.mockClear()
+  createCheckoutQuoteActionMock.mockClear()
 })
 
 vi.mock("next/navigation", () => ({
@@ -18,6 +28,10 @@ vi.mock("next/navigation", () => ({
     replace: replaceMock,
     push: pushMock,
   }),
+}))
+
+vi.mock("@/modules/flights/results/server/actions", () => ({
+  createCheckoutQuoteAction: (input: unknown) => createCheckoutQuoteActionMock(input),
 }))
 
 test("ReviewPageClient keeps inbound leg locked before outbound selection", () => {
@@ -43,7 +57,7 @@ test("ReviewPageClient updates URL when selecting a fare", () => {
   )
 })
 
-test("ReviewPageClient navigates to checkout when summary is complete", () => {
+test("ReviewPageClient navigates to checkout when summary is complete", async () => {
   render(
     <ReviewPageClient
       data={createReviewData({
@@ -67,9 +81,17 @@ test("ReviewPageClient navigates to checkout when summary is complete", () => {
   const checkoutButton = screen.getByRole("button", { name: "Go to checkout" })
   fireEvent.click(checkoutButton)
 
-  expect(pushMock).toHaveBeenCalledWith(
-    "/results/prq_1/checkout?offer=off_1&selected=off_partial_1%2Coff_partial_2"
+  await waitFor(() =>
+    expect(pushMock).toHaveBeenCalledWith(
+      "/results/prq_1/checkout?offer=off_1&selected=off_partial_1%2Coff_partial_2&quote=pqt_1"
+    )
   )
+
+  expect(createCheckoutQuoteActionMock).toHaveBeenCalledWith({
+    partialOfferRequestId: "prq_1",
+    selected: ["off_partial_1", "off_partial_2"],
+    offerId: "off_1",
+  })
 })
 
 function createReviewData(overrides?: Partial<ReviewPageData>): ReviewPageData {

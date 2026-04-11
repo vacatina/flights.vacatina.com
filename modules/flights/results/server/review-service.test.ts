@@ -87,6 +87,43 @@ test("fetchReviewPageData returns review data for valid selection", async () => 
   expect(result.summary.totalAmountLabel).toBe("US$915.60")
 })
 
+test("fetchReviewPageData applies priced sell amounts in summary", async () => {
+  const result = await fetchReviewPageData(
+    {
+      partialOfferRequestId: "prq_1",
+      state: {
+        selected: ["off_partial_1", "off_partial_2"],
+        fare: [],
+      },
+    },
+    {
+      async getBaseOfferRequest() {
+        return baseOfferRequestFixture
+      },
+      async getFaresBySelected() {
+        return faresOfferRequestFixture
+      },
+      async getAirlineLogosByAirlineId() {
+        return {}
+      },
+      async getOfferPricingMap() {
+        return {
+          off_1: {
+            offerId: "off_1",
+            netAmount: 915.6,
+            sellAmount: 990.6,
+            currency: "USD",
+            appliedRuleId: "rule_1",
+            appliedRuleSpecificity: 2,
+          },
+        }
+      },
+    }
+  )
+
+  expect(result.summary.totalAmountLabel).toBe("US$990.60")
+})
+
 test("fetchReviewPageData rejects duplicate selected partial offers", async () => {
   await expect(
     fetchReviewPageData(

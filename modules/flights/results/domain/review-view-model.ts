@@ -27,6 +27,7 @@ interface BuildReviewPageModelInput {
   selected: string[]
   requestedFare: string[]
   airlineLogosByAirlineId?: Readonly<Record<string, string>>
+  offerPricingByOfferId?: Readonly<Record<string, { sellAmount: number }>>
 }
 
 interface BuildReviewPageModelResult {
@@ -55,6 +56,7 @@ export function buildReviewPageModel({
   selected,
   requestedFare,
   airlineLogosByAirlineId = {},
+  offerPricingByOfferId = {},
 }: BuildReviewPageModelInput): BuildReviewPageModelResult {
   logFlightFlow("buildReviewPageModel", "start", {
     selectedCount: selected.length,
@@ -79,7 +81,7 @@ export function buildReviewPageModel({
     const header = createLegHeaderViewModel({
       legIndex,
       totalLegs,
-      offer: pickCheapestOffer(legOffers) ?? offers[0],
+      offer: pickCheapestOffer(legOffers, offerPricingByOfferId) ?? offers[0],
       airlineLogosByAirlineId,
     })
 
@@ -102,7 +104,7 @@ export function buildReviewPageModel({
       continue
     }
 
-    const groups = groupFareOptionsByLeg(legOffers, legIndex)
+    const groups = groupFareOptionsByLeg(legOffers, legIndex, offerPricingByOfferId)
     const optionGroups = Array.from(groups.values()).sort((left, right) => {
       if (left.minAmount !== right.minAmount) {
         return left.minAmount - right.minAmount
@@ -149,7 +151,12 @@ export function buildReviewPageModel({
   }
 
   const summaryOffers = candidateOffers.length > 0 ? candidateOffers : offers
-  const summary = createSummaryViewModel(summaryOffers, normalizedFare.length, totalLegs)
+  const summary = createSummaryViewModel(
+    summaryOffers,
+    normalizedFare.length,
+    totalLegs,
+    offerPricingByOfferId
+  )
 
   const result = {
     breadcrumbs,
@@ -274,7 +281,11 @@ function legTitle(totalLegs: number, legIndex: number) {
   return `Leg ${legIndex + 1}`
 }
 
-function groupFareOptionsByLeg(offers: Offer[], legIndex: number) {
+function groupFareOptionsByLeg(
+  offers: Offer[],
+  legIndex: number,
+  offerPricingByOfferId: Readonly<Record<string, { sellAmount: number }>>
+) {
   const groups = new Map<string, FareOptionGroup>()
 
   for (const offer of offers) {
@@ -285,7 +296,7 @@ function groupFareOptionsByLeg(offers: Offer[], legIndex: number) {
     }
 
     const key = createFareKey(offer, legIndex)
-    const amount = toOfferAmount(offer)
+    const amount = toOfferAmount(offer, offerPricingByOfferId)
     const existing = groups.get(key)
 
     if (existing) {
@@ -521,9 +532,10 @@ function formatHoldLine(offer: Offer) {
 function createSummaryViewModel(
   offers: Offer[],
   selectedFareCount: number,
-  totalLegs: number
+  totalLegs: number,
+  offerPricingByOfferId: Readonly<Record<string, { sellAmount: number }>>
 ): ReviewSummaryViewModel {
-  const summaryOffer = pickCheapestOffer(offers)
+  const summaryOffer = pickCheapestOffer(offers, offerPricingByOfferId)
   const checkoutEnabled = selectedFareCount === totalLegs && Boolean(summaryOffer)
 
   if (!summaryOffer) {
@@ -548,7 +560,7 @@ function createSummaryViewModel(
       ? `From ${Math.round(co2Value)}kg CO2`
       : "CO2 data unavailable",
     totalAmountLabel: formatCurrencyAmount(
-      toOfferAmount(summaryOffer),
+      toOfferAmount(summaryOffer, offerPricingByOfferId),
       summaryOffer.total_currency
     ),
     checkoutEnabled,
@@ -565,15 +577,31 @@ function createSummaryConditions(offer: Offer) {
   return firstLegLines.map((line) => line.label)
 }
 
-function pickCheapestOffer(offers: Offer[]) {
+function pickCheapestOffer(
+  offers: Offer[],
+  offerPricingByOfferId: Readonly<Record<string, { sellAmount: number }>>
+) {
   if (offers.length === 0) {
     return null
   }
 
-  return [...offers].sort((left, right) => toOfferAmount(left) - toOfferAmount(right))[0]
+  return [...offers].sort(
+    (left, right) =>
+      toOfferAmount(left, offerPricingByOfferId) -
+      toOfferAmount(right, offerPricingByOfferId)
+  )[0]
 }
 
-function toOfferAmount(offer: Offer) {
+function toOfferAmount(
+  offer: Offer,
+  offerPricingByOfferId: Readonly<Record<string, { sellAmount: number }>>
+) {
+  const priced = offerPricingByOfferId[offer.id]
+
+  if (priced && Number.isFinite(priced.sellAmount)) {
+    return priced.sellAmount
+  }
+
   const numeric = Number(offer.total_amount)
 
   if (!Number.isFinite(numeric)) {

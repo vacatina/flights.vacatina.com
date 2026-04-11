@@ -21,6 +21,11 @@ import {
   getAirlineLogosByAirlineId,
 } from "@/modules/flights/results/server/airline-logos"
 import {
+  formatCurrencyAmount,
+  getOfferPricingMap as getOfferPricingMapFromService,
+  summarizeOfferPricing,
+} from "@/modules/flights/pricing/server"
+import {
   logFlightFlow,
   logFlightFlowError,
 } from "@/modules/flights/shared/flow-debug"
@@ -38,6 +43,19 @@ interface FetchFareOptionsDeps {
   getAirlineLogosByAirlineId: (
     airlineIds: string[]
   ) => Promise<Record<string, string>>
+  getOfferPricingMap?: (offers: Offer[]) => Promise<
+    Record<
+      string,
+      {
+        offerId: string
+        currency: string
+        netAmount: number
+        sellAmount: number
+        appliedRuleId: string | null
+        appliedRuleSpecificity: number | null
+      }
+    >
+  >
   listOffers: (params: {
     offer_request_id: string
     after?: string
@@ -154,15 +172,24 @@ export async function fetchFareOptionsData(
   const airlineLogosByAirlineId = await deps.getAirlineLogosByAirlineId(
     airlineIds
   )
+  const offerPricingByOfferId = await (deps.getOfferPricingMap ?? getOfferPricingMapFromService)(
+    listResponse.data
+  )
+  const pricingSummary = summarizeOfferPricing(offerPricingByOfferId)
   logFlightFlow("fetchFareOptionsData", "airline_logos_resolved", {
     partialOfferRequestId: input.partialOfferRequestId,
     airlineIdsCount: airlineIds.length,
     logoCount: Object.keys(airlineLogosByAirlineId).length,
   })
+  logFlightFlow("fetchFareOptionsData", "offer_pricing_resolved", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    ...pricingSummary,
+  })
 
   const normalizedOffers = listResponse.data
     .map((offer) => normalizeOfferForLeg(offer, leg, airlineLogosByAirlineId))
     .filter((offer): offer is NonNullable<typeof offer> => offer !== null)
+    .map((offer) => applyPricingToOfferCard(offer, offerPricingByOfferId[offer.id]))
   const filteredOffers = applyOfferClientFilters(normalizedOffers, safeState)
   const sortedOffers = applyOfferClientSorting(filteredOffers, safeState.sort)
   const airlines = Array.from(new Set(normalizedOffers.map((offer) => offer.ownerName))).sort(
@@ -329,6 +356,22 @@ function normalizeSelectedOfferIds(selected: string[]) {
   return selected
     .map((offerId) => offerId.trim())
     .filter((offerId) => offerId.length > 0)
+}
+
+function applyPricingToOfferCard(
+  offer: NonNullable<ReturnType<typeof normalizeOfferForLeg>>,
+  pricing: { sellAmount: number; currency: string } | undefined
+) {
+  if (!pricing) {
+    return offer
+  }
+
+  return {
+    ...offer,
+    totalAmountValue: pricing.sellAmount,
+    totalCurrency: pricing.currency,
+    totalAmountLabel: formatCurrencyAmount(pricing.sellAmount, pricing.currency),
+  }
 }
 
 function getOfferRequestIdFromOfferRequest(offerRequest: OfferRequest): string | null {

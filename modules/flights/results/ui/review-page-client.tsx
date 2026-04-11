@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRightIcon, BriefcaseIcon, CheckIcon } from "lucide-react"
 
@@ -22,10 +22,13 @@ import {
   toReviewUrlSearchParams,
   type ReviewPageData,
 } from "@/modules/flights/results/domain"
+import { createCheckoutQuoteAction } from "@/modules/flights/results/server/actions"
 import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const router = useRouter()
+  const [isCreatingQuote, startCreatingQuote] = useTransition()
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   useEffect(() => {
     logFlightFlow("ReviewPageClient", "hydrated", {
@@ -80,17 +83,40 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
       })
       return
     }
+    const finalOfferId = data.summary.finalOfferId
+    setCheckoutError(null)
 
-    const params = new URLSearchParams()
-    params.set("offer", data.summary.finalOfferId)
-    params.set("selected", data.state.selected.join(","))
+    startCreatingQuote(() => {
+      void (async () => {
+        const result = await createCheckoutQuoteAction({
+          partialOfferRequestId: data.partialOfferRequestId,
+          selected: data.state.selected,
+          offerId: finalOfferId,
+        })
 
-    logFlightFlow("ReviewPageClient", "navigate_checkout", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      selectedCount: data.state.selected.length,
+        if (!result.ok) {
+          logFlightFlow("ReviewPageClient", "checkout_quote_failed", {
+            partialOfferRequestId: data.partialOfferRequestId,
+            code: result.error.code,
+          })
+          setCheckoutError(result.error.message)
+          return
+        }
+
+        const params = new URLSearchParams()
+        params.set("offer", finalOfferId)
+        params.set("selected", data.state.selected.join(","))
+        params.set("quote", result.data.quoteId)
+
+        logFlightFlow("ReviewPageClient", "navigate_checkout", {
+          partialOfferRequestId: data.partialOfferRequestId,
+          selectedCount: data.state.selected.length,
+          quoteId: result.data.quoteId,
+        })
+
+        router.push(`/results/${data.partialOfferRequestId}/checkout?${params.toString()}`)
+      })()
     })
-
-    router.push(`/results/${data.partialOfferRequestId}/checkout?${params.toString()}`)
   }
 
   return (
@@ -288,12 +314,16 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
                 <Button
                   className="h-12 w-full rounded-xl text-sm md:text-base"
-                  disabled={!data.summary.checkoutEnabled}
+                  disabled={!data.summary.checkoutEnabled || isCreatingQuote}
                   onClick={onGoToCheckout}
                 >
-                  Go to checkout
+                  {isCreatingQuote ? "Preparing checkout..." : "Go to checkout"}
                   <ArrowRightIcon data-icon="inline-end" />
                 </Button>
+
+                {checkoutError ? (
+                  <p className="text-sm text-destructive md:text-base">{checkoutError}</p>
+                ) : null}
 
                 <p className="text-sm text-muted-foreground italic md:text-base">
                   {data.summary.helperText}

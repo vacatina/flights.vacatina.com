@@ -10,6 +10,10 @@ import {
   getAirlineLogosByAirlineId,
 } from "@/modules/flights/results/server/airline-logos"
 import {
+  getOfferPricingMap as getOfferPricingMapFromService,
+  summarizeOfferPricing,
+} from "@/modules/flights/pricing/server"
+import {
   logDuffelError,
   mapDuffelErrorMessage,
 } from "@/modules/flights/results/server/error-map"
@@ -30,6 +34,19 @@ interface FetchReviewPageDeps {
   getAirlineLogosByAirlineId: (
     airlineIds: string[]
   ) => Promise<Record<string, string>>
+  getOfferPricingMap?: (offers: Offer[]) => Promise<
+    Record<
+      string,
+      {
+        offerId: string
+        currency: string
+        netAmount: number
+        sellAmount: number
+        appliedRuleId: string | null
+        appliedRuleSpecificity: number | null
+      }
+    >
+  >
 }
 
 export async function fetchReviewPageData(
@@ -98,10 +115,18 @@ export async function fetchReviewPageData(
   const airlineLogosByAirlineId = await deps.getAirlineLogosByAirlineId(
     airlineIds
   )
+  const offerPricingByOfferId = await (deps.getOfferPricingMap ?? getOfferPricingMapFromService)(
+    fares
+  )
+  const pricingSummary = summarizeOfferPricing(offerPricingByOfferId)
   logFlightFlow("fetchReviewPageData", "airline_logos_resolved", {
     partialOfferRequestId: input.partialOfferRequestId,
     airlineIdsCount: airlineIds.length,
     logoCount: Object.keys(airlineLogosByAirlineId).length,
+  })
+  logFlightFlow("fetchReviewPageData", "offer_pricing_resolved", {
+    partialOfferRequestId: input.partialOfferRequestId,
+    ...pricingSummary,
   })
 
   const reviewModel = buildReviewPageModel({
@@ -109,6 +134,7 @@ export async function fetchReviewPageData(
     selected: selectedPartialOffers,
     requestedFare: input.state.fare,
     airlineLogosByAirlineId,
+    offerPricingByOfferId,
   })
   logFlightFlow("fetchReviewPageData", "review_model_built", {
     partialOfferRequestId: input.partialOfferRequestId,

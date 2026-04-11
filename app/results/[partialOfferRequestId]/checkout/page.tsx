@@ -2,6 +2,10 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  formatCurrencyAmount,
+  validatePricedQuote,
+} from "@/modules/flights/pricing/server"
 import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 interface CheckoutPlaceholderPageProps {
@@ -30,12 +34,61 @@ export default async function CheckoutPlaceholderPage({
           .map((item) => item.trim())
           .filter(Boolean)
       : []
+  const quoteId =
+    typeof resolvedSearchParams.quote === "string"
+      ? resolvedSearchParams.quote
+      : undefined
+
+  const quoteValidation =
+    quoteId && selectedOfferId && selectedPartialOffers.length > 0
+      ? await validatePricedQuote({
+          quoteId,
+          partialOfferRequestId: resolvedParams.partialOfferRequestId,
+          offerId: selectedOfferId,
+          selectedPartialOffers,
+        })
+      : null
 
   logFlightFlow("CheckoutPlaceholderPage", "rendered", {
     partialOfferRequestId: resolvedParams.partialOfferRequestId,
     selectedOfferId: selectedOfferId ?? null,
     selectedPartialOfferCount: selectedPartialOffers.length,
+    quoteId: quoteId ?? null,
+    quoteValidationOk: quoteValidation?.ok ?? null,
+    quoteValidationReason: quoteValidation?.reason ?? null,
   })
+
+  if (quoteId && quoteValidation && !quoteValidation.ok) {
+    const reviewParams = new URLSearchParams()
+    reviewParams.set("selected", selectedPartialOffers.join(","))
+
+    return (
+      <main className="min-h-svh bg-muted/40 py-10">
+        <div className="mx-auto w-full max-w-2xl px-4">
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-xl">Checkout quote expired</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="text-muted-foreground">
+                {toQuoteFailureMessage(quoteValidation.reason)}
+              </p>
+              <Button
+                className="w-fit"
+                render={
+                  <Link
+                    href={`/results/${resolvedParams.partialOfferRequestId}/review?${reviewParams.toString()}`}
+                  />
+                }
+              >
+                Back to fare options
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-svh bg-muted/40 py-10">
@@ -48,11 +101,27 @@ export default async function CheckoutPlaceholderPage({
             <p>
               Booking checkout will be implemented in the next phase.
             </p>
+            {quoteValidation?.ok && quoteValidation.quote ? (
+              <p>
+                Locked total amount: {" "}
+                <strong>
+                  {formatCurrencyAmount(
+                    quoteValidation.quote.sellAmount,
+                    quoteValidation.quote.currency
+                  )}
+                </strong>
+              </p>
+            ) : (
+              <p>No locked quote attached yet.</p>
+            )}
             <p>
               Partial offer request: <code>{resolvedParams.partialOfferRequestId}</code>
             </p>
             <p>
               Selected full offer: <code>{selectedOfferId ?? "None"}</code>
+            </p>
+            <p>
+              Quote ID: <code>{quoteId ?? "None"}</code>
             </p>
             <p>
               Selected partial offers: {" "}
@@ -68,4 +137,21 @@ export default async function CheckoutPlaceholderPage({
       </div>
     </main>
   )
+}
+
+function toQuoteFailureMessage(reason: string | null) {
+  switch (reason) {
+    case "not_found":
+      return "The checkout quote was not found. Please generate a new quote from review."
+    case "not_active":
+      return "This checkout quote is no longer active. Please generate a new quote."
+    case "expired":
+      return "This checkout quote expired. Please return to review and continue to checkout again."
+    case "partial_offer_request_mismatch":
+    case "offer_mismatch":
+    case "selected_mismatch":
+      return "The quote does not match the selected fare state. Please regenerate from review."
+    default:
+      return "The checkout quote is invalid. Please generate a fresh quote."
+  }
 }
