@@ -2,6 +2,8 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getActorContext } from "@/modules/auth/server"
+import { getAuthServerConfig } from "@/modules/auth/server/config"
 import {
   formatCurrencyAmount,
   validatePricedQuote,
@@ -23,6 +25,10 @@ export default async function CheckoutPlaceholderPage({
     params,
     searchParams,
   ])
+  const { clerkEnabled } = getAuthServerConfig()
+  const actor = await getActorContext({
+    ensureGuestSession: false,
+  })
   const selectedOfferId =
     typeof resolvedSearchParams.offer === "string"
       ? resolvedSearchParams.offer
@@ -54,6 +60,7 @@ export default async function CheckoutPlaceholderPage({
     selectedOfferId: selectedOfferId ?? null,
     selectedPartialOfferCount: selectedPartialOffers.length,
     quoteId: quoteId ?? null,
+    actorType: actor.type,
     quoteValidationOk: quoteValidation?.ok ?? null,
     quoteValidationReason: quoteValidation?.reason ?? null,
   })
@@ -129,6 +136,17 @@ export default async function CheckoutPlaceholderPage({
                 ? selectedPartialOffers.join(", ")
                 : "None"}
             </p>
+            {clerkEnabled && actor.type === "guest" ? (
+              <p>
+                Sign in for faster checkout and future order history.{" "}
+                <Link
+                  href={`/sign-in?redirect_url=${encodeURIComponent(getCurrentCheckoutPath(resolvedParams.partialOfferRequestId, resolvedSearchParams))}`}
+                  className="text-primary underline underline-offset-4"
+                >
+                  Sign in
+                </Link>
+              </p>
+            ) : null}
             <div>
               <Button render={<Link href="/" />}>Start new search</Button>
             </div>
@@ -154,4 +172,29 @@ function toQuoteFailureMessage(reason: string | null) {
     default:
       return "The checkout quote is invalid. Please generate a fresh quote."
   }
+}
+
+function getCurrentCheckoutPath(
+  partialOfferRequestId: string,
+  searchParams: Record<string, string | string[] | undefined>
+) {
+  const params = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (typeof value === "string") {
+      params.set(key, value)
+      continue
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        params.append(key, item)
+      }
+    }
+  }
+
+  const suffix = params.toString()
+  const basePath = `/results/${partialOfferRequestId}/checkout`
+
+  return suffix ? `${basePath}?${suffix}` : basePath
 }

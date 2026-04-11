@@ -3,7 +3,8 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Show } from "@clerk/nextjs"
 import { ArrowRightIcon, BriefcaseIcon, CheckIcon } from "lucide-react"
 
 import {
@@ -27,8 +28,12 @@ import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
   const [isCreatingQuote, startCreatingQuote] = useTransition()
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
 
   useEffect(() => {
     logFlightFlow("ReviewPageClient", "hydrated", {
@@ -328,6 +333,20 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                 <p className="text-sm text-muted-foreground italic md:text-base">
                   {data.summary.helperText}
                 </p>
+
+                {clerkEnabled ? (
+                  <Show when="signed-out">
+                    <p className="text-sm text-muted-foreground md:text-base">
+                      Sign in for faster checkout and order history.{" "}
+                      <Link
+                        href={signInHref}
+                        className="text-primary underline underline-offset-4"
+                      >
+                        Sign in
+                      </Link>
+                    </p>
+                  </Show>
+                ) : null}
               </CardContent>
             </Card>
           </aside>
@@ -335,4 +354,14 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
       </div>
     </main>
   )
+}
+
+function buildRedirectPath(pathname: string | null, search: string) {
+  const normalizedPathname = pathname || "/"
+
+  if (!search) {
+    return normalizedPathname
+  }
+
+  return `${normalizedPathname}?${search}`
 }

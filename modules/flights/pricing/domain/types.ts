@@ -51,6 +51,9 @@ export interface PricedQuoteRecord extends PricedAmount {
   partialOfferRequestId: string
   offerId: string
   selectedPartialOffers: string[]
+  ownerUserId: string | null
+  ownerGuestId: string | null
+  ownerOrgId: string | null
   status: PricedQuoteStatus
   expiresAt: Date
   createdAt: Date

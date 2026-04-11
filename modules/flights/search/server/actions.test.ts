@@ -50,6 +50,10 @@ test("executeSearchPlacesAction returns validation error contract", async () => 
     {
       searchPlaces: async () => [],
       logError: () => undefined,
+      getActorContext: async () => ({
+        type: "guest",
+        guestId: "gst_test",
+      }),
     }
   )
 
@@ -68,6 +72,10 @@ test("executeSubmitFlightSearchAction returns field-level errors for invalid pay
       partialOfferRequestId: "por_test_invalid",
     }),
     logError: () => undefined,
+    getActorContext: async () => ({
+      type: "guest",
+      guestId: "gst_test",
+    }),
   })
 
   expect(result.ok).toBe(false)
@@ -87,6 +95,10 @@ test("executeSearchPlacesAction returns success contract", async () => {
     {
       searchPlaces: async () => options,
       logError: () => undefined,
+      getActorContext: async () => ({
+        type: "guest",
+        guestId: "gst_test",
+      }),
     }
   )
 
@@ -102,6 +114,10 @@ test("executeSubmitFlightSearchAction returns partial offer request id", async (
       partialOfferRequestId: "por_test_123",
     }),
     logError: () => undefined,
+    getActorContext: async () => ({
+      type: "guest",
+      guestId: "gst_test",
+    }),
   })
 
   expect(result).toEqual({
@@ -128,6 +144,10 @@ test("executeSubmitFlightSearchAction blocks multi-city for now", async () => {
       partialOfferRequestId: "por_test_123",
     }),
     logError: () => undefined,
+    getActorContext: async () => ({
+      type: "guest",
+      guestId: "gst_test",
+    }),
   })
 
   expect(result.ok).toBe(false)

@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getActorContext } from "@/modules/auth/server"
 import { parseReviewUrlState } from "@/modules/flights/results/domain"
 import { fetchReviewPageData } from "@/modules/flights/results/server"
 import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
@@ -22,9 +23,13 @@ export default async function ReviewPage({
     params,
     searchParams,
   ])
+  const actor = await getActorContext({
+    ensureGuestSession: false,
+  })
   logFlightFlow("ReviewPage", "request_received", {
     partialOfferRequestId: resolvedParams.partialOfferRequestId,
     searchParamKeys: Object.keys(resolvedSearchParams),
+    actorType: actor.type,
   })
   const state = parseReviewUrlState(resolvedSearchParams)
   logFlightFlow("ReviewPage", "state_parsed", {

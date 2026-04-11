@@ -2,11 +2,13 @@
 
 import { ZodError, type ZodIssue } from "zod"
 
+import { getActorContext } from "@/modules/auth/server"
 import {
   parseFlightSearchForm,
   parsePlaceSearchInput,
   toFlightSearchCommand,
 } from "@/modules/flights/search/domain"
+import type { ActorContext } from "@/modules/auth/types"
 import type {
   FlightSearchCommand,
   FlightSearchFormValues,
@@ -27,6 +29,7 @@ import {
 interface SearchPlacesDeps {
   searchPlaces: (query: string) => Promise<PlaceSuggestionOption[]>
   logError: (context: string, error: unknown) => void
+  getActorContext?: () => Promise<ActorContext>
 }
 
 interface SubmitFlightSearchDeps {
@@ -35,6 +38,7 @@ interface SubmitFlightSearchDeps {
     command: FlightSearchCommand
   ) => Promise<{ partialOfferRequestId: string }>
   logError: (context: string, error: unknown) => void
+  getActorContext?: () => Promise<ActorContext>
 }
 
 export async function searchPlacesAction(
@@ -56,8 +60,10 @@ export async function executeSearchPlacesAction(
     logError: defaultLogError,
   }
 ): Promise<ActionResult<PlaceSuggestionOption[]>> {
+  const actor = await resolveActionActorContext(deps.getActorContext)
   logFlightFlow("searchPlacesAction", "received_input", {
     inputType: typeof input,
+    actorType: actor.type,
   })
   const parsed = parsePlaceSearchInput(input)
 
@@ -103,8 +109,10 @@ export async function executeSubmitFlightSearchAction(
     logError: defaultLogError,
   }
 ): Promise<ActionResult<{ partialOfferRequestId: string }>> {
+  const actor = await resolveActionActorContext(deps.getActorContext)
   logFlightFlow("submitFlightSearchAction", "received_input", {
     inputType: typeof input,
+    actorType: actor.type,
   })
   const parsed = parseFlightSearchForm(input)
 
@@ -231,6 +239,20 @@ function formatIssueMessage(issue: ZodIssue) {
 function defaultLogError(context: string, error: unknown) {
   logFlightFlowError("search.server", "default_log_error", error, { context })
   console.error(context, error)
+}
+
+async function resolveActionActorContext(
+  resolveActor?: () => Promise<ActorContext>
+): Promise<ActorContext> {
+  try {
+    return await (resolveActor?.() ?? getActorContext())
+  } catch (error) {
+    logFlightFlowError("search.actions", "resolve_actor_fallback_to_guest", error)
+    return {
+      type: "guest",
+      guestId: "guest_unavailable",
+    }
+  }
 }
 
 async function defaultSearchPlaces(query: string) {
