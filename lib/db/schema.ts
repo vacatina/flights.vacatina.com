@@ -28,6 +28,23 @@ export const pricedQuoteStatusEnum = pgEnum("priced_quote_status", [
   "cancelled",
 ])
 
+export const checkoutSessionStatusEnum = pgEnum("checkout_session_status", [
+  "processing",
+  "payment_authorized",
+  "completed",
+  "failed",
+  "reconciliation_required",
+])
+
+export const checkoutPaymentModeEnum = pgEnum("checkout_payment_mode", [
+  "pay_now",
+  "hold",
+])
+
+export const checkoutSettlementTypeEnum = pgEnum("checkout_settlement_type", [
+  "balance",
+])
+
 export const guestSessionStatusEnum = pgEnum("guest_session_status", [
   "active",
   "linked",
@@ -254,11 +271,135 @@ export const pricedQuotes = pgTable(
   })
 )
 
+export const checkoutSessions = pgTable(
+  "checkout_sessions",
+  {
+    id: text("id").primaryKey(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    partialOfferRequestId: text("partial_offer_request_id").notNull(),
+    quoteId: text("quote_id")
+      .notNull()
+      .references(() => pricedQuotes.id, {
+        onDelete: "cascade",
+      }),
+    offerId: text("offer_id").notNull(),
+    selectedPartialOffers: jsonb("selected_partial_offers").$type<string[]>().notNull(),
+    ownerUserId: text("owner_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ownerGuestId: text("owner_guest_id").references(() => guestSessions.id, {
+      onDelete: "set null",
+    }),
+    ownerOrgId: text("owner_org_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    paymentMode: checkoutPaymentModeEnum("payment_mode").notNull(),
+    currency: text("currency").notNull(),
+    netAmount: numeric("net_amount", { precision: 14, scale: 4 }).notNull(),
+    sellAmount: numeric("sell_amount", { precision: 14, scale: 4 }).notNull(),
+    externalPaymentAuthorizationId: text("external_payment_authorization_id"),
+    externalPaymentCaptureId: text("external_payment_capture_id"),
+    duffelOrderId: text("duffel_order_id"),
+    status: checkoutSessionStatusEnum("status").notNull().default("processing"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    idempotencyKeyUniqueIdx: uniqueIndex("checkout_sessions_idempotency_key_unique_idx").on(
+      table.idempotencyKey
+    ),
+    lifecycleIdx: index("checkout_sessions_lifecycle_idx").on(
+      table.status,
+      table.expiresAt
+    ),
+    requestLookupIdx: index("checkout_sessions_request_lookup_idx").on(
+      table.partialOfferRequestId,
+      table.offerId,
+      table.createdAt
+    ),
+  })
+)
+
+export const flightOrders = pgTable(
+  "flight_orders",
+  {
+    id: text("id").primaryKey(),
+    checkoutSessionId: text("checkout_session_id")
+      .notNull()
+      .references(() => checkoutSessions.id, {
+        onDelete: "cascade",
+      }),
+    duffelOrderId: text("duffel_order_id").notNull(),
+    partialOfferRequestId: text("partial_offer_request_id").notNull(),
+    offerId: text("offer_id").notNull(),
+    selectedPartialOffers: jsonb("selected_partial_offers").$type<string[]>().notNull(),
+    ownerUserId: text("owner_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ownerGuestId: text("owner_guest_id").references(() => guestSessions.id, {
+      onDelete: "set null",
+    }),
+    ownerOrgId: text("owner_org_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    paymentMode: checkoutPaymentModeEnum("payment_mode").notNull(),
+    settlementType: checkoutSettlementTypeEnum("settlement_type")
+      .notNull()
+      .default("balance"),
+    currency: text("currency").notNull(),
+    netAmount: numeric("net_amount", { precision: 14, scale: 4 }).notNull(),
+    sellAmount: numeric("sell_amount", { precision: 14, scale: 4 }).notNull(),
+    duffelTotalAmount: numeric("duffel_total_amount", {
+      precision: 14,
+      scale: 4,
+    }).notNull(),
+    duffelTotalCurrency: text("duffel_total_currency").notNull(),
+    paymentAwaiting: boolean("payment_awaiting").notNull().default(false),
+    paymentRequiredBy: timestamp("payment_required_by", { withTimezone: true }),
+    priceGuaranteeExpiresAt: timestamp("price_guarantee_expires_at", {
+      withTimezone: true,
+    }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    checkoutSessionUniqueIdx: uniqueIndex("flight_orders_checkout_session_unique_idx").on(
+      table.checkoutSessionId
+    ),
+    duffelOrderUniqueIdx: uniqueIndex("flight_orders_duffel_order_unique_idx").on(
+      table.duffelOrderId
+    ),
+    requestLookupIdx: index("flight_orders_request_lookup_idx").on(
+      table.partialOfferRequestId,
+      table.offerId,
+      table.createdAt
+    ),
+  })
+)
+
 export type PricingRuleRow = typeof pricingRules.$inferSelect
 export type NewPricingRuleRow = typeof pricingRules.$inferInsert
 
 export type PricedQuoteRow = typeof pricedQuotes.$inferSelect
 export type NewPricedQuoteRow = typeof pricedQuotes.$inferInsert
+
+export type CheckoutSessionRow = typeof checkoutSessions.$inferSelect
+export type NewCheckoutSessionRow = typeof checkoutSessions.$inferInsert
+
+export type FlightOrderRow = typeof flightOrders.$inferSelect
+export type NewFlightOrderRow = typeof flightOrders.$inferInsert
 
 export type UserRow = typeof users.$inferSelect
 export type NewUserRow = typeof users.$inferInsert
