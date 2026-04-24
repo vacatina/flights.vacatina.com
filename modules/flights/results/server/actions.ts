@@ -127,9 +127,7 @@ export async function loadMoreFareOptionsAction(
     })
     return actionFailure(
       "UPSTREAM_ERROR",
-      error instanceof Error
-        ? error.message
-        : "Could not load more offers right now."
+      "Could not load more offers right now."
     )
   }
 }
@@ -249,9 +247,7 @@ export async function executeCreateCheckoutQuoteAction(
     })
     return actionFailure(
       "UPSTREAM_ERROR",
-      error instanceof Error
-        ? error.message
-        : "Could not create checkout quote right now."
+      "Could not create checkout quote right now. Please try again."
     )
   }
 }

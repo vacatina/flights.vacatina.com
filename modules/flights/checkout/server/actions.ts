@@ -117,7 +117,7 @@ export async function executeSubmitCheckoutAction(
     })
     return actionFailure(
       "UPSTREAM_ERROR",
-      error instanceof Error ? error.message : "Could not complete checkout."
+      "Could not complete checkout right now. Please try again."
     )
   }
 }
@@ -171,7 +171,7 @@ export async function executeStartCheckoutPaymentAction(
     })
     return actionFailure(
       "UPSTREAM_ERROR",
-      error instanceof Error ? error.message : "Could not start payment."
+      "Could not start payment right now. Please try again."
     )
   }
 }
@@ -214,7 +214,7 @@ export async function executeGetCheckoutSessionStatusAction(
     })
     return actionFailure(
       "UPSTREAM_ERROR",
-      error instanceof Error ? error.message : "Could not fetch checkout session status."
+      "Could not fetch checkout session status right now."
     )
   }
 }
@@ -233,4 +233,3 @@ async function getCheckoutSessionStatusResolver() {
   const { getCheckoutSessionStatus } = await import("@/modules/flights/checkout/server/service")
   return getCheckoutSessionStatus
 }
-

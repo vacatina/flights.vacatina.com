@@ -31,11 +31,8 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
 
   try {
     state = parseCheckoutUrlState(resolvedSearchParams)
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Invalid checkout link. Please return to fare options."
+  } catch {
+    const message = "Invalid checkout link. Please return to fare options."
     return (
       <CheckoutErrorState
         partialOfferRequestId={resolvedParams.partialOfferRequestId}
@@ -70,9 +67,7 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
     return (
       <CheckoutErrorState
         partialOfferRequestId={resolvedParams.partialOfferRequestId}
-        message={
-          error instanceof Error ? error.message : "Unable to load checkout details right now."
-        }
+        message="Unable to load checkout details right now. Please try again."
       />
     )
   }

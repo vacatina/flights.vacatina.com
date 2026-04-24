@@ -57,8 +57,7 @@ export default async function ReviewPage({
 
       return {
         ok: false as const,
-        message:
-          error instanceof Error ? error.message : "Could not load fare options.",
+        message: "Could not load fare options right now. Please try again.",
       }
     })
 
