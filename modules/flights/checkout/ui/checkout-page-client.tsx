@@ -306,10 +306,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             setSubmitError("Payment window was dismissed before confirmation.")
           }
           payhere.onError = (error) => {
+            logFlightFlow("CheckoutPageClient", "payhere_sdk_error", {
+              partialOfferRequestId: data.partialOfferRequestId,
+              errorType: typeof error,
+            })
             setPaymentProcessingMessage(null)
-            setSubmitError(
-              error instanceof Error ? error.message : "Payment failed to start."
-            )
+            setSubmitError("Payment failed to start. Please try again.")
           }
 
           payhere.startPayment(

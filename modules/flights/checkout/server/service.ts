@@ -627,7 +627,7 @@ export async function submitCheckout(
     await deps.sessionRepository.update(session.id, {
       status: "failed",
       errorCode: "checkout_submit_failed",
-      errorMessage: error instanceof Error ? error.message : "Checkout failed",
+      errorMessage: "Checkout could not be completed right now. Please try again.",
     })
 
     throw error
@@ -668,7 +668,10 @@ export async function getCheckoutSessionStatus(
   return {
     checkoutSessionId: session.id,
     status: session.status,
-    message: session.errorMessage ?? statusToMessage(session.status),
+    message: statusToMessage({
+      status: session.status,
+      errorCode: session.errorCode,
+    }),
     duffelOrderId: session.duffelOrderId,
     totalChargeAmountLabel:
       session.paymentAmount !== null && session.paymentCurrency
@@ -1027,10 +1030,7 @@ function buildPayHerePreview(input: {
   } catch (error) {
     return {
       payNowEnabled: false,
-      unavailableReason:
-        error instanceof Error
-          ? error.message
-          : "Pay now is unavailable for this currency.",
+      unavailableReason: toPayNowUnavailableReason(error),
       chargeCurrency: "LKR",
       estimatedFareAmountLkr: null,
       estimatedFareAmountLkrLabel: null,
@@ -1121,13 +1121,19 @@ function doesSessionOwnerMatch(
   return session.ownerGuestId === actor.guestId
 }
 
-function statusToMessage(status: CheckoutSessionStatus) {
-  switch (status) {
+function statusToMessage(input: {
+  status: CheckoutSessionStatus
+  errorCode: string | null
+}) {
+  switch (input.status) {
     case "processing":
       return "Payment is processing. Waiting for confirmation."
     case "payment_authorized":
       return "Payment received. Finalizing booking."
     case "failed":
+      if (input.errorCode === "checkout_submit_failed") {
+        return "Checkout could not be completed right now. Please try again."
+      }
       return "Payment failed. Please retry checkout."
     case "reconciliation_required":
       return "Payment received but booking is pending manual reconciliation."
@@ -1135,6 +1141,17 @@ function statusToMessage(status: CheckoutSessionStatus) {
     default:
       return null
   }
+}
+
+function toPayNowUnavailableReason(error: unknown) {
+  if (
+    error instanceof Error &&
+    error.message.startsWith("PayHere pay_now is unavailable for")
+  ) {
+    return error.message
+  }
+
+  return "Pay now is unavailable right now. Please try hold order."
 }
 
 function isPaymentAmountMatch(input: {
