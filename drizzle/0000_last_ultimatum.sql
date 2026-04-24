@@ -19,9 +19,25 @@ CREATE TABLE "checkout_sessions" (
 	"currency" text NOT NULL,
 	"net_amount" numeric(14, 4) NOT NULL,
 	"sell_amount" numeric(14, 4) NOT NULL,
+	"payment_provider" text,
+	"provider_order_id" text,
+	"provider_payment_id" text,
+	"provider_status_code" text,
+	"provider_status_message" text,
+	"payment_currency" text,
+	"payment_amount" numeric(14, 4),
+	"fx_source_currency" text,
+	"fx_target_currency" text,
+	"fx_base_rate" numeric(18, 8),
+	"fx_buffer_percent" numeric(8, 4),
+	"fx_effective_rate" numeric(18, 8),
+	"checkout_payload_snapshot" jsonb,
 	"external_payment_authorization_id" text,
 	"external_payment_capture_id" text,
 	"duffel_order_id" text,
+	"payment_initiated_at" timestamp with time zone,
+	"payment_confirmed_at" timestamp with time zone,
+	"finalized_at" timestamp with time zone,
 	"status" "checkout_session_status" DEFAULT 'processing' NOT NULL,
 	"error_code" text,
 	"error_message" text,
@@ -97,6 +113,17 @@ CREATE TABLE "organizations" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "payment_webhook_events" (
+	"id" text PRIMARY KEY NOT NULL,
+	"provider" text NOT NULL,
+	"event_key" text NOT NULL,
+	"provider_order_id" text NOT NULL,
+	"provider_payment_id" text,
+	"payload" jsonb,
+	"processed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "priced_quotes" (
 	"id" text PRIMARY KEY NOT NULL,
 	"partial_offer_request_id" text NOT NULL,
@@ -165,6 +192,7 @@ ALTER TABLE "priced_quotes" ADD CONSTRAINT "priced_quotes_owner_org_id_organizat
 CREATE UNIQUE INDEX "checkout_sessions_idempotency_key_unique_idx" ON "checkout_sessions" USING btree ("idempotency_key");--> statement-breakpoint
 CREATE INDEX "checkout_sessions_lifecycle_idx" ON "checkout_sessions" USING btree ("status","expires_at");--> statement-breakpoint
 CREATE INDEX "checkout_sessions_request_lookup_idx" ON "checkout_sessions" USING btree ("partial_offer_request_id","offer_id","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "checkout_sessions_provider_order_id_unique_idx" ON "checkout_sessions" USING btree ("provider_order_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "flight_orders_checkout_session_unique_idx" ON "flight_orders" USING btree ("checkout_session_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "flight_orders_duffel_order_unique_idx" ON "flight_orders" USING btree ("duffel_order_id");--> statement-breakpoint
 CREATE INDEX "flight_orders_request_lookup_idx" ON "flight_orders" USING btree ("partial_offer_request_id","offer_id","created_at");--> statement-breakpoint
@@ -175,6 +203,8 @@ CREATE UNIQUE INDEX "organization_members_org_user_unique_idx" ON "organization_
 CREATE INDEX "organization_members_org_lookup_idx" ON "organization_members" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "organization_members_user_lookup_idx" ON "organization_members" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "organizations_slug_unique_idx" ON "organizations" USING btree ("slug");--> statement-breakpoint
+CREATE UNIQUE INDEX "payment_webhook_events_provider_event_unique_idx" ON "payment_webhook_events" USING btree ("provider","event_key");--> statement-breakpoint
+CREATE INDEX "payment_webhook_events_provider_order_lookup_idx" ON "payment_webhook_events" USING btree ("provider","provider_order_id","created_at");--> statement-breakpoint
 CREATE INDEX "priced_quotes_validation_idx" ON "priced_quotes" USING btree ("id","status","expires_at");--> statement-breakpoint
 CREATE INDEX "priced_quotes_request_lookup_idx" ON "priced_quotes" USING btree ("partial_offer_request_id","offer_id","created_at");--> statement-breakpoint
 CREATE INDEX "priced_quotes_owner_lookup_idx" ON "priced_quotes" USING btree ("owner_user_id","owner_guest_id");--> statement-breakpoint

@@ -8,7 +8,7 @@ import {
   upsertUserMirror,
 } from "@/modules/auth/server/repository"
 import { resolveGuestSession } from "@/modules/auth/server/guest-session"
-import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface GetActorContextOptions {
   ensureGuestSession?: boolean
@@ -37,18 +37,36 @@ export async function getActorContext(
       }))
 
     if (guestSession.guestId) {
-      const linked = await findGuestSessionLink(guestSession.guestId, user.id)
+      let linked = false
 
-      if (!linked) {
-        await linkGuestSessionToUser({
-          guestSessionId: guestSession.guestId,
-          userId: user.id,
-        })
-        logFlightFlow("auth.actor", "guest_linked", {
+      try {
+        linked = await findGuestSessionLink(guestSession.guestId, user.id)
+      } catch (error) {
+        logFlightFlowError("auth.actor", "guest_link_lookup_failed", error, {
           guestId: guestSession.guestId,
           appUserId: user.id,
           clerkUserId: authState.userId,
         })
+      }
+
+      if (!linked) {
+        try {
+          await linkGuestSessionToUser({
+            guestSessionId: guestSession.guestId,
+            userId: user.id,
+          })
+          logFlightFlow("auth.actor", "guest_linked", {
+            guestId: guestSession.guestId,
+            appUserId: user.id,
+            clerkUserId: authState.userId,
+          })
+        } catch (error) {
+          logFlightFlowError("auth.actor", "guest_link_failed", error, {
+            guestId: guestSession.guestId,
+            appUserId: user.id,
+            clerkUserId: authState.userId,
+          })
+        }
       }
     }
 

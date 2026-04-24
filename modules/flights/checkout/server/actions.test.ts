@@ -140,6 +140,32 @@ test("executeGetCheckoutSessionStatusAction returns success for valid input", as
   expect(result.ok && result.data.status).toBe("processing")
 })
 
+test("executeStartCheckoutPaymentAction sanitizes upstream errors", async () => {
+  const result = await executeStartCheckoutPaymentAction(
+    {
+      ...validPayload,
+      paymentMode: "pay_now",
+    },
+    {
+      async getActorContext() {
+        return {
+          type: "guest",
+          guestId: "gst_1",
+        }
+      },
+      async startCheckoutPayment() {
+        throw new Error('Failed query: insert into "checkout_sessions" ...')
+      },
+    }
+  )
+
+  expect(result.ok).toBe(false)
+  expect(!result.ok && result.error.code).toBe("UPSTREAM_ERROR")
+  expect(!result.ok && result.error.message).toBe(
+    "Could not start payment right now. Please try again."
+  )
+})
+
 test("executeSubmitCheckoutAction returns validation error for invalid payload", async () => {
   const result = await executeSubmitCheckoutAction(
     {
@@ -158,4 +184,3 @@ test("executeSubmitCheckoutAction returns validation error for invalid payload",
   expect(result.ok).toBe(false)
   expect(!result.ok && result.error.code).toBe("VALIDATION_ERROR")
 })
-

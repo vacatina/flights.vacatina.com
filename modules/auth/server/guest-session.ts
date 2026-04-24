@@ -49,9 +49,19 @@ export async function resolveGuestSession(
   const cookieStore = options.cookieStore ?? ((await cookies()) as GuestSessionCookieStore)
 
   const currentToken = cookieStore.get(config.guestSessionCookieName)?.value
-  const currentPayload = verifySignedGuestSessionToken(currentToken)
+  const currentPayload = verifySignedGuestSessionToken(currentToken, {
+    now,
+  })
 
   if (currentPayload) {
+    try {
+      await persistGuestSession(currentPayload.guestId, new Date(currentPayload.expiresAt))
+    } catch (error) {
+      logFlightFlowError("auth.guestSession", "persist_existing_cookie_session_failed", error, {
+        guestId: currentPayload.guestId,
+      })
+    }
+
     return {
       guestId: currentPayload.guestId,
       created: false,
