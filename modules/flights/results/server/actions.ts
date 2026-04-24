@@ -81,9 +81,21 @@ interface CreateCheckoutQuoteDeps {
 export async function loadMoreFareOptionsAction(
   input: unknown
 ): Promise<ActionResult<{ offers: OfferCardViewModel[]; after: string | null }>> {
-  const actor = await resolveActionActorContext({
-    scope: "results.actions",
-  })
+  let actor: ActorContext
+
+  try {
+    actor = await resolveActionActorContext({
+      scope: "results.actions",
+    })
+  } catch (error) {
+    logFlightFlowError("loadMoreFareOptionsAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
+  }
   logFlightFlow("loadMoreFareOptionsAction", "received_input", {
     inputType: typeof input,
     actorType: actor.type,
@@ -142,10 +154,22 @@ export async function executeCreateCheckoutQuoteAction(
   input: unknown,
   deps: CreateCheckoutQuoteDeps = defaultCreateCheckoutQuoteDeps
 ): Promise<ActionResult<{ quoteId: string; expiresAt: string }>> {
-  const actor = await resolveActionActorContext({
-    scope: "results.actions",
-    resolveActor: deps.getActorContext,
-  })
+  let actor: ActorContext
+
+  try {
+    actor = await resolveActionActorContext({
+      scope: "results.actions",
+      resolveActor: deps.getActorContext,
+    })
+  } catch (error) {
+    logFlightFlowError("createCheckoutQuoteAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
+  }
   logFlightFlow("createCheckoutQuoteAction", "received_input", {
     inputType: typeof input,
     actorType: actor.type,

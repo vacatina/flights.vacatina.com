@@ -1,12 +1,13 @@
-import Link from "next/link"
-
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActorContext } from "@/modules/auth/server"
 import { parseResultsUrlState } from "@/modules/flights/results/domain"
 import { fetchFareOptionsData } from "@/modules/flights/results/server"
-import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { FareOptionsPageClient } from "@/modules/flights/results/ui"
+import {
+  logFlowPageFailure,
+  logFlowPageRequest,
+} from "@/modules/flights/shared/server"
+import { FlowPageErrorState } from "@/modules/flights/shared/ui"
 
 interface FareOptionsPageProps {
   params: Promise<{
@@ -27,7 +28,8 @@ export default async function FareOptionsPage({
     ensureGuestSession: false,
   })
 
-  logFlightFlow("FareOptionsPage", "request_received", {
+  logFlowPageRequest({
+    scope: "FareOptionsPage",
     partialOfferRequestId: resolvedParams.partialOfferRequestId,
     searchParamKeys: Object.keys(resolvedSearchParams),
     actorType: actor.type,
@@ -47,17 +49,16 @@ export default async function FareOptionsPage({
   })
     .then((data) => ({ ok: true as const, data }))
     .catch((error) => {
-      logFlightFlowError("FareOptionsPage", "fetch_failed", error, {
-        partialOfferRequestId: resolvedParams.partialOfferRequestId,
-        leg: state.leg,
-        selectedCount: state.selected.length,
+      logFlowPageFailure({
+        scope: "FareOptionsPage",
+        step: "fetch_failed",
+        error,
+        metadata: {
+          partialOfferRequestId: resolvedParams.partialOfferRequestId,
+          leg: state.leg,
+          selectedCount: state.selected.length,
+        },
       })
-      console.error("[flights/results] FareOptionsPage failed", {
-        partialOfferRequestId: resolvedParams.partialOfferRequestId,
-        leg: state.leg,
-        selectedCount: state.selected.length,
-      })
-      console.error(error)
 
       return {
         ok: false as const,
@@ -71,21 +72,12 @@ export default async function FareOptionsPage({
       hasMessage: Boolean(result.message),
     })
     return (
-      <main className="min-h-svh bg-muted/40 py-10">
-        <div className="mx-auto w-full max-w-2xl px-4">
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-xl">Unable to load fare options</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <p className="text-muted-foreground">{result.message}</p>
-              <Button className="w-fit" render={<Link href="/" />}>
-                Back to search
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      <FlowPageErrorState
+        title="Unable to load fare options"
+        message={result.message}
+        backHref="/"
+        backLabel="Back to search"
+      />
     )
   }
 

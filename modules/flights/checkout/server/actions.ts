@@ -71,10 +71,22 @@ export async function executeSubmitCheckoutAction(
   input: unknown,
   deps: SubmitCheckoutActionDeps = {}
 ): Promise<ActionResult<SubmitCheckoutSuccess>> {
-  const actor = await resolveActionActorContext({
-    scope: "checkout.actions",
-    resolveActor: deps.getActorContext,
-  })
+  let actor: ActorContext
+
+  try {
+    actor = await resolveActionActorContext({
+      scope: "checkout.actions",
+      resolveActor: deps.getActorContext,
+    })
+  } catch (error) {
+    logFlightFlowError("submitCheckoutAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
+  }
   logFlightFlow("submitCheckoutAction", "received", {
     actorType: actor.type,
     inputType: typeof input,
@@ -132,10 +144,22 @@ export async function executeStartCheckoutPaymentAction(
   input: unknown,
   deps: StartCheckoutPaymentActionDeps = {}
 ): Promise<ActionResult<CheckoutPaymentStartResult>> {
-  const actor = await resolveActionActorContext({
-    scope: "checkout.actions",
-    resolveActor: deps.getActorContext,
-  })
+  let actor: ActorContext
+
+  try {
+    actor = await resolveActionActorContext({
+      scope: "checkout.actions",
+      resolveActor: deps.getActorContext,
+    })
+  } catch (error) {
+    logFlightFlowError("startCheckoutPaymentAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
+  }
 
   let payload: CheckoutSubmitInput
 
@@ -186,10 +210,22 @@ export async function executeGetCheckoutSessionStatusAction(
   input: unknown,
   deps: CheckoutSessionStatusActionDeps = {}
 ): Promise<ActionResult<CheckoutSessionStatusResult>> {
-  const actor = await resolveActionActorContext({
-    scope: "checkout.actions",
-    resolveActor: deps.getActorContext,
-  })
+  let actor: ActorContext
+
+  try {
+    actor = await resolveActionActorContext({
+      scope: "checkout.actions",
+      resolveActor: deps.getActorContext,
+    })
+  } catch (error) {
+    logFlightFlowError("getCheckoutSessionStatusAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
+  }
 
   const parsed = checkoutSessionStatusSchema.safeParse(input)
 

@@ -140,6 +140,7 @@ beforeEach(() => {
       offerId: "off_1",
       selectedPartialOffers: ["off_partial_1"],
       quoteId: "pqt_1",
+      step: "traveler",
     },
     quote: {
       quoteId: "pqt_1",
@@ -198,6 +199,7 @@ test("fetchCheckoutPageData includes payHere preview", async () => {
         offerId: "off_1",
         selectedPartialOffers: ["off_partial_1"],
         quoteId: "pqt_1",
+        step: "traveler",
       },
       actor: {
         type: "guest",
@@ -618,4 +620,3 @@ function createPaymentWebhookEventRepository(): PaymentWebhookEventRepository {
     },
   }
 }
-

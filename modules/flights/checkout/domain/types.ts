@@ -2,11 +2,13 @@ import type { CreateOrderService, Offer, SeatMap } from "@duffel/api/types"
 import type { PayHereStartPaymentPayload } from "@/modules/flights/payments/payhere"
 
 export type CheckoutPaymentMode = "pay_now" | "hold"
+export type CheckoutWizardStep = "traveler" | "extras" | "pay"
 
 export interface CheckoutUrlState {
   offerId: string
   selectedPartialOffers: string[]
   quoteId: string
+  step: CheckoutWizardStep
 }
 
 export interface CheckoutContactInput {
