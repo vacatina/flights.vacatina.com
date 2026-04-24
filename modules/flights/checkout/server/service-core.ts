@@ -9,6 +9,7 @@ import { z } from "zod"
 import type { ActorContext } from "@/modules/auth/types"
 import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
 import { toNumeric } from "@/lib/shared/number"
+import { normalizeSelectedStrings } from "@/lib/shared/selection"
 import {
   buildCheckoutPageModel,
   computeAncillaryPricing,
@@ -99,6 +100,14 @@ interface CheckoutServiceDeps {
   sessionRepository: CheckoutSessionRepository
   orderRepository: FlightOrderRepository
   paymentWebhookEventRepository: PaymentWebhookEventRepository
+}
+
+interface CheckoutQuoteViewSource {
+  id: string
+  currency: string
+  netAmount: number
+  sellAmount: number
+  expiresAt: Date
 }
 
 const checkoutPayloadSnapshotSchema = z.object({
@@ -231,7 +240,30 @@ export async function fetchCheckoutPageData(
     owner: toQuoteOwner(input.actor),
   })
 
-  if (!quoteValidation.ok || !quoteValidation.quote) {
+  let quoteForView: CheckoutQuoteViewSource | null =
+    quoteValidation.ok && quoteValidation.quote
+      ? toCheckoutQuoteViewSource(quoteValidation.quote)
+      : null
+
+  if (!quoteForView && input.state.status && input.state.sessionId) {
+    const fallbackQuote = await resolveQuoteFromSessionForStatusMode({
+      input,
+      deps,
+    })
+
+    if (fallbackQuote) {
+      quoteForView = fallbackQuote
+      logFlightFlow("fetchCheckoutPageData", "quote_fallback_from_session", {
+        partialOfferRequestId: input.partialOfferRequestId,
+        offerId: input.state.offerId,
+        quoteId: fallbackQuote.id,
+        checkoutSessionId: input.state.sessionId,
+        status: input.state.status,
+      })
+    }
+  }
+
+  if (!quoteForView) {
     throw new Error(toQuoteValidationErrorMessage(quoteValidation.reason))
   }
 
@@ -245,18 +277,18 @@ export async function fetchCheckoutPageData(
     offer,
     seatMaps,
     quote: {
-      id: quoteValidation.quote.id,
-      currency: quoteValidation.quote.currency,
-      netAmount: quoteValidation.quote.netAmount,
-      sellAmount: quoteValidation.quote.sellAmount,
-      expiresAt: quoteValidation.quote.expiresAt,
+      id: quoteForView.id,
+      currency: quoteForView.currency,
+      netAmount: quoteForView.netAmount,
+      sellAmount: quoteForView.sellAmount,
+      expiresAt: quoteForView.expiresAt,
     },
     airlineLogosByAirlineId: logos,
   })
 
   const payHerePreview = buildPayHerePreview({
-    fareNetAmount: quoteValidation.quote.netAmount,
-    sourceCurrency: quoteValidation.quote.currency,
+    fareNetAmount: quoteForView.netAmount,
+    sourceCurrency: quoteForView.currency,
   })
 
   model.payHere = payHerePreview
@@ -270,6 +302,56 @@ export async function fetchCheckoutPageData(
   })
 
   return model
+}
+
+async function resolveQuoteFromSessionForStatusMode(input: {
+  input: FetchCheckoutPageDataInput
+  deps: CheckoutServiceDeps
+}) {
+  const checkoutSessionId = input.input.state.sessionId
+
+  if (!checkoutSessionId) {
+    return null
+  }
+
+  const session = await input.deps.sessionRepository.findById(checkoutSessionId)
+
+  if (!session) {
+    return null
+  }
+
+  if (!doesSessionOwnerMatch(session, input.input.actor)) {
+    return null
+  }
+
+  if (session.partialOfferRequestId !== input.input.partialOfferRequestId) {
+    return null
+  }
+
+  if (session.quoteId !== input.input.state.quoteId) {
+    return null
+  }
+
+  if (session.offerId !== input.input.state.offerId) {
+    return null
+  }
+
+  if (
+    !areSelectedPartialOffersEqual(
+      session.selectedPartialOffers,
+      input.input.state.selectedPartialOffers
+    )
+  ) {
+    return null
+  }
+
+  return {
+    id: session.quoteId,
+    currency: session.currency,
+    netAmount: session.netAmount,
+    sellAmount: session.sellAmount,
+    expiresAt: session.expiresAt,
+  }
 }
 
 export async function startCheckoutPayment(
@@ -1224,6 +1306,39 @@ function toQuoteValidationErrorMessage(reason: string | null) {
     default:
       return "Checkout quote validation failed."
   }
+}
+
+function toCheckoutQuoteViewSource(quote: {
+  id: string
+  currency: string
+  netAmount: number
+  sellAmount: number
+  expiresAt: Date
+}) {
+  return {
+    id: quote.id,
+    currency: quote.currency,
+    netAmount: quote.netAmount,
+    sellAmount: quote.sellAmount,
+    expiresAt: quote.expiresAt,
+  }
+}
+
+function areSelectedPartialOffersEqual(a: string[], b: string[]) {
+  const normalizedA = normalizeSelectedStrings(a)
+  const normalizedB = normalizeSelectedStrings(b)
+
+  if (normalizedA.length !== normalizedB.length) {
+    return false
+  }
+
+  for (let i = 0; i < normalizedA.length; i += 1) {
+    if (normalizedA[i] !== normalizedB[i]) {
+      return false
+    }
+  }
+
+  return true
 }
 
 function buildCheckoutIdempotencyKey(input: {

@@ -12,7 +12,10 @@ import {
   submitCheckoutAction,
 } from "@/modules/flights/checkout/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
-import { ensurePayHereSdk, startPayHerePayment } from "@/modules/flights/checkout/ui/payhere-client"
+import {
+  ensurePayHereSdk,
+  startPayHerePayment,
+} from "@/modules/flights/checkout/ui/payhere-client"
 import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
 
 interface CheckoutSubmitSuccessState {
@@ -22,9 +25,20 @@ interface CheckoutSubmitSuccessState {
   paymentMode: "pay_now" | "hold"
 }
 
+export interface CheckoutPayNowResolution {
+  sessionId: string
+  status: "processing" | "success" | "failed" | "reconciliation"
+  duffelOrderId: string | null
+  totalChargeAmountLabel: string | null
+  message: string | null
+}
+
 interface UseCheckoutFlowInput {
   data: CheckoutPageData
   onSuccess?: (result: CheckoutSubmitSuccessState) => void
+  onPayNowProcessingStart?: (sessionId: string) => void
+  onPayNowResolved?: (resolution: CheckoutPayNowResolution) => void
+  onPayNowDismissed?: () => void
 }
 
 export function useCheckoutFlow(input: UseCheckoutFlowInput) {
@@ -32,6 +46,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [paymentProcessingMessage, setPaymentProcessingMessage] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<CheckoutSubmitSuccessState | null>(null)
+  const [activePollingSessionId, setActivePollingSessionId] = useState<string | null>(null)
 
   function resetFeedback() {
     setSubmitError(null)
@@ -132,14 +147,23 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
           startPayHerePayment({
             payload: startResult.data.payment,
             onCompleted: () => {
+              logFlightFlow("CheckoutPageClient", "payment_popup_completed_redirected_processing", {
+                partialOfferRequestId: input.data.partialOfferRequestId,
+                checkoutSessionId: startResult.data.checkoutSessionId,
+              })
               setPaymentProcessingMessage(
                 "Payment received. Finalizing booking with airline..."
               )
+              input.onPayNowProcessingStart?.(startResult.data.checkoutSessionId)
               void pollCheckoutCompletion(startResult.data.checkoutSessionId)
             },
             onDismissed: () => {
+              logFlightFlow("CheckoutPageClient", "checkout_popup_dismissed_returned_pay_step", {
+                partialOfferRequestId: input.data.partialOfferRequestId,
+              })
               setPaymentProcessingMessage(null)
               setSubmitError("Payment window was dismissed before confirmation.")
+              input.onPayNowDismissed?.()
             },
             onError: (error) => {
               logFlightFlow("CheckoutPageClient", "payhere_sdk_error", {
@@ -148,6 +172,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
               })
               setPaymentProcessingMessage(null)
               setSubmitError("Payment failed to start. Please try again.")
+              input.onPayNowDismissed?.()
             },
           })
           return
@@ -178,50 +203,72 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
   }
 
   async function pollCheckoutCompletion(checkoutSessionId: string) {
+    if (activePollingSessionId === checkoutSessionId) {
+      return
+    }
+
+    setActivePollingSessionId(checkoutSessionId)
+    logFlightFlow("CheckoutPageClient", "checkout_processing_poll_started", {
+      partialOfferRequestId: input.data.partialOfferRequestId,
+      checkoutSessionId,
+    })
+
     const maxAttempts = 60
     const intervalMs = 2_000
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const result = await getCheckoutSessionStatusAction({
-        checkoutSessionId,
-      })
+      const resolution = await resolveCheckoutSession(checkoutSessionId)
 
-      if (!result.ok) {
-        setSubmitError(
-          toSafeActionMessage(
-            result.error.message,
-            "Could not confirm payment right now. Please refresh and try again."
-          )
-        )
-        setPaymentProcessingMessage(null)
+      if (!resolution) {
+        setActivePollingSessionId(null)
         return
       }
 
-      if (result.data.status === "completed") {
+      if (resolution.status === "success") {
+        logFlightFlow(
+          "CheckoutPageClient",
+          "checkout_processing_poll_resolved_completed",
+          {
+            partialOfferRequestId: input.data.partialOfferRequestId,
+            checkoutSessionId,
+            duffelOrderId: resolution.duffelOrderId,
+          }
+        )
+
         const success: CheckoutSubmitSuccessState = {
-          duffelOrderId: result.data.duffelOrderId ?? "unknown",
+          duffelOrderId: resolution.duffelOrderId ?? "unknown",
           totalSellAmountLabel:
-            result.data.totalChargeAmountLabel ?? input.data.quote.fareSellAmountLabel,
+            resolution.totalChargeAmountLabel ?? input.data.quote.fareSellAmountLabel,
           paymentRequiredByLabel: null,
           paymentMode: "pay_now",
         }
         setSubmitSuccess(success)
         setPaymentProcessingMessage(null)
         input.onSuccess?.(success)
+        input.onPayNowResolved?.(resolution)
+        setActivePollingSessionId(null)
         return
       }
 
-      if (
-        result.data.status === "failed" ||
-        result.data.status === "reconciliation_required"
-      ) {
+      if (resolution.status === "failed" || resolution.status === "reconciliation") {
+        const eventName =
+          resolution.status === "failed"
+            ? "checkout_processing_poll_resolved_failed"
+            : "checkout_processing_poll_resolved_reconciliation"
+
+        logFlightFlow("CheckoutPageClient", eventName, {
+          partialOfferRequestId: input.data.partialOfferRequestId,
+          checkoutSessionId,
+        })
         setSubmitError(
           toSafeActionMessage(
-            result.data.message,
+            resolution.message,
             "Payment was received but booking needs manual reconciliation."
           )
         )
         setPaymentProcessingMessage(null)
+        input.onPayNowResolved?.(resolution)
+        setActivePollingSessionId(null)
         return
       }
 
@@ -231,7 +278,76 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
     setSubmitError(
       "Payment confirmation is taking longer than expected. Please refresh this page in a moment."
     )
-    setPaymentProcessingMessage(null)
+    setPaymentProcessingMessage(
+      "Payment is still being finalized. You can refresh this page in a moment."
+    )
+    setActivePollingSessionId(null)
+  }
+
+  async function resolveCheckoutSession(
+    checkoutSessionId: string
+  ): Promise<CheckoutPayNowResolution | null> {
+    const result = await getCheckoutSessionStatusAction({
+      checkoutSessionId,
+    })
+
+    if (!result.ok) {
+      setSubmitError(
+        toSafeActionMessage(
+          result.error.message,
+          "Could not confirm payment right now. Please refresh and try again."
+        )
+      )
+      setPaymentProcessingMessage(null)
+      return null
+    }
+
+    if (result.data.status === "completed") {
+      return {
+        sessionId: checkoutSessionId,
+        status: "success",
+        duffelOrderId: result.data.duffelOrderId,
+        totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+        message: null,
+      }
+    }
+
+    if (result.data.status === "failed") {
+      return {
+        sessionId: checkoutSessionId,
+        status: "failed",
+        duffelOrderId: result.data.duffelOrderId,
+        totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+        message: result.data.message,
+      }
+    }
+
+    if (result.data.status === "reconciliation_required") {
+      return {
+        sessionId: checkoutSessionId,
+        status: "reconciliation",
+        duffelOrderId: result.data.duffelOrderId,
+        totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+        message: result.data.message,
+      }
+    }
+
+    return {
+      sessionId: checkoutSessionId,
+      status: "processing",
+      duffelOrderId: result.data.duffelOrderId,
+      totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+      message: result.data.message,
+    }
+  }
+
+  async function syncPayNowResolution(checkoutSessionId: string) {
+    return resolveCheckoutSession(checkoutSessionId)
+  }
+
+  async function resumePayNowProcessing(checkoutSessionId: string) {
+    setPaymentProcessingMessage("Payment is processing. Waiting for confirmation...")
+    await pollCheckoutCompletion(checkoutSessionId)
   }
 
   return {
@@ -240,8 +356,11 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
     setSubmitError,
     paymentProcessingMessage,
     submitSuccess,
+    activePollingSessionId,
     onSubmit,
     resetFeedback,
+    syncPayNowResolution,
+    resumePayNowProcessing,
   }
 }
 

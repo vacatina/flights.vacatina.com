@@ -1,6 +1,7 @@
 export * from "@/modules/flights/checkout/ui/checkout-page-client"
 export * from "@/modules/flights/checkout/ui/duffel-ancillaries-panel"
 export * from "@/modules/flights/checkout/ui/checkout-form-values"
+export * from "@/modules/flights/checkout/ui/checkout-payment-status-view"
 export * from "@/modules/flights/checkout/ui/payhere-client"
 export * from "@/modules/flights/checkout/ui/hooks"
 export * from "@/modules/flights/checkout/ui/wizard"

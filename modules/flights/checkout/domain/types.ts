@@ -3,12 +3,19 @@ import type { PayHereStartPaymentPayload } from "@/modules/flights/payments/payh
 
 export type CheckoutPaymentMode = "pay_now" | "hold"
 export type CheckoutWizardStep = "traveler" | "extras" | "pay"
+export type CheckoutPaymentUiStatus =
+  | "processing"
+  | "success"
+  | "failed"
+  | "reconciliation"
 
 export interface CheckoutUrlState {
   offerId: string
   selectedPartialOffers: string[]
   quoteId: string
   step: CheckoutWizardStep
+  status?: CheckoutPaymentUiStatus
+  sessionId?: string
 }
 
 export interface CheckoutContactInput {

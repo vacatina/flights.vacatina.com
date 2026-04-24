@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import type {
+  CheckoutPaymentUiStatus,
   CheckoutUrlState,
   CheckoutWizardStep,
 } from "@/modules/flights/checkout/domain/types"
@@ -11,8 +12,16 @@ const checkoutQuerySchema = z.object({
   selected: z.string().min(1),
   quote: z.string().min(1),
   step: z.string().optional(),
+  status: z.string().optional(),
+  session: z.string().optional(),
 })
 const checkoutStepSchema = z.enum(["traveler", "extras", "pay"])
+const checkoutPaymentStatusSchema = z.enum([
+  "processing",
+  "success",
+  "failed",
+  "reconciliation",
+])
 
 type SearchParamInput = Record<string, string | string[] | undefined>
 
@@ -24,6 +33,8 @@ export function parseCheckoutUrlState(
     selected: firstValue(searchParams.selected),
     quote: firstValue(searchParams.quote),
     step: firstValue(searchParams.step),
+    status: firstValue(searchParams.status),
+    session: firstValue(searchParams.session),
   })
 
   if (!parsed.success) {
@@ -39,6 +50,8 @@ export function parseCheckoutUrlState(
     selectedPartialOffers: parseSelected(parsed.data.selected),
     quoteId: parsed.data.quote.trim(),
     step: parseStep(parsed.data.step),
+    status: parseStatus(parsed.data.status),
+    sessionId: parseSession(parsed.data.session),
   }
 
   if (state.selectedPartialOffers.length === 0) {
@@ -56,6 +69,14 @@ export function toCheckoutUrlSearchParams(state: CheckoutUrlState) {
 
   if (state.step !== "traveler") {
     params.set("step", state.step)
+  }
+
+  if (state.status) {
+    params.set("status", state.status)
+  }
+
+  if (state.sessionId) {
+    params.set("session", state.sessionId)
   }
 
   return params
@@ -84,4 +105,27 @@ function parseStep(value: string | undefined): CheckoutWizardStep {
   }
 
   return parsed.data
+}
+
+function parseStatus(value: string | undefined): CheckoutPaymentUiStatus | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const parsed = checkoutPaymentStatusSchema.safeParse(value)
+
+  if (!parsed.success) {
+    return undefined
+  }
+
+  return parsed.data
+}
+
+function parseSession(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : undefined
 }

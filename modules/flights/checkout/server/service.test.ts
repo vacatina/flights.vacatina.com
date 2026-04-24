@@ -223,6 +223,104 @@ test("fetchCheckoutPageData includes payHere preview", async () => {
   expect(result.payHere.estimatedFareAmountLkr).toBe(33000)
 })
 
+test("fetchCheckoutPageData uses session fallback for status mode when quote is not active", async () => {
+  mockFns.validatePricedQuote.mockResolvedValue({
+    ok: false,
+    reason: "not_active",
+    quote: {
+      id: "pqt_1",
+      partialOfferRequestId: "prq_1",
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      ownerUserId: null,
+      ownerGuestId: "gst_1",
+      ownerOrgId: null,
+      currency: "USD",
+      netAmount: 90,
+      sellAmount: 108,
+      appliedRuleId: null,
+      appliedRuleSpecificity: null,
+      status: "consumed",
+      expiresAt: new Date("2026-04-13T11:00:00.000Z"),
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  })
+
+  const sessionRepo = createSessionRepository()
+  await sessionRepo.repo.create({
+    id: "chs_1",
+    idempotencyKey: "idempotency_fallback_1",
+    partialOfferRequestId: "prq_1",
+    quoteId: "pqt_1",
+    offerId: "off_1",
+    selectedPartialOffers: ["off_partial_1"],
+    ownerUserId: null,
+    ownerGuestId: "gst_1",
+    ownerOrgId: null,
+    paymentMode: "pay_now",
+    currency: "USD",
+    netAmount: 130,
+    sellAmount: 160,
+    paymentProvider: "payhere",
+    providerOrderId: "chs_1",
+    providerPaymentId: "pay_1",
+    providerStatusCode: "2",
+    providerStatusMessage: "success",
+    paymentCurrency: "LKR",
+    paymentAmount: 33000,
+    fxSourceCurrency: "USD",
+    fxTargetCurrency: "LKR",
+    fxBaseRate: 320,
+    fxBufferPercent: 3,
+    fxEffectiveRate: 329.6,
+    checkoutPayloadSnapshot: null,
+    status: "completed",
+    paymentInitiatedAt: NOW,
+    paymentConfirmedAt: NOW,
+    finalizedAt: NOW,
+    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
+  })
+
+  await fetchCheckoutPageData(
+    {
+      partialOfferRequestId: "prq_1",
+      state: {
+        offerId: "off_1",
+        selectedPartialOffers: ["off_partial_1"],
+        quoteId: "pqt_1",
+        step: "pay",
+        status: "success",
+        sessionId: "chs_1",
+      },
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => {
+        throw new Error("not used")
+      },
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  const modelInput = mockFns.buildCheckoutPageModel.mock.calls.at(-1)?.[0]
+  expect(modelInput.quote.netAmount).toBe(130)
+  expect(modelInput.quote.sellAmount).toBe(160)
+  expect(mockFns.convertToLkr).toHaveBeenCalledWith({
+    amount: 130,
+    sourceCurrency: "USD",
+    bufferPercent: 3,
+  })
+})
+
 test("startCheckoutPayment creates processing session and payload", async () => {
   const sessionRepo = createSessionRepository()
   const result = await startCheckoutPayment(
