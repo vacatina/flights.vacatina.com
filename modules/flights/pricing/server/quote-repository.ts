@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm"
 
 import { getDbClient, pricedQuotes } from "@/lib/db"
+import { toNumeric } from "@/lib/shared/number"
+import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
 import type {
   PricedQuoteRecord,
   PricedQuoteStatus,
 } from "@/modules/flights/pricing/domain"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 interface CreateQuoteInput {
   id: string
@@ -142,7 +144,7 @@ function toQuoteRecord(row: typeof pricedQuotes.$inferSelect): PricedQuoteRecord
     id: row.id,
     partialOfferRequestId: row.partialOfferRequestId,
     offerId: row.offerId,
-    selectedPartialOffers: normalizeSelectedPartialOffers(row.selectedPartialOffers),
+    selectedPartialOffers: normalizeUnknownSelectedStrings(row.selectedPartialOffers),
     ownerUserId: row.ownerUserId,
     ownerGuestId: row.ownerGuestId,
     ownerOrgId: row.ownerOrgId,
@@ -156,22 +158,6 @@ function toQuoteRecord(row: typeof pricedQuotes.$inferSelect): PricedQuoteRecord
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
-}
-
-function normalizeSelectedPartialOffers(value: unknown) {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item.length > 0)
-}
-
-function toNumeric(value: string) {
-  const parsed = Number(value)
-
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 function toDbNumeric(value: number) {

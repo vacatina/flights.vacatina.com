@@ -1,4 +1,5 @@
 import type { ActorContext } from "@/modules/auth/types"
+import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
 import { getClerkAuthState } from "@/modules/auth/server/clerk"
 import {
   findGuestSessionLink,
@@ -7,7 +8,7 @@ import {
   upsertUserMirror,
 } from "@/modules/auth/server/repository"
 import { resolveGuestSession } from "@/modules/auth/server/guest-session"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 interface GetActorContextOptions {
   ensureGuestSession?: boolean
@@ -98,6 +99,6 @@ export function resolveActorContext(input: ResolveActorContextInput): ActorConte
 
   return {
     type: "guest",
-    guestId: "guest_unavailable",
+    guestId: GUEST_UNAVAILABLE_ID,
   }
 }

@@ -1,6 +1,6 @@
 import "server-only"
 
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 export type CheckoutMetricName =
   | "checkout_started"
@@ -9,6 +9,12 @@ export type CheckoutMetricName =
   | "payment_authorized"
   | "order_created"
   | "quote_consumed"
+  | "payhere_start_total"
+  | "payhere_notify_total"
+  | "payhere_notify_invalid_sig_total"
+  | "checkout_payment_success_total"
+  | "checkout_payment_failed_total"
+  | "checkout_reconciliation_required_total"
 
 const counters = new Map<CheckoutMetricName, number>()
 

@@ -5,7 +5,7 @@ import { cookies } from "next/headers"
 import { getAuthServerConfig } from "@/modules/auth/server/config"
 import { upsertGuestSession } from "@/modules/auth/server/repository"
 import type { GuestSessionPayload } from "@/modules/auth/types"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface GuestSessionCookieStore {
   get: (name: string) => { value: string } | undefined

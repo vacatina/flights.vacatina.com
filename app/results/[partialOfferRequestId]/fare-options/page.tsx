@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActorContext } from "@/modules/auth/server"
 import { parseResultsUrlState } from "@/modules/flights/results/domain"
 import { fetchFareOptionsData } from "@/modules/flights/results/server"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 import { FareOptionsPageClient } from "@/modules/flights/results/ui"
 
 interface FareOptionsPageProps {

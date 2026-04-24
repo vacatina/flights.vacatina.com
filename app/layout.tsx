@@ -27,7 +27,8 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Vacatina Flights",
-  description: "",
+  description:
+    "Search, compare, and book international flights with flexible fare options and streamlined checkout.",
 }
 
 export default function RootLayout({

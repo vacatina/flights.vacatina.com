@@ -1,4 +1,4 @@
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 export type PricingMetricName =
   | "pricing_rule_applied_total"

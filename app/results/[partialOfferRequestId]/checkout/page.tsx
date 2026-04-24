@@ -11,7 +11,7 @@ import {
   fetchCheckoutPageData,
 } from "@/modules/flights/checkout/server/service"
 import { CheckoutPageClient } from "@/modules/flights/checkout/ui"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface CheckoutPageProps {
   params: Promise<{

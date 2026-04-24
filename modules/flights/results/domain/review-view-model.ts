@@ -13,7 +13,7 @@ import {
   toDurationMinutes,
 } from "@/modules/flights/results/domain/offer-view-model"
 import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import type {
   ReviewFareOptionLine,
   ReviewFareOptionViewModel,

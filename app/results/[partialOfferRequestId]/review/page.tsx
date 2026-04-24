@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActorContext } from "@/modules/auth/server"
 import { parseReviewUrlState } from "@/modules/flights/results/domain"
 import { fetchReviewPageData } from "@/modules/flights/results/server"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 import { ReviewPageClient } from "@/modules/flights/results/ui"
 
 interface ReviewPageProps {

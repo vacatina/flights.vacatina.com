@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import type { CheckoutUrlState } from "@/modules/flights/checkout/domain/types"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 const checkoutQuerySchema = z.object({
   offer: z.string().min(1),

@@ -2,7 +2,8 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { isProductionEnvironment } from "@/lib/shared/env"
 
 export interface ExternalPaymentAuthorization {
   authorizationId: string
@@ -30,9 +31,26 @@ export interface ExternalPaymentProvider {
 }
 
 const FORCE_FAIL_ENV_KEY = "CHECKOUT_PAYMENT_PLACEHOLDER_FORCE_FAIL"
+const ALLOW_PLACEHOLDER_ENV_KEY = "CHECKOUT_ALLOW_PLACEHOLDER_PAYMENT_PROVIDER"
+
+export function assertPlaceholderPaymentProviderAllowed() {
+  if (!isProductionEnvironment()) {
+    return
+  }
+
+  if (process.env[ALLOW_PLACEHOLDER_ENV_KEY]?.trim() === "1") {
+    return
+  }
+
+  throw new Error(
+    `Placeholder payment provider is disabled in production. Set ${ALLOW_PLACEHOLDER_ENV_KEY}=1 only for controlled non-live environments.`
+  )
+}
 
 export const placeholderExternalPaymentProvider: ExternalPaymentProvider = {
   async authorize(input) {
+    assertPlaceholderPaymentProviderAllowed()
+
     if (process.env[FORCE_FAIL_ENV_KEY] === "authorize") {
       throw new Error("Payment authorization failed. Please try again.")
     }
@@ -54,6 +72,8 @@ export const placeholderExternalPaymentProvider: ExternalPaymentProvider = {
     return result
   },
   async capture(input) {
+    assertPlaceholderPaymentProviderAllowed()
+
     if (process.env[FORCE_FAIL_ENV_KEY] === "capture") {
       throw new Error("Payment capture failed. Please contact support.")
     }

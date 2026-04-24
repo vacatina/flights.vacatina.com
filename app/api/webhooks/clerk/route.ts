@@ -8,7 +8,7 @@ import {
   upsertUserMirror,
   verifyClerkWebhookRequest,
 } from "@/modules/auth/server"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 const userWebhookDataSchema = z.object({
   id: z.string(),

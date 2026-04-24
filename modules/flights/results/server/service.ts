@@ -28,7 +28,8 @@ import {
 import {
   logFlightFlow,
   logFlightFlowError,
-} from "@/modules/flights/shared/flow-debug"
+} from "@/lib/logging/flow-debug"
+import { normalizeSelectedStrings } from "@/lib/shared/selection"
 
 const duffelConfig = getDuffelFlightConfig()
 const INVALID_SELECTION_STATE_MESSAGE =
@@ -80,7 +81,7 @@ export async function fetchFareOptionsData(
     stops: input.state.stops,
     after: input.state.after,
   })
-  const selectedFromUrl = normalizeSelectedOfferIds(input.state.selected)
+  const selectedFromUrl = normalizeSelectedStrings(input.state.selected)
   const baseOfferRequest = await deps.getBaseOfferRequest(input.partialOfferRequestId)
   const totalLegs = Math.max(baseOfferRequest.slices.length, 1)
   const leg = Math.min(Math.max(input.state.leg, 0), totalLegs - 1)
@@ -350,12 +351,6 @@ const defaultFetchFareOptionsDeps: FetchFareOptionsDeps = {
       )
     }
   },
-}
-
-function normalizeSelectedOfferIds(selected: string[]) {
-  return selected
-    .map((offerId) => offerId.trim())
-    .filter((offerId) => offerId.length > 0)
 }
 
 function applyPricingToOfferCard(

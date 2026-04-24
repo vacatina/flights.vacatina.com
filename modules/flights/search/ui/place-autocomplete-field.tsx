@@ -17,7 +17,7 @@ import type {
   PlaceSuggestionOption,
 } from "@/modules/flights/search/domain"
 import { searchPlacesAction } from "@/modules/flights/search/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 interface PlaceAutocompleteFieldProps {
   control: Control<FlightSearchFormValues>
@@ -59,11 +59,6 @@ export function PlaceAutocompleteField({
 
     const activeRequest = requestIdRef.current + 1
     requestIdRef.current = activeRequest
-    logFlightFlow("placeAutocompleteField", "search_debounced", {
-      field: name,
-      queryLength: trimmed.length,
-      activeRequest,
-    })
 
     const timeout = window.setTimeout(() => {
       startTransition(async () => {
@@ -127,17 +122,10 @@ export function PlaceAutocompleteField({
   }
 
   function handleInputBlur() {
-    logFlightFlow("placeAutocompleteField", "input_blurred", {
-      field: name,
-    })
     setOpen(false)
   }
 
   function handleInputChange(value: string) {
-    logFlightFlow("placeAutocompleteField", "input_changed", {
-      field: name,
-      valueLength: value.length,
-    })
     setQuery(value)
     setOpen(true)
     const trimmed = value.trim()
@@ -163,9 +151,6 @@ export function PlaceAutocompleteField({
         <Input
           value={inputValue}
           onFocus={() => {
-            logFlightFlow("placeAutocompleteField", "input_focused", {
-              field: name,
-            })
             setQuery(selectedDisplayName)
             setOpen(true)
           }}

@@ -21,7 +21,8 @@ import {
   defaultPricingRuleRepository,
   type PricingRuleRepository,
 } from "@/modules/flights/pricing/server/rule-repository"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { normalizeSelectedStrings } from "@/lib/shared/selection"
 
 interface PricingServiceDeps {
   now: () => Date
@@ -137,7 +138,7 @@ export async function createPricedQuote(
     id: quoteId,
     partialOfferRequestId: input.partialOfferRequestId,
     offerId: input.offerId,
-    selectedPartialOffers: normalizeSelected(input.selectedPartialOffers),
+    selectedPartialOffers: normalizeSelectedStrings(input.selectedPartialOffers),
     ownerUserId: input.ownerUserId ?? null,
     ownerGuestId: input.ownerGuestId ?? null,
     ownerOrgId: input.ownerOrgId ?? null,
@@ -228,7 +229,7 @@ export async function validatePricedQuote(
     return failQuoteValidation("offer_mismatch", quote)
   }
 
-  const expectedSelected = normalizeSelected(input.selectedPartialOffers)
+  const expectedSelected = normalizeSelectedStrings(input.selectedPartialOffers)
 
   if (!equalsArray(quote.selectedPartialOffers, expectedSelected)) {
     return failQuoteValidation("selected_mismatch", quote)
@@ -348,12 +349,6 @@ function equalsArray(left: string[], right: string[]) {
 
 function createQuoteId() {
   return `pqt_${randomUUID().replaceAll("-", "")}`
-}
-
-function normalizeSelected(selected: string[]) {
-  return selected
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0)
 }
 
 export function summarizeOfferPricing(pricingByOfferId: Record<string, OfferPriceRecord>) {

@@ -1,4 +1,5 @@
 export * from "@/modules/auth/server/actor"
+export * from "@/modules/auth/server/action-context"
 export * from "@/modules/auth/server/clerk"
 export * from "@/modules/auth/server/config"
 export * from "@/modules/auth/server/guards"

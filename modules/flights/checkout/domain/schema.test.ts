@@ -12,6 +12,11 @@ const validPayload = {
     email: "test@example.com",
     phoneNumber: "+94771234567",
   },
+  billing: {
+    address: "12 Temple Road",
+    city: "Colombo",
+    country: "Sri Lanka",
+  },
   passengers: [
     {
       id: "pas_1",

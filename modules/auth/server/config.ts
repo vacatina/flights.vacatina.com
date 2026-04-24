@@ -1,3 +1,6 @@
+import { parseIntegerFromEnv, isProductionEnvironment } from "@/lib/shared/env"
+import { clamp } from "@/lib/shared/number"
+
 const DEFAULT_GUEST_SESSION_COOKIE_NAME = "guest_session"
 const DEFAULT_GUEST_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const DEFAULT_GUEST_SESSION_SECRET = "local-guest-session-secret"
@@ -52,29 +55,19 @@ export function isClerkWebhookSigningSecretConfigured() {
 }
 
 function resolveGuestSessionSecret() {
-  return (
+  const configuredSecret =
     process.env.AUTH_GUEST_SESSION_SECRET?.trim() ||
-    process.env.CLERK_SECRET_KEY?.trim() ||
-    DEFAULT_GUEST_SESSION_SECRET
-  )
-}
+    process.env.CLERK_SECRET_KEY?.trim()
 
-function parseIntegerFromEnv(name: string, fallback: number) {
-  const raw = process.env[name]
-
-  if (!raw) {
-    return fallback
+  if (configuredSecret) {
+    return configuredSecret
   }
 
-  const parsed = Number.parseInt(raw, 10)
-
-  if (Number.isNaN(parsed)) {
-    return fallback
+  if (isProductionEnvironment()) {
+    throw new Error(
+      "AUTH_GUEST_SESSION_SECRET (or CLERK_SECRET_KEY) must be configured in production."
+    )
   }
 
-  return parsed
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
+  return DEFAULT_GUEST_SESSION_SECRET
 }

@@ -62,7 +62,7 @@ import {
   type FareOptionsPageData,
 } from "@/modules/flights/results/domain"
 import { loadMoreFareOptionsAction } from "@/modules/flights/results/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { cn } from "@/lib/utils"
 
 const SORT_OPTIONS = [
@@ -99,33 +99,11 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
     data.state.landingTo,
   ])
 
-  useEffect(() => {
-    logFlightFlow("FareOptionsPageClient", "hydrated", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      leg: data.leg,
-      totalLegs: data.totalLegs,
-      selectedCount: data.selected.length,
-      initialOfferCount: data.offers.length,
-      hasNextAfter: Boolean(data.after),
-    })
-  }, [
-    data.after,
-    data.leg,
-    data.offers.length,
-    data.partialOfferRequestId,
-    data.selected.length,
-    data.totalLegs,
-  ])
-
   const updateQuery = useCallback(function updateQuery(
     patch: Partial<Omit<FareOptionsPageData["state"], "selected">> & {
       selected?: string[]
     }
   ) {
-    logFlightFlow("FareOptionsPageClient", "update_query_requested", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      patchKeys: Object.keys(patch),
-    })
     const nextState = {
       ...data.state,
       ...patch,
@@ -133,12 +111,6 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
       selected: patch.selected ?? data.state.selected,
     }
     const search = toResultsUrlSearchParams(nextState).toString()
-    logFlightFlow("FareOptionsPageClient", "update_query_navigate", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      nextLeg: nextState.leg,
-      selectedCount: nextState.selected.length,
-      hasAfter: Boolean(nextState.after),
-    })
     router.replace(
       `/results/${data.partialOfferRequestId}/fare-options?${search}`
     )

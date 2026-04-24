@@ -3,8 +3,9 @@
 import type { Offer, OfferRequest } from "@duffel/api/types"
 import { z } from "zod"
 
-import { getActorContext } from "@/modules/auth/server"
+import { resolveActionActorContext } from "@/modules/auth/server"
 import type { ActorContext } from "@/modules/auth/types"
+import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
 import {
   createPricedQuote as createPricedQuoteFromPricingService,
   getOfferPricingMap as getOfferPricingMapFromPricingService,
@@ -19,7 +20,8 @@ import type { OfferCardViewModel } from "@/modules/flights/results/domain"
 import {
   logFlightFlow,
   logFlightFlowError,
-} from "@/modules/flights/shared/flow-debug"
+} from "@/lib/logging/flow-debug"
+import { normalizeSelectedStrings } from "@/lib/shared/selection"
 
 const loadMoreFareOptionsSchema = z.object({
   partialOfferRequestId: z.string().min(1),
@@ -79,7 +81,9 @@ interface CreateCheckoutQuoteDeps {
 export async function loadMoreFareOptionsAction(
   input: unknown
 ): Promise<ActionResult<{ offers: OfferCardViewModel[]; after: string | null }>> {
-  const actor = await resolveActionActorContext()
+  const actor = await resolveActionActorContext({
+    scope: "results.actions",
+  })
   logFlightFlow("loadMoreFareOptionsAction", "received_input", {
     inputType: typeof input,
     actorType: actor.type,
@@ -140,7 +144,10 @@ export async function executeCreateCheckoutQuoteAction(
   input: unknown,
   deps: CreateCheckoutQuoteDeps = defaultCreateCheckoutQuoteDeps
 ): Promise<ActionResult<{ quoteId: string; expiresAt: string }>> {
-  const actor = await resolveActionActorContext(deps.getActorContext)
+  const actor = await resolveActionActorContext({
+    scope: "results.actions",
+    resolveActor: deps.getActorContext,
+  })
   logFlightFlow("createCheckoutQuoteAction", "received_input", {
     inputType: typeof input,
     actorType: actor.type,
@@ -156,7 +163,7 @@ export async function executeCreateCheckoutQuoteAction(
     return actionFailure("VALIDATION_ERROR", "Invalid checkout quote request")
   }
 
-  const selected = normalizeSelectedOffers(parsed.data.selected)
+  const selected = normalizeSelectedStrings(parsed.data.selected)
 
   if (selected.length !== parsed.data.selected.length) {
     logFlightFlow("createCheckoutQuoteAction", "validation_failed_selected_items", {
@@ -212,7 +219,7 @@ export async function executeCreateCheckoutQuoteAction(
       selectedPartialOffers: selected,
       ownerUserId: actor.type === "user" ? actor.appUserId : null,
       ownerGuestId:
-        actor.type === "guest" && actor.guestId !== "guest_unavailable"
+        actor.type === "guest" && actor.guestId !== GUEST_UNAVAILABLE_ID
           ? actor.guestId
           : null,
       ownerOrgId: null,
@@ -268,22 +275,4 @@ const defaultCreateCheckoutQuoteDeps: CreateCheckoutQuoteDeps = {
   async createPricedQuote(input) {
     return createPricedQuoteFromPricingService(input)
   },
-}
-
-function normalizeSelectedOffers(selected: string[]) {
-  return selected.map((item) => item.trim()).filter((item) => item.length > 0)
-}
-
-async function resolveActionActorContext(
-  resolveActor?: () => Promise<ActorContext>
-): Promise<ActorContext> {
-  try {
-    return await (resolveActor?.() ?? getActorContext())
-  } catch (error) {
-    logFlightFlowError("results.actions", "resolve_actor_fallback_to_guest", error)
-    return {
-      type: "guest",
-      guestId: "guest_unavailable",
-    }
-  }
 }

@@ -1,11 +1,13 @@
 "use server"
 
-import { ZodError } from "zod"
+import { z, ZodError } from "zod"
 
-import { getActorContext } from "@/modules/auth/server"
+import { resolveActionActorContext } from "@/modules/auth/server"
 import type { ActorContext } from "@/modules/auth/types"
 import {
   parseCheckoutSubmitInput,
+  type CheckoutPaymentStartResult,
+  type CheckoutSessionStatusResult,
   type CheckoutSubmitInput,
 } from "@/modules/flights/checkout/domain"
 import {
@@ -13,7 +15,7 @@ import {
   actionSuccess,
   type ActionResult,
 } from "@/modules/flights/search/server/types"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface SubmitCheckoutActionDeps {
   getActorContext?: () => Promise<ActorContext>
@@ -30,6 +32,22 @@ interface SubmitCheckoutActionDeps {
   }>
 }
 
+interface StartCheckoutPaymentActionDeps {
+  getActorContext?: () => Promise<ActorContext>
+  startCheckoutPayment?: (input: {
+    actor: ActorContext
+    payload: CheckoutSubmitInput
+  }) => Promise<CheckoutPaymentStartResult>
+}
+
+interface CheckoutSessionStatusActionDeps {
+  getActorContext?: () => Promise<ActorContext>
+  getCheckoutSessionStatus?: (input: {
+    actor: ActorContext
+    checkoutSessionId: string
+  }) => Promise<CheckoutSessionStatusResult>
+}
+
 type SubmitCheckoutSuccess = {
   checkoutSessionId: string
   flightOrderId: string
@@ -39,11 +57,13 @@ type SubmitCheckoutSuccess = {
   paymentRequiredByLabel: string | null
 }
 
+const checkoutSessionStatusSchema = z.object({
+  checkoutSessionId: z.string().trim().min(1),
+})
+
 export async function submitCheckoutAction(
   input: unknown
-): Promise<
-  ActionResult<SubmitCheckoutSuccess>
-> {
+): Promise<ActionResult<SubmitCheckoutSuccess>> {
   return executeSubmitCheckoutAction(input)
 }
 
@@ -51,7 +71,10 @@ export async function executeSubmitCheckoutAction(
   input: unknown,
   deps: SubmitCheckoutActionDeps = {}
 ): Promise<ActionResult<SubmitCheckoutSuccess>> {
-  const actor = await resolveActionActorContext(deps.getActorContext)
+  const actor = await resolveActionActorContext({
+    scope: "checkout.actions",
+    resolveActor: deps.getActorContext,
+  })
   logFlightFlow("submitCheckoutAction", "received", {
     actorType: actor.type,
     inputType: typeof input,
@@ -70,6 +93,13 @@ export async function executeSubmitCheckoutAction(
     }
 
     return actionFailure("VALIDATION_ERROR", "Invalid checkout payload")
+  }
+
+  if (payload.paymentMode !== "hold") {
+    return actionFailure(
+      "VALIDATION_ERROR",
+      "Pay now checkout must be started through the payment initialization action."
+    )
   }
 
   try {
@@ -92,17 +122,100 @@ export async function executeSubmitCheckoutAction(
   }
 }
 
-async function resolveActionActorContext(
-  resolveActor?: () => Promise<ActorContext>
-): Promise<ActorContext> {
+export async function startCheckoutPaymentAction(
+  input: unknown
+): Promise<ActionResult<CheckoutPaymentStartResult>> {
+  return executeStartCheckoutPaymentAction(input)
+}
+
+export async function executeStartCheckoutPaymentAction(
+  input: unknown,
+  deps: StartCheckoutPaymentActionDeps = {}
+): Promise<ActionResult<CheckoutPaymentStartResult>> {
+  const actor = await resolveActionActorContext({
+    scope: "checkout.actions",
+    resolveActor: deps.getActorContext,
+  })
+
+  let payload: CheckoutSubmitInput
+
   try {
-    return await (resolveActor?.() ?? getActorContext())
+    payload = parseCheckoutSubmitInput(input)
   } catch (error) {
-    logFlightFlowError("checkout.actions", "resolve_actor_fallback_to_guest", error)
-    return {
-      type: "guest",
-      guestId: "guest_unavailable",
+    if (error instanceof ZodError) {
+      return actionFailure(
+        "VALIDATION_ERROR",
+        error.issues[0]?.message ?? "Invalid checkout payload"
+      )
     }
+
+    return actionFailure("VALIDATION_ERROR", "Invalid checkout payload")
+  }
+
+  if (payload.paymentMode !== "pay_now") {
+    return actionFailure("VALIDATION_ERROR", "Invalid payment mode for pay now.")
+  }
+
+  try {
+    const startCheckoutPayment =
+      deps.startCheckoutPayment ?? (await getCheckoutPaymentStarter())
+    const result = await startCheckoutPayment({
+      actor,
+      payload,
+    })
+    return actionSuccess(result)
+  } catch (error) {
+    logFlightFlowError("startCheckoutPaymentAction", "failed", error, {
+      partialOfferRequestId: payload.partialOfferRequestId,
+      offerId: payload.offerId,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      error instanceof Error ? error.message : "Could not start payment."
+    )
+  }
+}
+
+export async function getCheckoutSessionStatusAction(
+  input: unknown
+): Promise<ActionResult<CheckoutSessionStatusResult>> {
+  return executeGetCheckoutSessionStatusAction(input)
+}
+
+export async function executeGetCheckoutSessionStatusAction(
+  input: unknown,
+  deps: CheckoutSessionStatusActionDeps = {}
+): Promise<ActionResult<CheckoutSessionStatusResult>> {
+  const actor = await resolveActionActorContext({
+    scope: "checkout.actions",
+    resolveActor: deps.getActorContext,
+  })
+
+  const parsed = checkoutSessionStatusSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return actionFailure(
+      "VALIDATION_ERROR",
+      parsed.error.issues[0]?.message ?? "Invalid checkout session request"
+    )
+  }
+
+  try {
+    const getCheckoutSessionStatus =
+      deps.getCheckoutSessionStatus ?? (await getCheckoutSessionStatusResolver())
+    const result = await getCheckoutSessionStatus({
+      actor,
+      checkoutSessionId: parsed.data.checkoutSessionId,
+    })
+    return actionSuccess(result)
+  } catch (error) {
+    logFlightFlowError("getCheckoutSessionStatusAction", "failed", error, {
+      checkoutSessionId: parsed.data.checkoutSessionId,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      error instanceof Error ? error.message : "Could not fetch checkout session status."
+    )
   }
 }
 
@@ -110,3 +223,14 @@ async function getCheckoutSubmitter() {
   const { submitCheckout } = await import("@/modules/flights/checkout/server/service")
   return submitCheckout
 }
+
+async function getCheckoutPaymentStarter() {
+  const { startCheckoutPayment } = await import("@/modules/flights/checkout/server/service")
+  return startCheckoutPayment
+}
+
+async function getCheckoutSessionStatusResolver() {
+  const { getCheckoutSessionStatus } = await import("@/modules/flights/checkout/server/service")
+  return getCheckoutSessionStatus
+}
+

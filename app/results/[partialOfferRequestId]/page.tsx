@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 export default async function ResultsPage({
   params,

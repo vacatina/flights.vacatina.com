@@ -24,7 +24,7 @@ import {
   type ReviewPageData,
 } from "@/modules/flights/results/domain"
 import { createCheckoutQuoteAction } from "@/modules/flights/results/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const router = useRouter()

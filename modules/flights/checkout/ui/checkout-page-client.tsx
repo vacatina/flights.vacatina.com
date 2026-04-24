@@ -35,8 +35,12 @@ import {
   type CheckoutPageData,
   type CheckoutPassengerInput,
 } from "@/modules/flights/checkout/domain"
-import { submitCheckoutAction } from "@/modules/flights/checkout/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import {
+  getCheckoutSessionStatusAction,
+  startCheckoutPaymentAction,
+  submitCheckoutAction,
+} from "@/modules/flights/checkout/server/actions"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { DuffelAncillariesPanel } from "@/modules/flights/checkout/ui/duffel-ancillaries-panel"
 
 interface CheckoutPageClientProps {
@@ -49,6 +53,11 @@ interface CheckoutFormValues {
   contact: {
     email: string
     phoneNumber: string
+  }
+  billing: {
+    address: string
+    city: string
+    country: string
   }
   passengers: Array<{
     id: string
@@ -73,11 +82,47 @@ interface CheckoutFormValues {
   }
 }
 
+interface PayHereStartPaymentPayloadClient {
+  sandbox: boolean
+  merchant_id: string
+  return_url: string
+  cancel_url: string
+  notify_url: string
+  order_id: string
+  items: string
+  amount: string
+  currency: "LKR"
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  country: string
+  custom_1?: string
+  custom_2?: string
+  hash: string
+}
+
+interface PayHereGlobal {
+  onCompleted: (orderId: string) => void
+  onDismissed: () => void
+  onError: (error: unknown) => void
+  startPayment: (payment: PayHereStartPaymentPayloadClient) => void
+}
+
+declare global {
+  interface Window {
+    payhere?: PayHereGlobal
+  }
+}
+
 export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isSubmitting, startSubmit] = useTransition()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [paymentProcessingMessage, setPaymentProcessingMessage] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<{
     duffelOrderId: string
     totalSellAmountLabel: string
@@ -87,10 +132,18 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   const form = useForm<CheckoutFormValues>({
     defaultValues: {
-      paymentMode: data.paymentRequirements.canHold ? "pay_now" : "pay_now",
+      paymentMode:
+        data.payHere.payNowEnabled || !data.paymentRequirements.canHold
+          ? "pay_now"
+          : "hold",
       contact: {
         email: "",
         phoneNumber: "",
+      },
+      billing: {
+        address: "",
+        city: "",
+        country: "Sri Lanka",
       },
       passengers: data.passengerDefaults.map((passenger) => ({
         id: passenger.id,
@@ -153,6 +206,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   async function onSubmit(values: CheckoutFormValues) {
     setSubmitError(null)
     setSubmitSuccess(null)
+    setPaymentProcessingMessage(null)
 
     const passengers: CheckoutPassengerInput[] = values.passengers.map((passenger) => {
       const identityDocument =
@@ -186,6 +240,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       selectedPartialOffers: data.state.selectedPartialOffers,
       paymentMode: values.paymentMode,
       contact: values.contact,
+      billing: values.billing,
       passengers,
       metadata: values.metadata,
       ancillarySelection:
@@ -203,6 +258,66 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
     startSubmit(() => {
       void (async () => {
+        if (values.paymentMode === "pay_now") {
+          if (!data.payHere.payNowEnabled) {
+            setSubmitError(
+              data.payHere.unavailableReason ?? "Pay now is unavailable for this fare."
+            )
+            return
+          }
+
+          const startResult = await startCheckoutPaymentAction(payload)
+
+          if (!startResult.ok) {
+            setSubmitError(startResult.error.message)
+            return
+          }
+
+          setPaymentProcessingMessage("Opening PayHere payment window...")
+
+          try {
+            await loadPayHereSdk(data.payHere.scriptUrl)
+          } catch (error) {
+            setSubmitError(
+              error instanceof Error
+                ? error.message
+                : "Could not load PayHere payment SDK."
+            )
+            setPaymentProcessingMessage(null)
+            return
+          }
+
+          const payhere = window.payhere
+
+          if (!payhere) {
+            setSubmitError("PayHere SDK is unavailable right now. Please try again.")
+            setPaymentProcessingMessage(null)
+            return
+          }
+
+          payhere.onCompleted = () => {
+            setPaymentProcessingMessage(
+              "Payment received. Finalizing booking with airline..."
+            )
+            void pollCheckoutCompletion(startResult.data.checkoutSessionId)
+          }
+          payhere.onDismissed = () => {
+            setPaymentProcessingMessage(null)
+            setSubmitError("Payment window was dismissed before confirmation.")
+          }
+          payhere.onError = (error) => {
+            setPaymentProcessingMessage(null)
+            setSubmitError(
+              error instanceof Error ? error.message : "Payment failed to start."
+            )
+          }
+
+          payhere.startPayment(
+            startResult.data.payment as PayHereStartPaymentPayloadClient
+          )
+          return
+        }
+
         const result = await submitCheckoutAction(payload)
 
         if (!result.ok) {
@@ -218,6 +333,54 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
         })
       })()
     })
+  }
+
+  async function pollCheckoutCompletion(checkoutSessionId: string) {
+    const maxAttempts = 60
+    const intervalMs = 2_000
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const result = await getCheckoutSessionStatusAction({
+        checkoutSessionId,
+      })
+
+      if (!result.ok) {
+        setSubmitError(result.error.message)
+        setPaymentProcessingMessage(null)
+        return
+      }
+
+      if (result.data.status === "completed") {
+        setSubmitSuccess({
+          duffelOrderId: result.data.duffelOrderId ?? "unknown",
+          totalSellAmountLabel:
+            result.data.totalChargeAmountLabel ?? data.quote.fareSellAmountLabel,
+          paymentRequiredByLabel: null,
+          paymentMode: "pay_now",
+        })
+        setPaymentProcessingMessage(null)
+        return
+      }
+
+      if (
+        result.data.status === "failed" ||
+        result.data.status === "reconciliation_required"
+      ) {
+        setSubmitError(
+          result.data.message ??
+            "Payment was received but booking needs manual reconciliation."
+        )
+        setPaymentProcessingMessage(null)
+        return
+      }
+
+      await wait(intervalMs)
+    }
+
+    setSubmitError(
+      "Payment confirmation is taking longer than expected. Please refresh this page in a moment."
+    )
+    setPaymentProcessingMessage(null)
   }
 
   return (
@@ -369,17 +532,19 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
               <div className="grid gap-3 md:grid-cols-2">
                 <button
                   type="button"
+                  disabled={!data.payHere.payNowEnabled}
                   onClick={() => form.setValue("paymentMode", "pay_now")}
                   className={cn(
                     "rounded-2xl border px-4 py-4 text-left",
                     paymentMode === "pay_now"
                       ? "border-emerald-500 bg-emerald-50/50"
-                      : "bg-card"
+                      : "bg-card",
+                    !data.payHere.payNowEnabled && "cursor-not-allowed opacity-60"
                   )}
                 >
                   <p className="text-lg font-semibold md:text-base">Pay now</p>
                   <p className="text-sm text-muted-foreground">
-                    Confirm booking now with your payment gateway
+                    Pay with PayHere ({data.payHere.chargeCurrency})
                   </p>
                 </button>
                 <button
@@ -401,6 +566,17 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
               {paymentMode === "hold" && data.paymentRequirements.paymentRequiredByLabel ? (
                 <p className="text-sm text-muted-foreground">
                   Payment required by {data.paymentRequirements.paymentRequiredByLabel}
+                </p>
+              ) : null}
+              {paymentMode === "pay_now" && !data.payHere.payNowEnabled ? (
+                <p className="text-sm text-destructive">
+                  {data.payHere.unavailableReason ?? "Pay now is unavailable for this fare."}
+                </p>
+              ) : null}
+              {paymentMode === "pay_now" && data.payHere.payNowEnabled ? (
+                <p className="text-sm text-muted-foreground">
+                  Charges are settled in {data.payHere.chargeCurrency}. FX includes a{" "}
+                  {data.payHere.fxBufferPercent}% buffer.
                 </p>
               ) : null}
             </section>
@@ -425,6 +601,32 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     id="checkout-contact-phone"
                     placeholder="+94771234567"
                     {...form.register("contact.phoneNumber")}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2 md:col-span-3">
+                  <Label htmlFor="checkout-billing-address">Billing address</Label>
+                  <Input
+                    id="checkout-billing-address"
+                    placeholder="123 Main Street"
+                    {...form.register("billing.address")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="checkout-billing-city">City</Label>
+                  <Input
+                    id="checkout-billing-city"
+                    placeholder="Colombo"
+                    {...form.register("billing.city")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="checkout-billing-country">Country</Label>
+                  <Input
+                    id="checkout-billing-country"
+                    placeholder="Sri Lanka"
+                    {...form.register("billing.country")}
                   />
                 </div>
               </div>
@@ -645,15 +847,25 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                   <Separator />
                   <div className="flex items-center justify-between text-lg font-semibold md:text-base">
                     <span>Total</span>
-                    <span>{formatPreviewCurrency(totalPreview, data.quote.currency)}</span>
+                    <span>
+                      {paymentMode === "pay_now"
+                        ? data.payHere.estimatedFareAmountLkrLabel ??
+                          `${data.payHere.chargeCurrency} --`
+                        : formatPreviewCurrency(totalPreview, data.quote.currency)}
+                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Final amount is revalidated on confirm before order creation.
+                    {paymentMode === "pay_now"
+                      ? "Final PayHere charge is recalculated server-side from latest fare and selected extras."
+                      : "Final amount is revalidated on confirm before order creation."}
                   </p>
                 </CardContent>
               </Card>
 
               {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+              {paymentProcessingMessage ? (
+                <p className="text-sm text-muted-foreground">{paymentProcessingMessage}</p>
+              ) : null}
 
               {clerkEnabled ? (
                 <Show when="signed-out">
@@ -671,7 +883,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                   ? "Confirming..."
                   : paymentMode === "hold"
                     ? "Confirm and hold"
-                    : "Pay now and confirm"}
+                    : "Pay with PayHere"}
                 <ArrowRightIcon data-icon="inline-end" />
               </Button>
             </section>
@@ -729,6 +941,62 @@ function formatPreviewCurrency(amount: number, currency: string) {
   } catch {
     return `${currency}${amount.toFixed(currency === "JPY" ? 0 : 2)}`
   }
+}
+
+async function loadPayHereSdk(scriptUrl: string) {
+  if (typeof window === "undefined") {
+    throw new Error("PayHere SDK can only load in browser.")
+  }
+
+  if (window.payhere) {
+    return
+  }
+
+  const existing = document.querySelector<HTMLScriptElement>(
+    'script[data-payhere-sdk="true"]'
+  )
+
+  if (existing) {
+    await waitForScriptLoad(existing)
+    return
+  }
+
+  const script = document.createElement("script")
+  script.src = scriptUrl
+  script.async = true
+  script.setAttribute("data-payhere-sdk", "true")
+  document.head.appendChild(script)
+  await waitForScriptLoad(script)
+}
+
+function waitForScriptLoad(script: HTMLScriptElement) {
+  if ((script as HTMLScriptElement & { dataset: { loaded?: string } }).dataset.loaded === "true") {
+    return Promise.resolve()
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const onLoad = () => {
+      script.dataset.loaded = "true"
+      script.removeEventListener("load", onLoad)
+      script.removeEventListener("error", onError)
+      resolve()
+    }
+
+    const onError = () => {
+      script.removeEventListener("load", onLoad)
+      script.removeEventListener("error", onError)
+      reject(new Error("Failed to load PayHere SDK script."))
+    }
+
+    script.addEventListener("load", onLoad)
+    script.addEventListener("error", onError)
+  })
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 }
 
 function buildRedirectPath(pathname: string | null, search: string) {

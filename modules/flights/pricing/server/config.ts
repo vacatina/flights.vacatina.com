@@ -1,3 +1,6 @@
+import { parseIntegerFromEnv } from "@/lib/shared/env"
+import { clamp } from "@/lib/shared/number"
+
 const DEFAULT_QUOTE_TTL_MS = 10 * 60 * 1000
 
 export interface PricingServerConfig {
@@ -22,24 +25,4 @@ export function getPricingServerConfig(): PricingServerConfig {
   }
 
   return cachedConfig
-}
-
-function parseIntegerFromEnv(name: string, fallback: number) {
-  const raw = process.env[name]
-
-  if (!raw) {
-    return fallback
-  }
-
-  const parsed = Number.parseInt(raw, 10)
-
-  if (Number.isNaN(parsed)) {
-    return fallback
-  }
-
-  return parsed
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
 }
