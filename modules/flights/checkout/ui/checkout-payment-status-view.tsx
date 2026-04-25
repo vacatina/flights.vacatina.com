@@ -32,6 +32,13 @@ export function CheckoutPaymentStatusView({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border bg-muted/20 py-8">
+            <div className="relative size-16">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary border-r-primary" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Processing payment...</p>
+          </div>
           <p>Payment was received. We are confirming your order with the airline.</p>
           <p>
             This can take a few moments. Keep this page open or refresh if needed.
