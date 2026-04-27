@@ -2,6 +2,7 @@ import { Figtree, Geist_Mono, Inter } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 
 import "./globals.css"
+import { SiteFooter } from "@/components/navigation/site-footer"
 import { SiteNavbar } from "@/components/navigation/site-navbar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
@@ -35,9 +36,10 @@ export default function RootLayout({
 
   const appShell = (
     <ThemeProvider>
-      <div className="min-h-svh">
+      <div id="top" className="min-h-svh">
         <SiteNavbar clerkEnabled={clerkEnabled} />
         {children}
+        <SiteFooter />
       </div>
     </ThemeProvider>
   )
