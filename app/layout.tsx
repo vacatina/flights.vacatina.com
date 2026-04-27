@@ -1,13 +1,8 @@
-import {
-  Figtree,
-  Geist_Mono,
-  Inter,
-} from "next/font/google"
+import { Figtree, Geist_Mono, Inter } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
-import { Suspense } from "react"
 
 import "./globals.css"
-import { AuthHeaderControls } from "@/components/auth/auth-header-controls"
+import { SiteNavbar } from "@/components/navigation/site-navbar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 import { isClerkConfigured } from "@/modules/auth/server/config"
@@ -41,15 +36,7 @@ export default function RootLayout({
   const appShell = (
     <ThemeProvider>
       <div className="min-h-svh">
-        {clerkEnabled ? (
-          <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-            <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-end px-4 md:px-8">
-              <Suspense fallback={<div className="h-8" />}>
-                <AuthHeaderControls />
-              </Suspense>
-            </div>
-          </header>
-        ) : null}
+        <SiteNavbar clerkEnabled={clerkEnabled} />
         {children}
       </div>
     </ThemeProvider>

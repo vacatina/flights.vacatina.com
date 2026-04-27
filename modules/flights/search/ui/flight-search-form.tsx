@@ -122,13 +122,7 @@ export function FlightSearchForm() {
       outboundOrigin: outboundOrigin?.iataCode,
       outboundDestination: outboundDestination?.iataCode,
     })
-  }, [
-    isSubmitted,
-    journeyType,
-    outboundDestination,
-    outboundOrigin,
-    setValue,
-  ])
+  }, [isSubmitted, journeyType, outboundDestination, outboundOrigin, setValue])
 
   const onSubmit = handleSubmit((values) => {
     logFlightFlow("flightSearchForm", "submit_clicked", {
@@ -154,7 +148,9 @@ export function FlightSearchForm() {
     const result = await submitFlightSearchAction(values)
 
     if (!result.ok) {
-      const appliedFieldErrors = applyServerFieldErrors(result.error.fieldErrors)
+      const appliedFieldErrors = applyServerFieldErrors(
+        result.error.fieldErrors
+      )
       logFlightFlow("flightSearchForm", "submit_failed", {
         code: result.error.code,
         fieldErrorCount: appliedFieldErrors,
@@ -244,7 +240,9 @@ export function FlightSearchForm() {
     >
       <FieldGroup className="gap-9">
         <div className="flex flex-col gap-4">
-          <h2 className="font-heading text-3xl font-semibold md:text-2xl">Journey type</h2>
+          <h2 className="font-heading text-3xl font-semibold md:text-2xl">
+            Journey type
+          </h2>
           <ToggleGroup
             value={[journeyType]}
             onValueChange={(nextValues) => {
@@ -352,7 +350,10 @@ export function FlightSearchForm() {
         {isMultiCityJourney && (
           <div className="flex flex-col gap-5">
             {fields.map((sliceField, index) => (
-              <Card key={sliceField.id} className="rounded-2xl bg-background/70 shadow-none">
+              <Card
+                key={sliceField.id}
+                className="rounded-2xl bg-background/70 shadow-none"
+              >
                 <CardContent className="flex flex-col gap-6 p-6 md:p-7">
                   <div className="flex items-center justify-between">
                     <span className="rounded-md bg-muted px-4 py-2 text-sm font-medium">
@@ -435,11 +436,13 @@ export function FlightSearchForm() {
                   </SelectTrigger>
                   <SelectContent align="start" className="rounded-xl">
                     <SelectGroup>
-                      {Object.entries(CABIN_CLASS_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
+                      {Object.entries(CABIN_CLASS_LABELS).map(
+                        ([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        )
+                      )}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -463,7 +466,9 @@ export function FlightSearchForm() {
                       <FieldLabel>Child {index + 1}</FieldLabel>
                       <Select
                         value={String(field.value ?? 11)}
-                        onValueChange={(nextValue) => field.onChange(Number(nextValue))}
+                        onValueChange={(nextValue) =>
+                          field.onChange(Number(nextValue))
+                        }
                       >
                         <SelectTrigger className="h-14 w-full rounded-xl px-6 text-[1.8rem] font-normal md:text-base">
                           <SelectValue />
@@ -486,15 +491,16 @@ export function FlightSearchForm() {
             </div>
           </FieldGroup>
         )}
-
       </FieldGroup>
 
-      {serverError && <p className="text-base text-destructive">{serverError}</p>}
+      {serverError && (
+        <p className="text-base text-destructive">{serverError}</p>
+      )}
       <Button
         type="submit"
         size="lg"
         disabled={isSubmitting}
-        className="h-16 w-full rounded-xl text-[2.1rem] font-semibold md:text-2xl"
+        className="h-16 w-full rounded-xl text-[2.1rem] font-medium md:text-2xl"
       >
         {isSubmitting ? "Checking..." : "Find available flights"}
       </Button>
