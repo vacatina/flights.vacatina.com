@@ -1,5 +1,6 @@
 export * from "@/modules/flights/search/domain/constants"
 export * from "@/modules/flights/search/domain/defaults"
+export * from "@/modules/flights/search/domain/features"
 export * from "@/modules/flights/search/domain/mappers"
 export * from "@/modules/flights/search/domain/schema"
 export * from "@/modules/flights/search/domain/time"

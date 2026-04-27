@@ -3,7 +3,7 @@ import {
   dedupeSuggestionsById,
   normalizePlaceSuggestion,
 } from "@/modules/flights/search/server/place-normalizer"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 export async function searchPlaceSuggestions(query: string) {
   logFlightFlow("searchPlaceSuggestions", "start", {

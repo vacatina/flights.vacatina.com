@@ -16,6 +16,12 @@ const contactSchema = z.object({
     .regex(E164_PHONE_PATTERN, "Enter phone number in international format (+...)"),
 })
 
+const billingSchema = z.object({
+  address: z.string().trim().min(3).max(255),
+  city: z.string().trim().min(2).max(80),
+  country: z.string().trim().min(2).max(80),
+})
+
 const identityDocumentSchema = z.object({
   type: z.enum(["passport", "tax_id"]),
   uniqueIdentifier: z.string().trim().min(1).max(50),
@@ -95,6 +101,7 @@ export const checkoutSubmitSchema = z
     selectedPartialOffers: z.array(z.string().trim().min(1)).min(1),
     paymentMode: z.enum(["pay_now", "hold"]),
     contact: contactSchema,
+    billing: billingSchema.nullish(),
     passengers: z.array(passengerSchema).min(1),
     metadata: z.array(metadataPairSchema).default([]),
     ancillarySelection: ancillarySelectionSchema.nullish(),
@@ -143,6 +150,14 @@ export const checkoutSubmitSchema = z
       }
 
       uniqueKeys.add(normalizedKey)
+    }
+
+    if (value.paymentMode === "pay_now" && !value.billing) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["billing"],
+        message: "Billing address is required for pay now.",
+      })
     }
   })
 

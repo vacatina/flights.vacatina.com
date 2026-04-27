@@ -54,6 +54,60 @@ test("FareOptionsPageClient debounces flight-number filter URL updates", () => {
   expect(replaceMock.mock.calls[0]?.[0]).toContain("flightNumber=AI")
 })
 
+test("FareOptionsPageClient skips URL update when debounced value is unchanged", () => {
+  render(
+    <FareOptionsPageClient
+      data={createFareOptionsData({
+        state: {
+          ...createFareOptionsData().state,
+          flightNumber: "AI",
+        },
+      })}
+    />
+  )
+
+  const input = screen.getByPlaceholderText("e.g. AI0278")
+
+  fireEvent.change(input, { target: { value: "AI " } })
+  vi.advanceTimersByTime(300)
+
+  expect(replaceMock).not.toHaveBeenCalled()
+})
+
+test("FareOptionsPageClient syncs local filter drafts after server-state navigation", async () => {
+  const initial = createFareOptionsData({
+    state: {
+      ...createFareOptionsData().state,
+      flightNumber: "AI0278",
+      takeoffFrom: 120,
+      takeoffTo: 900,
+      landingFrom: 300,
+      landingTo: 1020,
+    },
+  })
+  const { rerender } = render(<FareOptionsPageClient data={initial} />)
+
+  const input = screen.getByPlaceholderText("e.g. AI0278") as HTMLInputElement
+  expect(input.value).toBe("AI0278")
+
+  fireEvent.change(input, { target: { value: "STALE" } })
+
+  const navigated = createFareOptionsData({
+    state: {
+      ...createFareOptionsData().state,
+      flightNumber: "BA1234",
+      takeoffFrom: 60,
+      takeoffTo: 840,
+      landingFrom: 240,
+      landingTo: 1110,
+    },
+  })
+  rerender(<FareOptionsPageClient data={navigated} />)
+
+  vi.advanceTimersByTime(300)
+  expect(replaceMock).not.toHaveBeenCalled()
+})
+
 test("FareOptionsPageClient coalesces take-off slider URL updates", () => {
   render(<FareOptionsPageClient data={createFareOptionsData()} />)
 

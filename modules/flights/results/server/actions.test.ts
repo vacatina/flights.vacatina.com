@@ -95,3 +95,48 @@ test("executeCreateCheckoutQuoteAction rejects missing selected offer", async ()
   expect(result.ok).toBe(false)
   expect(!result.ok && result.error.code).toBe("VALIDATION_ERROR")
 })
+
+test("executeCreateCheckoutQuoteAction sanitizes quote creation errors", async () => {
+  const result = await executeCreateCheckoutQuoteAction(
+    {
+      partialOfferRequestId: "prq_1",
+      selected: ["off_partial_1"],
+      offerId: "off_1",
+    },
+    {
+      async getFaresBySelected() {
+        return {
+          offers: [offerFixture],
+          slices: [{}],
+        } as unknown as OfferRequest
+      },
+      async getOfferPricingMap() {
+        return {
+          off_1: {
+            offerId: "off_1",
+            currency: "USD",
+            netAmount: 915.6,
+            sellAmount: 990.6,
+            appliedRuleId: "rule_1",
+            appliedRuleSpecificity: 2,
+          },
+        }
+      },
+      async createPricedQuote() {
+        throw new Error('Failed query: insert into "priced_quotes" ...')
+      },
+      async getActorContext() {
+        return {
+          type: "guest" as const,
+          guestId: "gst_test",
+        }
+      },
+    }
+  )
+
+  expect(result.ok).toBe(false)
+  expect(!result.ok && result.error.code).toBe("UPSTREAM_ERROR")
+  expect(!result.ok && result.error.message).toBe(
+    "Could not create checkout quote right now. Please try again."
+  )
+})

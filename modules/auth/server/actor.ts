@@ -1,4 +1,5 @@
 import type { ActorContext } from "@/modules/auth/types"
+import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
 import { getClerkAuthState } from "@/modules/auth/server/clerk"
 import {
   findGuestSessionLink,
@@ -7,7 +8,7 @@ import {
   upsertUserMirror,
 } from "@/modules/auth/server/repository"
 import { resolveGuestSession } from "@/modules/auth/server/guest-session"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface GetActorContextOptions {
   ensureGuestSession?: boolean
@@ -36,18 +37,36 @@ export async function getActorContext(
       }))
 
     if (guestSession.guestId) {
-      const linked = await findGuestSessionLink(guestSession.guestId, user.id)
+      let linked = false
 
-      if (!linked) {
-        await linkGuestSessionToUser({
-          guestSessionId: guestSession.guestId,
-          userId: user.id,
-        })
-        logFlightFlow("auth.actor", "guest_linked", {
+      try {
+        linked = await findGuestSessionLink(guestSession.guestId, user.id)
+      } catch (error) {
+        logFlightFlowError("auth.actor", "guest_link_lookup_failed", error, {
           guestId: guestSession.guestId,
           appUserId: user.id,
           clerkUserId: authState.userId,
         })
+      }
+
+      if (!linked) {
+        try {
+          await linkGuestSessionToUser({
+            guestSessionId: guestSession.guestId,
+            userId: user.id,
+          })
+          logFlightFlow("auth.actor", "guest_linked", {
+            guestId: guestSession.guestId,
+            appUserId: user.id,
+            clerkUserId: authState.userId,
+          })
+        } catch (error) {
+          logFlightFlowError("auth.actor", "guest_link_failed", error, {
+            guestId: guestSession.guestId,
+            appUserId: user.id,
+            clerkUserId: authState.userId,
+          })
+        }
       }
     }
 
@@ -98,6 +117,6 @@ export function resolveActorContext(input: ResolveActorContextInput): ActorConte
 
   return {
     type: "guest",
-    guestId: "guest_unavailable",
+    guestId: GUEST_UNAVAILABLE_ID,
   }
 }

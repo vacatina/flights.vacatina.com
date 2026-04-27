@@ -1,12 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
-import { useEffect, useMemo, useState, useTransition } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
-import { Show } from "@clerk/nextjs"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useFieldArray, useForm, useWatch } from "react-hook-form"
-import { ArrowRightIcon, BriefcaseIcon, PlaneTakeoffIcon } from "lucide-react"
 
 import {
   Breadcrumb,
@@ -18,79 +15,56 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
-import {
-  extractServicesFromAncillariesPayload,
-  type CheckoutAncillaryPayloadMetadata,
+  toCheckoutUrlSearchParams,
   type CheckoutPageData,
-  type CheckoutPassengerInput,
+  type CheckoutPaymentUiStatus,
+  type CheckoutWizardStep,
 } from "@/modules/flights/checkout/domain"
-import { submitCheckoutAction } from "@/modules/flights/checkout/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
-import { DuffelAncillariesPanel } from "@/modules/flights/checkout/ui/duffel-ancillaries-panel"
+import { CheckoutPaymentStatusView } from "@/modules/flights/checkout/ui/checkout-payment-status-view"
+import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
+import { useCheckoutDraftPersistence } from "@/modules/flights/checkout/ui/hooks/use-checkout-draft-persistence"
+import {
+  useCheckoutFlow,
+  type CheckoutPayNowResolution,
+} from "@/modules/flights/checkout/ui/hooks/use-checkout-flow"
+import { useCheckoutStepRouting } from "@/modules/flights/checkout/ui/hooks/use-checkout-step-routing"
+import {
+  CheckoutExtrasStep,
+  CheckoutPayStep,
+  CheckoutTravelerStep,
+  CheckoutWizardShell,
+} from "@/modules/flights/checkout/ui/wizard"
 
 interface CheckoutPageClientProps {
   data: CheckoutPageData
   clerkEnabled: boolean
 }
 
-interface CheckoutFormValues {
-  paymentMode: "pay_now" | "hold"
-  contact: {
-    email: string
-    phoneNumber: string
-  }
-  passengers: Array<{
-    id: string
-    type: "adult" | "child" | "infant_without_seat"
-    title: "mr" | "mrs" | "ms" | "miss" | "dr"
-    givenName: string
-    familyName: string
-    bornOn: string
-    gender: "m" | "f"
-    identityType: "passport" | "tax_id"
-    identityNumber: string
-    identityCountryCode: string
-    identityExpiresOn: string
-  }>
-  metadata: Array<{
-    key: string
-    value: string
-  }>
-  ancillarySelection: {
-    services: Array<{ id: string; quantity: number }>
-    metadata: CheckoutAncillaryPayloadMetadata | null
-  }
-}
-
 export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [isSubmitting, startSubmit] = useTransition()
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [submitSuccess, setSubmitSuccess] = useState<{
-    duffelOrderId: string
-    totalSellAmountLabel: string
-    paymentRequiredByLabel: string | null
-    paymentMode: "pay_now" | "hold"
-  } | null>(null)
+  const router = useRouter()
+  const [stepError, setStepError] = useState<string | null>(null)
+  const [payNowResolution, setPayNowResolution] =
+    useState<CheckoutPayNowResolution | null>(null)
+  const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
 
   const form = useForm<CheckoutFormValues>({
     defaultValues: {
-      paymentMode: data.paymentRequirements.canHold ? "pay_now" : "pay_now",
+      paymentMode:
+        data.payHere.payNowEnabled || !data.paymentRequirements.canHold
+          ? "pay_now"
+          : "hold",
       contact: {
         email: "",
         phoneNumber: "",
+      },
+      billing: {
+        address: "",
+        city: "",
+        country: "Sri Lanka",
       },
       passengers: data.passengerDefaults.map((passenger) => ({
         id: passenger.id,
@@ -116,6 +90,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     control: form.control,
     name: "metadata",
   })
+
   const paymentMode = useWatch({
     control: form.control,
     name: "paymentMode",
@@ -128,12 +103,119 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     control: form.control,
     name: "passengers",
   })
+  const contactWatch = useWatch({
+    control: form.control,
+    name: "contact",
+  })
+  const billingWatch = useWatch({
+    control: form.control,
+    name: "billing",
+  })
+
+  const buildCheckoutHref = useCallback(
+    (input: {
+      step: CheckoutWizardStep
+      status?: CheckoutPaymentUiStatus
+      sessionId?: string
+    }) => {
+      const params = toCheckoutUrlSearchParams({
+        ...data.state,
+        step: input.step,
+        status: input.status,
+        sessionId: input.sessionId,
+      })
+      return `/results/${data.partialOfferRequestId}/checkout?${params.toString()}`
+    },
+    [data.partialOfferRequestId, data.state]
+  )
+
+  const checkoutFlow = useCheckoutFlow({
+    data,
+    onPayNowProcessingStart: (sessionId) => {
+      router.replace(
+        buildCheckoutHref({
+          step: "pay",
+          status: "processing",
+          sessionId,
+        })
+      )
+    },
+    onPayNowResolved: (resolution) => {
+      setPayNowResolution(resolution)
+      router.replace(
+        buildCheckoutHref({
+          step: "pay",
+          status: mapResolutionStatusToQueryStatus(resolution.status),
+          sessionId: resolution.sessionId,
+        })
+      )
+    },
+    onPayNowDismissed: () => {
+      router.replace(
+        buildCheckoutHref({
+          step: "pay",
+        })
+      )
+    },
+  })
+  const {
+    activePollingSessionId,
+    isSubmitting,
+    onSubmit,
+    paymentProcessingMessage,
+    resumePayNowProcessing,
+    setSubmitError,
+    submitError,
+    submitSuccess,
+    syncPayNowResolution,
+  } = checkoutFlow
+  const stepRouting = useCheckoutStepRouting({
+    partialOfferRequestId: data.partialOfferRequestId,
+    state: data.state,
+  })
+
+  const draftKey = useMemo(
+    () =>
+      `checkout-draft:${data.partialOfferRequestId}:${data.state.quoteId}:${data.state.offerId}`,
+    [data.partialOfferRequestId, data.state.offerId, data.state.quoteId]
+  )
+
+  const { clearDraft } = useCheckoutDraftPersistence({
+    form,
+    draftKey,
+    enabled: !submitSuccess,
+  })
+
   const ancillaryPreviewTotal = useMemo(
     () => computeAncillaryPreviewTotal(ancillarySelection?.metadata ?? null),
     [ancillarySelection?.metadata]
   )
   const totalPreview = data.quote.fareSellAmount + ancillaryPreviewTotal
-  const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
+  const currentStatus = data.state.status
+  const currentSessionId = data.state.sessionId
+  const statusModeActive = Boolean(currentStatus && currentSessionId)
+  const fallbackMissingSessionMessage =
+    data.state.status && !data.state.sessionId
+      ? "Payment status link is incomplete. Please retry payment from the pay step."
+      : null
+
+  const travelerStepReady = useMemo(
+    () =>
+      validateTravelerStep({
+        paymentMode,
+        contact: contactWatch,
+        billing: billingWatch,
+        passengers: passengersWatch,
+        identityDocumentsRequired: data.identityDocumentsRequired,
+      }),
+    [
+      billingWatch,
+      contactWatch,
+      data.identityDocumentsRequired,
+      passengersWatch,
+      paymentMode,
+    ]
+  )
 
   useEffect(() => {
     if (paymentMode !== "hold") {
@@ -150,75 +232,158 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     })
   }, [paymentMode, ancillarySelection?.services?.length, form])
 
-  async function onSubmit(values: CheckoutFormValues) {
-    setSubmitError(null)
-    setSubmitSuccess(null)
-
-    const passengers: CheckoutPassengerInput[] = values.passengers.map((passenger) => {
-      const identityDocument =
-        passenger.identityNumber.trim() &&
-        passenger.identityCountryCode.trim() &&
-        passenger.identityExpiresOn.trim()
-          ? {
-              type: passenger.identityType,
-              uniqueIdentifier: passenger.identityNumber.trim(),
-              issuingCountryCode: passenger.identityCountryCode.trim().toUpperCase(),
-              expiresOn: passenger.identityExpiresOn.trim(),
-            }
-          : null
-
-      return {
-        id: passenger.id,
-        type: passenger.type,
-        title: passenger.title,
-        givenName: passenger.givenName,
-        familyName: passenger.familyName,
-        bornOn: passenger.bornOn,
-        gender: passenger.gender,
-        identityDocument,
-      }
-    })
-
-    const payload = {
-      partialOfferRequestId: data.partialOfferRequestId,
-      offerId: data.state.offerId,
-      quoteId: data.state.quoteId,
-      selectedPartialOffers: data.state.selectedPartialOffers,
-      paymentMode: values.paymentMode,
-      contact: values.contact,
-      passengers,
-      metadata: values.metadata,
-      ancillarySelection:
-        values.ancillarySelection.services.length > 0
-          ? values.ancillarySelection
-          : null,
+  useEffect(() => {
+    if (!submitSuccess) {
+      return
     }
 
-    logFlightFlow("CheckoutPageClient", "submit_clicked", {
+    clearDraft()
+  }, [submitSuccess, clearDraft])
+
+  useEffect(() => {
+    logFlightFlow("CheckoutPageClient", "hydrated", {
       partialOfferRequestId: data.partialOfferRequestId,
-      paymentMode: values.paymentMode,
-      selectedServicesCount: values.ancillarySelection.services.length,
-      metadataCount: values.metadata.length,
+      step: stepRouting.currentStep,
+      status: currentStatus,
+      selectedCount: data.state.selectedPartialOffers.length,
+      payNowEnabled: data.payHere.payNowEnabled,
     })
+  }, [
+    currentStatus,
+    data.partialOfferRequestId,
+    data.payHere.payNowEnabled,
+    data.state.selectedPartialOffers.length,
+    stepRouting.currentStep,
+  ])
 
-    startSubmit(() => {
-      void (async () => {
-        const result = await submitCheckoutAction(payload)
+  useEffect(() => {
+    if (!data.state.status) {
+      return
+    }
 
-        if (!result.ok) {
-          setSubmitError(result.error.message)
-          return
-        }
+    if (!data.state.sessionId) {
+      if (data.state.status === "processing") {
+        router.replace(
+          buildCheckoutHref({
+            step: "pay",
+          })
+        )
+      }
 
-        setSubmitSuccess({
-          duffelOrderId: result.data.duffelOrderId,
-          totalSellAmountLabel: result.data.totalSellAmountLabel,
-          paymentRequiredByLabel: result.data.paymentRequiredByLabel,
-          paymentMode: result.data.paymentMode,
-        })
-      })()
+      return
+    }
+
+    if (data.state.status === "processing") {
+      if (activePollingSessionId === data.state.sessionId) {
+        return
+      }
+
+      void resumePayNowProcessing(data.state.sessionId)
+      return
+    }
+
+    if (
+      payNowResolution &&
+      payNowResolution.sessionId === data.state.sessionId &&
+      mapResolutionStatusToQueryStatus(payNowResolution.status) === data.state.status
+    ) {
+      return
+    }
+
+    void (async () => {
+      const resolution = await syncPayNowResolution(data.state.sessionId ?? "")
+
+      if (!resolution) {
+        return
+      }
+
+      setPayNowResolution(resolution)
+
+      const canonicalStatus = mapResolutionStatusToQueryStatus(resolution.status)
+
+      if (canonicalStatus !== data.state.status) {
+        router.replace(
+          buildCheckoutHref({
+            step: "pay",
+            status: canonicalStatus,
+            sessionId: data.state.sessionId,
+          })
+        )
+      }
+    })()
+  }, [
+    activePollingSessionId,
+    buildCheckoutHref,
+    data.state.sessionId,
+    data.state.status,
+    payNowResolution,
+    resumePayNowProcessing,
+    router,
+    syncPayNowResolution,
+  ])
+
+  useEffect(() => {
+    if (currentStatus !== "success") {
+      return
+    }
+
+    logFlightFlow("CheckoutPageClient", "checkout_confirmation_rendered", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      checkoutSessionId: currentSessionId,
+      duffelOrderId: payNowResolution?.duffelOrderId ?? null,
     })
+  }, [
+    currentSessionId,
+    currentStatus,
+    data.partialOfferRequestId,
+    payNowResolution?.duffelOrderId,
+  ])
+
+  function canNavigateToStep(step: CheckoutWizardStep) {
+    if (step === "traveler") {
+      return true
+    }
+
+    return travelerStepReady
   }
+
+  function navigateStep(step: CheckoutWizardStep) {
+    if (!canNavigateToStep(step)) {
+      setStepError("Complete required traveler details before continuing.")
+      return
+    }
+
+    setStepError(null)
+    stepRouting.navigateStep(step)
+  }
+
+  function continueFromTraveler() {
+    if (!travelerStepReady) {
+      setStepError("Complete required traveler details before continuing.")
+      return
+    }
+
+    stepRouting.goNextStep()
+  }
+
+  function continueFromExtras() {
+    stepRouting.goNextStep()
+  }
+
+  function onRetryPayStep() {
+    setPayNowResolution(null)
+    setSubmitError(null)
+    router.replace(
+      buildCheckoutHref({
+        step: "pay",
+      })
+    )
+  }
+
+  const effectiveStep: CheckoutWizardStep =
+    data.state.status && !data.state.sessionId ? "pay" : stepRouting.currentStep
+
+  const payStepError = checkoutFlow.submitError ?? fallbackMissingSessionMessage
 
   return (
     <main className="min-h-svh bg-muted/40 py-6 md:py-10">
@@ -252,7 +417,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
           </div>
 
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-2xl">
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
               {data.tripSummary.routeLabel}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -262,7 +427,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </p>
           </div>
 
-          {submitSuccess ? (
+      {submitSuccess?.paymentMode === "hold" ? (
             <Card className="rounded-2xl border-emerald-500/40 bg-emerald-50/30">
               <CardHeader>
                 <CardTitle className="text-xl">Order created successfully</CardTitle>
@@ -274,9 +439,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                 <p>
                   Total charged: <strong>{submitSuccess.totalSellAmountLabel}</strong>
                 </p>
-                {submitSuccess.paymentMode === "hold" && submitSuccess.paymentRequiredByLabel ? (
+                {submitSuccess.paymentRequiredByLabel ? (
                   <p>
-                    Payment required by: <strong>{submitSuccess.paymentRequiredByLabel}</strong>
+                    Payment required by:{" "}
+                    <strong>{submitSuccess.paymentRequiredByLabel}</strong>
                   </p>
                 ) : null}
                 <Button className="mt-2" render={<Link href="/" />}>
@@ -286,416 +452,88 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </Card>
           ) : null}
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Selected flights</h2>
-
-              {data.selectedFlights.map((flight) => (
-                <Card key={flight.legIndex} className="rounded-2xl border bg-card/95 py-0">
-                  <CardContent className="space-y-4 px-5 pt-5 md:px-6 md:pt-6">
-                    <div className="grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-start">
-                      <div className="flex items-center gap-4">
-                        <div className="flex size-12 items-center justify-center rounded-md border bg-muted/30">
-                          {flight.ownerLogoSymbolUrl ? (
-                            <Image
-                              src={flight.ownerLogoSymbolUrl}
-                              alt={`${flight.ownerName} logo`}
-                              width={26}
-                              height={26}
-                              unoptimized
-                            />
-                          ) : (
-                            <PlaneTakeoffIcon className="size-5" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            {flight.legTitle}
-                            {flight.dateLabel ? ` · ${flight.dateLabel}` : ""}
-                          </p>
-                          <p className="text-xl font-semibold md:text-lg">
-                            {flight.departureTimeLabel} - {flight.arrivalTimeLabel}
-                            {flight.arrivalDayOffset > 0 ? `+${flight.arrivalDayOffset}` : ""}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{flight.ownerName}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-lg font-semibold md:text-base">{flight.durationLabel}</p>
-                        <p className="text-sm text-muted-foreground">{flight.routeLabel}</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-semibold md:text-base">{flight.stopsLabel}</p>
-                        <p className="text-sm text-muted-foreground">{flight.stopsDetails}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 pb-4">
-                      {flight.timeline.map((event, index) => (
-                        <div key={event.id} className="space-y-1">
-                          <div className="grid gap-2 md:grid-cols-[360px_1fr]">
-                            <p className="font-semibold">{event.dateTimeLabel}</p>
-                            <p>{event.description}</p>
-                          </div>
-                          {event.segmentDurationLabel ? (
-                            <p className="text-sm text-muted-foreground">
-                              Flight duration: {event.segmentDurationLabel}
-                            </p>
-                          ) : null}
-                          {event.meta.length > 0 ? (
-                            <p className="text-sm text-muted-foreground">{event.meta.join(" · ")}</p>
-                          ) : null}
-                          {event.id.endsWith("-arrive") &&
-                          flight.layovers.length > 0 &&
-                          index / 2 < flight.layovers.length ? (
-                            <p className="inline-flex rounded-full bg-muted px-3 py-1 text-sm">
-                              {flight.layovers[Math.floor(index / 2)]?.label}
-                            </p>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </section>
-
-            <Separator />
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">
-                Paying now, or later?
-              </h2>
-              <div className="grid gap-3 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => form.setValue("paymentMode", "pay_now")}
-                  className={cn(
-                    "rounded-2xl border px-4 py-4 text-left",
-                    paymentMode === "pay_now"
-                      ? "border-emerald-500 bg-emerald-50/50"
-                      : "bg-card"
-                  )}
-                >
-                  <p className="text-lg font-semibold md:text-base">Pay now</p>
-                  <p className="text-sm text-muted-foreground">
-                    Confirm booking now with your payment gateway
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  disabled={!data.paymentRequirements.canHold}
-                  onClick={() => form.setValue("paymentMode", "hold")}
-                  className={cn(
-                    "rounded-2xl border px-4 py-4 text-left",
-                    paymentMode === "hold" ? "border-primary bg-primary/5" : "bg-card",
-                    !data.paymentRequirements.canHold && "cursor-not-allowed opacity-60"
-                  )}
-                >
-                  <p className="text-lg font-semibold md:text-base">Hold order</p>
-                  <p className="text-sm text-muted-foreground">
-                    Hold price/space and pay before the deadline
-                  </p>
-                </button>
-              </div>
-              {paymentMode === "hold" && data.paymentRequirements.paymentRequiredByLabel ? (
-                <p className="text-sm text-muted-foreground">
-                  Payment required by {data.paymentRequirements.paymentRequiredByLabel}
-                </p>
-              ) : null}
-            </section>
-
-            <Separator />
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Contact details</h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="checkout-contact-email">Email</Label>
-                  <Input
-                    id="checkout-contact-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    {...form.register("contact.email")}
+          {statusModeActive && currentStatus ? (
+            <CheckoutPaymentStatusView
+              status={currentStatus}
+              sessionId={currentSessionId}
+              resolution={payNowResolution}
+              errorMessage={submitError}
+              onRetryPay={onRetryPayStep}
+            />
+          ) : (
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <CheckoutWizardShell
+                currentStep={effectiveStep}
+                onStepChange={navigateStep}
+                canNavigateToStep={canNavigateToStep}
+              >
+                {effectiveStep === "traveler" ? (
+                  <CheckoutTravelerStep
+                    data={data}
+                    form={form}
+                    paymentMode={paymentMode}
+                    passengers={passengersWatch}
+                    ancillaryServicesCount={ancillarySelection?.services.length ?? 0}
+                    stepError={stepError}
+                    onContinue={continueFromTraveler}
+                    disabled={isSubmitting}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="checkout-contact-phone">Phone number</Label>
-                  <Input
-                    id="checkout-contact-phone"
-                    placeholder="+94771234567"
-                    {...form.register("contact.phoneNumber")}
+                ) : null}
+
+                {effectiveStep === "extras" ? (
+                  <CheckoutExtrasStep
+                    data={data}
+                    form={form}
+                    metadataFieldArray={metadataFieldArray}
+                    paymentMode={paymentMode}
+                    onBack={stepRouting.goPreviousStep}
+                    onContinue={continueFromExtras}
+                    disabled={isSubmitting}
                   />
-                </div>
-              </div>
-            </section>
+                ) : null}
 
-            <Separator />
-
-            <section className="space-y-5">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Passengers</h2>
-              <div className="space-y-5">
-                {(passengersWatch ?? []).map((passenger, index) => (
-                  <Card key={passenger.id} className="rounded-2xl">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-lg">
-                        {data.passengerDefaults[index]?.label ?? `Passenger ${index + 1}`}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label>Title</Label>
-                          <Select
-                            value={passenger.title}
-                            onValueChange={(value) => {
-                              if (!value) {
-                                return
-                              }
-                              form.setValue(
-                                `passengers.${index}.title`,
-                                value as CheckoutFormValues["passengers"][number]["title"]
-                              )
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="mr">Mr.</SelectItem>
-                              <SelectItem value="mrs">Mrs.</SelectItem>
-                              <SelectItem value="ms">Ms.</SelectItem>
-                              <SelectItem value="miss">Miss.</SelectItem>
-                              <SelectItem value="dr">Dr.</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Given name</Label>
-                          <Input {...form.register(`passengers.${index}.givenName`)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Family name</Label>
-                          <Input {...form.register(`passengers.${index}.familyName`)} />
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label>Date of birth</Label>
-                          <Input type="date" {...form.register(`passengers.${index}.bornOn`)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Gender</Label>
-                          <Select
-                            value={passenger.gender}
-                            onValueChange={(value) => {
-                              if (!value) {
-                                return
-                              }
-                              form.setValue(
-                                `passengers.${index}.gender`,
-                                value as CheckoutFormValues["passengers"][number]["gender"]
-                              )
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="m">Male</SelectItem>
-                              <SelectItem value="f">Female</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 rounded-xl bg-muted/40 p-4">
-                        <p className="text-sm font-medium">Identity document</p>
-                        <div className="grid gap-4 md:grid-cols-4">
-                          <div className="space-y-2">
-                            <Label>Type</Label>
-                            <Select
-                            value={passenger.identityType}
-                            onValueChange={(value) => {
-                              if (!value) {
-                                return
-                              }
-                              form.setValue(
-                                `passengers.${index}.identityType`,
-                                value as CheckoutFormValues["passengers"][number]["identityType"]
-                              )
-                            }}
-                          >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {data.supportedIdentityDocumentTypes.map((type) => (
-                                  <SelectItem key={type} value={type}>
-                                    {type}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Document number</Label>
-                            <Input {...form.register(`passengers.${index}.identityNumber`)} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Issuing country</Label>
-                            <Input
-                              placeholder="US"
-                              maxLength={2}
-                              {...form.register(`passengers.${index}.identityCountryCode`)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Expiry date</Label>
-                            <Input
-                              type="date"
-                              {...form.register(`passengers.${index}.identityExpiresOn`)}
-                            />
-                          </div>
-                        </div>
-                        {data.identityDocumentsRequired ? (
-                          <p className="text-sm text-muted-foreground">
-                            Identity document is required for this offer.
-                          </p>
-                        ) : null}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-
-            <Separator />
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Add extras</h2>
-              <Card className="rounded-2xl">
-                <CardContent className="space-y-4 p-4 md:p-5">
-                  <div className="flex items-start gap-3">
-                    <BriefcaseIcon className="mt-0.5 size-5" />
-                    <div className="space-y-1">
-                      <p className="font-medium">Extra baggage and seat selection</p>
-                      <p className="text-sm text-muted-foreground">
-                        Choose ancillaries with Duffel Components
-                      </p>
-                    </div>
-                  </div>
-                  <DuffelAncillariesPanel
-                    offer={data.ancillary.offer}
-                    seatMaps={data.ancillary.seatMaps}
-                    passengers={buildAncillaryPassengers(form.getValues())}
-                    disabled={paymentMode === "hold"}
-                    onSelectionChange={(selection) => {
-                      const services = extractServicesFromAncillariesPayload({
-                        services: selection.services,
-                      })
-                      form.setValue("ancillarySelection", {
-                        services,
-                        metadata: selection.metadata,
-                      })
-                    }}
+                {effectiveStep === "pay" ? (
+                  <CheckoutPayStep
+                    data={data}
+                    paymentMode={paymentMode}
+                    ancillaryPreviewTotal={ancillaryPreviewTotal}
+                    totalPreview={totalPreview}
+                    submitError={payStepError}
+                    paymentProcessingMessage={paymentProcessingMessage}
+                    isSubmitting={isSubmitting}
+                    clerkEnabled={clerkEnabled}
+                    signInHref={signInHref}
+                    onBack={stepRouting.goPreviousStep}
                   />
-                </CardContent>
-              </Card>
-            </section>
-
-            <Separator />
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Add metadata</h2>
-              <div className="space-y-3">
-                {metadataFieldArray.fields.map((field, index) => (
-                  <div key={field.id} className="grid gap-3 md:grid-cols-2">
-                    <Input placeholder="Key" {...form.register(`metadata.${index}.key`)} />
-                    <Input placeholder="Value" {...form.register(`metadata.${index}.value`)} />
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="text-sm font-medium text-primary"
-                  onClick={() => metadataFieldArray.append({ key: "", value: "" })}
-                >
-                  Add another key/value pair
-                </button>
-              </div>
-            </section>
-
-            <Separator />
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight md:text-xl">
-                {paymentMode === "hold" ? "Confirm and pay later" : "Payment"}
-              </h2>
-              <Card className="rounded-2xl">
-                <CardContent className="space-y-3 p-4 md:p-5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Fare</span>
-                    <span>{data.quote.fareSellAmountLabel}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Extras</span>
-                    <span>{formatPreviewCurrency(ancillaryPreviewTotal, data.quote.currency)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between text-lg font-semibold md:text-base">
-                    <span>Total</span>
-                    <span>{formatPreviewCurrency(totalPreview, data.quote.currency)}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Final amount is revalidated on confirm before order creation.
-                  </p>
-                </CardContent>
-              </Card>
-
-              {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
-
-              {clerkEnabled ? (
-                <Show when="signed-out">
-                  <p className="text-sm text-muted-foreground">
-                    Sign in for faster checkout and future order history.{" "}
-                    <Link href={signInHref} className="text-primary underline underline-offset-4">
-                      Sign in
-                    </Link>
-                  </p>
-                </Show>
-              ) : null}
-
-              <Button type="submit" className="h-12 w-full rounded-xl text-sm md:text-base" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Confirming..."
-                  : paymentMode === "hold"
-                    ? "Confirm and hold"
-                    : "Pay now and confirm"}
-                <ArrowRightIcon data-icon="inline-end" />
-              </Button>
-            </section>
-          </form>
+                ) : null}
+              </CheckoutWizardShell>
+            </form>
+          )}
         </div>
       </div>
     </main>
   )
 }
 
-function buildAncillaryPassengers(values: CheckoutFormValues) {
-  return values.passengers.map((passenger) => ({
-    id: passenger.id,
-    title: passenger.title,
-    given_name: passenger.givenName || "Passenger",
-    family_name: passenger.familyName || "Name",
-    gender: passenger.gender,
-    born_on: passenger.bornOn || "1990-01-01",
-    email: values.contact.email || "traveler@example.com",
-    phone_number: values.contact.phoneNumber || "+10000000000",
-  }))
+function mapResolutionStatusToQueryStatus(
+  status: CheckoutPayNowResolution["status"]
+): CheckoutPaymentUiStatus {
+  switch (status) {
+    case "success":
+      return "success"
+    case "failed":
+      return "failed"
+    case "reconciliation":
+      return "reconciliation"
+    case "processing":
+    default:
+      return "processing"
+  }
 }
 
-function computeAncillaryPreviewTotal(metadata: CheckoutAncillaryPayloadMetadata | null) {
+function computeAncillaryPreviewTotal(
+  metadata: CheckoutFormValues["ancillarySelection"]["metadata"] | null
+) {
   if (!metadata) {
     return 0
   }
@@ -718,17 +556,52 @@ function computeAncillaryPreviewTotal(metadata: CheckoutAncillaryPayloadMetadata
   }, 0)
 }
 
-function formatPreviewCurrency(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: currency === "JPY" ? 0 : 2,
-      maximumFractionDigits: currency === "JPY" ? 0 : 2,
-    }).format(amount)
-  } catch {
-    return `${currency}${amount.toFixed(currency === "JPY" ? 0 : 2)}`
+function validateTravelerStep(input: {
+  paymentMode: CheckoutFormValues["paymentMode"] | undefined
+  contact: CheckoutFormValues["contact"] | undefined
+  billing: CheckoutFormValues["billing"] | undefined
+  passengers: CheckoutFormValues["passengers"] | undefined
+  identityDocumentsRequired: boolean
+}) {
+  if (!input.contact?.email?.trim() || !input.contact.phoneNumber?.trim()) {
+    return false
   }
+
+  if (input.paymentMode === "pay_now") {
+    if (
+      !input.billing?.address?.trim() ||
+      !input.billing.city?.trim() ||
+      !input.billing.country?.trim()
+    ) {
+      return false
+    }
+  }
+
+  if (!input.passengers || input.passengers.length === 0) {
+    return false
+  }
+
+  for (const passenger of input.passengers) {
+    if (
+      !passenger.givenName.trim() ||
+      !passenger.familyName.trim() ||
+      !passenger.bornOn.trim()
+    ) {
+      return false
+    }
+
+    if (input.identityDocumentsRequired) {
+      if (
+        !passenger.identityNumber.trim() ||
+        !passenger.identityCountryCode.trim() ||
+        !passenger.identityExpiresOn.trim()
+      ) {
+        return false
+      }
+    }
+  }
+
+  return true
 }
 
 function buildRedirectPath(pathname: string | null, search: string) {

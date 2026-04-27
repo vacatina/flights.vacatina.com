@@ -1,13 +1,27 @@
 import { z } from "zod"
 
-import type { CheckoutUrlState } from "@/modules/flights/checkout/domain/types"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import type {
+  CheckoutPaymentUiStatus,
+  CheckoutUrlState,
+  CheckoutWizardStep,
+} from "@/modules/flights/checkout/domain/types"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 const checkoutQuerySchema = z.object({
   offer: z.string().min(1),
   selected: z.string().min(1),
   quote: z.string().min(1),
+  step: z.string().optional(),
+  status: z.string().optional(),
+  session: z.string().optional(),
 })
+const checkoutStepSchema = z.enum(["traveler", "extras", "pay"])
+const checkoutPaymentStatusSchema = z.enum([
+  "processing",
+  "success",
+  "failed",
+  "reconciliation",
+])
 
 type SearchParamInput = Record<string, string | string[] | undefined>
 
@@ -18,6 +32,9 @@ export function parseCheckoutUrlState(
     offer: firstValue(searchParams.offer),
     selected: firstValue(searchParams.selected),
     quote: firstValue(searchParams.quote),
+    step: firstValue(searchParams.step),
+    status: firstValue(searchParams.status),
+    session: firstValue(searchParams.session),
   })
 
   if (!parsed.success) {
@@ -32,6 +49,9 @@ export function parseCheckoutUrlState(
     offerId: parsed.data.offer.trim(),
     selectedPartialOffers: parseSelected(parsed.data.selected),
     quoteId: parsed.data.quote.trim(),
+    step: parseStep(parsed.data.step),
+    status: parseStatus(parsed.data.status),
+    sessionId: parseSession(parsed.data.session),
   }
 
   if (state.selectedPartialOffers.length === 0) {
@@ -46,6 +66,19 @@ export function toCheckoutUrlSearchParams(state: CheckoutUrlState) {
   params.set("offer", state.offerId)
   params.set("selected", state.selectedPartialOffers.join(","))
   params.set("quote", state.quoteId)
+
+  if (state.step !== "traveler") {
+    params.set("step", state.step)
+  }
+
+  if (state.status) {
+    params.set("status", state.status)
+  }
+
+  if (state.sessionId) {
+    params.set("session", state.sessionId)
+  }
+
   return params
 }
 
@@ -62,4 +95,37 @@ function firstValue(value: string | string[] | undefined) {
   }
 
   return value
+}
+
+function parseStep(value: string | undefined): CheckoutWizardStep {
+  const parsed = checkoutStepSchema.safeParse(value)
+
+  if (!parsed.success) {
+    return "traveler"
+  }
+
+  return parsed.data
+}
+
+function parseStatus(value: string | undefined): CheckoutPaymentUiStatus | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const parsed = checkoutPaymentStatusSchema.safeParse(value)
+
+  if (!parsed.success) {
+    return undefined
+  }
+
+  return parsed.data
+}
+
+function parseSession(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : undefined
 }

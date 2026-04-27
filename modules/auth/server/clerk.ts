@@ -3,7 +3,7 @@ import { verifyWebhook } from "@clerk/nextjs/webhooks"
 import type { NextRequest } from "next/server"
 
 import { getAuthServerConfig } from "@/modules/auth/server/config"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 export interface ClerkAuthState {
   isAuthenticated: boolean

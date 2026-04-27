@@ -35,6 +35,7 @@ import {
   createEmptySlice,
   ensureSlicesForJourneyType,
   flightSearchFormSchema,
+  isMultiCitySearchEnabled,
   JOURNEY_TYPE_LABELS,
   MAX_MULTI_CITY_SLICES,
   type CabinClass,
@@ -42,13 +43,17 @@ import {
   type JourneyType,
 } from "@/modules/flights/search/domain"
 import { submitFlightSearchAction } from "@/modules/flights/search/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 import { DatePickerField } from "@/modules/flights/search/ui/date-picker-field"
 import { PassengersPopover } from "@/modules/flights/search/ui/passengers-popover"
 import { PlaceAutocompleteField } from "@/modules/flights/search/ui/place-autocomplete-field"
 import { TimeRangePopover } from "@/modules/flights/search/ui/time-range-popover"
 
-const JOURNEY_OPTIONS: JourneyType[] = ["one_way", "return"]
+const MULTI_CITY_ENABLED = isMultiCitySearchEnabled()
+const JOURNEY_OPTIONS: JourneyType[] = MULTI_CITY_ENABLED
+  ? ["one_way", "return", "multi_city"]
+  : ["one_way", "return"]
 const CHILD_AGE_OPTIONS = Array.from({ length: 18 }, (_, index) => index)
 
 export function FlightSearchForm() {
@@ -154,7 +159,14 @@ export function FlightSearchForm() {
         code: result.error.code,
         fieldErrorCount: appliedFieldErrors,
       })
-      setServerError(appliedFieldErrors > 0 ? null : result.error.message)
+      setServerError(
+        appliedFieldErrors > 0
+          ? null
+          : toSafeUserErrorMessage(
+              result.error.message,
+              "Unable to search flights right now. Please try again."
+            )
+      )
       return
     }
 
@@ -221,8 +233,9 @@ export function FlightSearchForm() {
     return appliedCount
   }
 
+  const isMultiCityJourney = MULTI_CITY_ENABLED && journeyType === "multi_city"
   const canAddMultiCitySlice =
-    journeyType === "multi_city" && fields.length < MAX_MULTI_CITY_SLICES
+    isMultiCityJourney && fields.length < MAX_MULTI_CITY_SLICES
 
   return (
     <form
@@ -273,7 +286,7 @@ export function FlightSearchForm() {
           </ToggleGroup>
         </div>
 
-        {journeyType !== "multi_city" && (
+        {!isMultiCityJourney && (
           <div className="flex flex-col gap-7">
             <div className="grid gap-6 md:grid-cols-2">
               <PlaceAutocompleteField
@@ -336,7 +349,7 @@ export function FlightSearchForm() {
           </div>
         )}
 
-        {journeyType === "multi_city" && (
+        {isMultiCityJourney && (
           <div className="flex flex-col gap-5">
             {fields.map((sliceField, index) => (
               <Card key={sliceField.id} className="rounded-2xl bg-background/70 shadow-none">
@@ -474,13 +487,6 @@ export function FlightSearchForm() {
           </FieldGroup>
         )}
 
-        <Button
-          type="button"
-          variant="link"
-          className="self-end px-0 text-3xl font-medium text-primary md:text-lg"
-        >
-          Advanced options
-        </Button>
       </FieldGroup>
 
       {serverError && <p className="text-base text-destructive">{serverError}</p>}

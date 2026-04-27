@@ -1,7 +1,6 @@
 import { z } from "zod"
 
 import type { ReviewUrlState } from "@/modules/flights/results/domain/review-types"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
 
 const reviewQuerySchema = z.object({
   selected: z.string().min(1),
@@ -11,9 +10,6 @@ const reviewQuerySchema = z.object({
 type SearchParamInput = Record<string, string | string[] | undefined>
 
 export function parseReviewUrlState(searchParams: SearchParamInput): ReviewUrlState {
-  logFlightFlow("parseReviewUrlState", "received_search_params", {
-    keys: Object.keys(searchParams),
-  })
   const selectedRaw = normalizeQueryList(searchParams.selected)
   const fareRaw = normalizeQueryList(searchParams.fare)
 
@@ -23,10 +19,6 @@ export function parseReviewUrlState(searchParams: SearchParamInput): ReviewUrlSt
   })
 
   if (!parsed.success) {
-    logFlightFlow("parseReviewUrlState", "parse_failed_using_empty_state", {
-      issueCount: parsed.error.issues.length,
-      firstIssue: parsed.error.issues[0]?.message,
-    })
     return {
       selected: [],
       fare: [],
@@ -38,19 +30,10 @@ export function parseReviewUrlState(searchParams: SearchParamInput): ReviewUrlSt
     fare: parsed.data.fare.flatMap((value) => splitCsv(value)),
   }
 
-  logFlightFlow("parseReviewUrlState", "parse_succeeded", {
-    selectedCount: result.selected.length,
-    fareCount: result.fare.length,
-  })
-
   return result
 }
 
 export function toReviewUrlSearchParams(state: ReviewUrlState): URLSearchParams {
-  logFlightFlow("toReviewUrlSearchParams", "serializing_state", {
-    selectedCount: state.selected.length,
-    fareCount: state.fare.length,
-  })
   const params = new URLSearchParams()
 
   if (state.selected.length > 0) {
@@ -65,11 +48,6 @@ export function toReviewUrlSearchParams(state: ReviewUrlState): URLSearchParams 
     params.append("fare", fareKey)
   }
 
-  logFlightFlow("toReviewUrlSearchParams", "serialized_state", {
-    paramCount: Array.from(params.keys()).length,
-    hasSelected: params.has("selected"),
-    fareParamCount: params.getAll("fare").length,
-  })
   return params
 }
 

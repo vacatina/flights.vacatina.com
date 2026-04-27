@@ -1,16 +1,32 @@
 import type { CreateOrderService, Offer, SeatMap } from "@duffel/api/types"
+import type { PayHereStartPaymentPayload } from "@/modules/flights/payments/payhere"
 
 export type CheckoutPaymentMode = "pay_now" | "hold"
+export type CheckoutWizardStep = "traveler" | "extras" | "pay"
+export type CheckoutPaymentUiStatus =
+  | "processing"
+  | "success"
+  | "failed"
+  | "reconciliation"
 
 export interface CheckoutUrlState {
   offerId: string
   selectedPartialOffers: string[]
   quoteId: string
+  step: CheckoutWizardStep
+  status?: CheckoutPaymentUiStatus
+  sessionId?: string
 }
 
 export interface CheckoutContactInput {
   email: string
   phoneNumber: string
+}
+
+export interface CheckoutBillingInput {
+  address: string
+  city: string
+  country: string
 }
 
 export interface CheckoutIdentityDocumentInput {
@@ -62,6 +78,7 @@ export interface CheckoutSubmitInput {
   selectedPartialOffers: string[]
   paymentMode: CheckoutPaymentMode
   contact: CheckoutContactInput
+  billing: CheckoutBillingInput | null
   passengers: CheckoutPassengerInput[]
   metadata: CheckoutMetadataPairInput[]
   ancillarySelection?: CheckoutAncillarySelectionInput | null
@@ -140,6 +157,19 @@ export interface CheckoutPageData {
     offer: Offer
     seatMaps: SeatMap[]
   }
+  payHere: {
+    payNowEnabled: boolean
+    unavailableReason: string | null
+    chargeCurrency: "LKR"
+    estimatedFareAmountLkr: number | null
+    estimatedFareAmountLkrLabel: string | null
+    fxSourceCurrency: string
+    fxTargetCurrency: "LKR"
+    fxBaseRate: number | null
+    fxBufferPercent: number
+    fxEffectiveRate: number | null
+    scriptUrl: string
+  }
 }
 
 export interface CheckoutAncillaryPricingLine {
@@ -166,4 +196,21 @@ export interface CheckoutSubmissionResult {
   paymentMode: CheckoutPaymentMode
   totalSellAmountLabel: string
   paymentRequiredByLabel: string | null
+}
+
+export interface CheckoutPaymentStartResult {
+  checkoutSessionId: string
+  payment: PayHereStartPaymentPayload
+  chargeAmount: number
+  chargeCurrency: "LKR"
+  chargeAmountLabel: string
+  status: "processing"
+}
+
+export interface CheckoutSessionStatusResult {
+  checkoutSessionId: string
+  status: "processing" | "payment_authorized" | "completed" | "failed" | "reconciliation_required"
+  message: string | null
+  duffelOrderId: string | null
+  totalChargeAmountLabel: string | null
 }

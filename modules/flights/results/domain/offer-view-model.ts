@@ -7,7 +7,7 @@ import {
 } from "date-fns"
 
 import { clockTimeToMinutes } from "@/modules/flights/search/domain"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import type {
   OfferCardLayover,
   OfferCardTimelineEvent,

@@ -20,7 +20,8 @@ import {
 import {
   logFlightFlow,
   logFlightFlowError,
-} from "@/modules/flights/shared/flow-debug"
+} from "@/lib/logging/flow-debug"
+import { normalizeSelectedStrings } from "@/lib/shared/selection"
 
 const INVALID_REVIEW_STATE_MESSAGE =
   "Invalid fare selection state. Please return to fare options and reselect flights."
@@ -61,7 +62,7 @@ export async function fetchReviewPageData(
     selectedCount: input.state.selected.length,
     fareCount: input.state.fare.length,
   })
-  const selectedPartialOffers = normalizeSelectedOfferIds(input.state.selected)
+  const selectedPartialOffers = normalizeSelectedStrings(input.state.selected)
   logFlightFlow("fetchReviewPageData", "selected_normalized", {
     partialOfferRequestId: input.partialOfferRequestId,
     selectedCount: selectedPartialOffers.length,
@@ -244,10 +245,4 @@ const defaultFetchReviewPageDeps: FetchReviewPageDeps = {
   async getAirlineLogosByAirlineId(airlineIds) {
     return getAirlineLogosByAirlineId(airlineIds)
   },
-}
-
-function normalizeSelectedOfferIds(selected: string[]) {
-  return selected
-    .map((offerId) => offerId.trim())
-    .filter((offerId) => offerId.length > 0)
 }

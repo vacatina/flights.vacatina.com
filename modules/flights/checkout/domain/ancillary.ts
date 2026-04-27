@@ -1,6 +1,7 @@
 import type { CreateOrderService, Offer } from "@duffel/api/types"
 
 import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
+import { toNumeric } from "@/lib/shared/number"
 import type {
   CheckoutAncillaryPricing,
   CheckoutAncillarySelectionInput,
@@ -162,16 +163,6 @@ function extractServices(value: unknown) {
       } satisfies CreateOrderService
     })
     .filter((item): item is CreateOrderService => Boolean(item))
-}
-
-function toNumeric(value: string) {
-  const numeric = Number(value)
-
-  if (!Number.isFinite(numeric)) {
-    return 0
-  }
-
-  return numeric
 }
 
 function roundByCurrency(value: number, currency: string) {

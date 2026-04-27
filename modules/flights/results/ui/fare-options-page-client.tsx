@@ -62,8 +62,9 @@ import {
   type FareOptionsPageData,
 } from "@/modules/flights/results/domain"
 import { loadMoreFareOptionsAction } from "@/modules/flights/results/server/actions"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { cn } from "@/lib/utils"
+import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
 const SORT_OPTIONS = [
   { value: "least_expensive", label: "Least expensive" },
@@ -99,50 +100,47 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
     data.state.landingTo,
   ])
 
-  useEffect(() => {
-    logFlightFlow("FareOptionsPageClient", "hydrated", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      leg: data.leg,
-      totalLegs: data.totalLegs,
-      selectedCount: data.selected.length,
-      initialOfferCount: data.offers.length,
-      hasNextAfter: Boolean(data.after),
-    })
-  }, [
-    data.after,
-    data.leg,
-    data.offers.length,
-    data.partialOfferRequestId,
-    data.selected.length,
-    data.totalLegs,
-  ])
-
   const updateQuery = useCallback(function updateQuery(
     patch: Partial<Omit<FareOptionsPageData["state"], "selected">> & {
       selected?: string[]
     }
   ) {
-    logFlightFlow("FareOptionsPageClient", "update_query_requested", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      patchKeys: Object.keys(patch),
-    })
     const nextState = {
       ...data.state,
       ...patch,
       after: undefined,
       selected: patch.selected ?? data.state.selected,
     }
+
+    if (isResultsStateEqual(nextState, data.state)) {
+      return
+    }
+
     const search = toResultsUrlSearchParams(nextState).toString()
-    logFlightFlow("FareOptionsPageClient", "update_query_navigate", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      nextLeg: nextState.leg,
-      selectedCount: nextState.selected.length,
-      hasAfter: Boolean(nextState.after),
-    })
     router.replace(
       `/results/${data.partialOfferRequestId}/fare-options?${search}`
     )
   }, [data.partialOfferRequestId, data.state, router])
+
+  useEffect(() => {
+    const nextValue = data.state.flightNumber ?? ""
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftFlightNumber((current) =>
+      current === nextValue ? current : nextValue
+    )
+  }, [data.state.flightNumber])
+
+  useEffect(() => {
+    const nextRange: [number, number] = [data.state.takeoffFrom, data.state.takeoffTo]
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftTakeoffRange((current) => (sameRange(current, nextRange) ? current : nextRange))
+  }, [data.state.takeoffFrom, data.state.takeoffTo])
+
+  useEffect(() => {
+    const nextRange: [number, number] = [data.state.landingFrom, data.state.landingTo]
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftLandingRange((current) => (sameRange(current, nextRange) ? current : nextRange))
+  }, [data.state.landingFrom, data.state.landingTo])
 
   useEffect(() => {
     const normalizedDraft = draftFlightNumber.trim() || undefined
@@ -276,7 +274,12 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
             after: nextAfter,
             code: result.error.code,
           })
-          setLoadMoreError(result.error.message)
+          setLoadMoreError(
+            toSafeUserErrorMessage(
+              result.error.message,
+              "Unable to load more fares right now. Please try again."
+            )
+          )
           return
         }
 
@@ -821,4 +824,24 @@ function sameRange(
   right: readonly [number, number]
 ) {
   return left[0] === right[0] && left[1] === right[1]
+}
+
+function isResultsStateEqual(
+  left: FareOptionsPageData["state"],
+  right: FareOptionsPageData["state"]
+) {
+  return (
+    left.leg === right.leg &&
+    left.sort === right.sort &&
+    left.stops === right.stops &&
+    left.airline === right.airline &&
+    left.flightNumber === right.flightNumber &&
+    left.takeoffFrom === right.takeoffFrom &&
+    left.takeoffTo === right.takeoffTo &&
+    left.landingFrom === right.landingFrom &&
+    left.landingTo === right.landingTo &&
+    left.after === right.after &&
+    left.selected.length === right.selected.length &&
+    left.selected.every((value, index) => value === right.selected[index])
+  )
 }

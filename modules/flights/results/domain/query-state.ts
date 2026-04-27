@@ -4,7 +4,7 @@ import {
   SLIDER_TIME_MAX,
   SLIDER_TIME_MIN,
 } from "@/modules/flights/search/domain"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { normalizeSelectedStrings } from "@/lib/shared/selection"
 import type {
   ResultsUrlState,
   StopsFilterOption,
@@ -35,10 +35,6 @@ const optionalTextSchema = z.string().trim()
 type SearchParamInput = Record<string, string | string[] | undefined>
 
 export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrlState {
-  logFlightFlow("parseResultsUrlState", "received_search_params", {
-    keys: Object.keys(searchParams),
-  })
-
   const normalized = {
     leg: firstValue(searchParams.leg),
     selected: normalizeSelected(searchParams.selected),
@@ -68,41 +64,17 @@ export function parseResultsUrlState(searchParams: SearchParamInput): ResultsUrl
   }
 
   if (result.takeoffFrom > result.takeoffTo) {
-    logFlightFlow("parseResultsUrlState", "invalid_takeoff_range_defaulting_takeoffTo", {
-      takeoffFrom: result.takeoffFrom,
-      takeoffTo: result.takeoffTo,
-    })
     result.takeoffTo = SLIDER_TIME_MAX
   }
 
   if (result.landingFrom > result.landingTo) {
-    logFlightFlow("parseResultsUrlState", "invalid_landing_range_defaulting_landingTo", {
-      landingFrom: result.landingFrom,
-      landingTo: result.landingTo,
-    })
     result.landingTo = SLIDER_TIME_MAX
   }
-
-  logFlightFlow("parseResultsUrlState", "parse_succeeded", {
-    leg: result.leg,
-    selectedCount: result.selected.length,
-    sort: result.sort,
-    stops: result.stops,
-    hasAirlineFilter: Boolean(result.airline),
-    hasFlightNumberFilter: Boolean(result.flightNumber),
-    hasAfter: Boolean(result.after),
-  })
 
   return result
 }
 
 export function toResultsUrlSearchParams(state: ResultsUrlState): URLSearchParams {
-  logFlightFlow("toResultsUrlSearchParams", "serializing_state", {
-    leg: state.leg,
-    selectedCount: state.selected.length,
-    sort: state.sort,
-    stops: state.stops,
-  })
   const params = new URLSearchParams()
 
   params.set("leg", String(Math.max(state.leg, 0)))
@@ -129,11 +101,6 @@ export function toResultsUrlSearchParams(state: ResultsUrlState): URLSearchParam
     params.set("after", state.after)
   }
 
-  logFlightFlow("toResultsUrlSearchParams", "serialized_state", {
-    paramCount: Array.from(params.keys()).length,
-    hasSelected: params.has("selected"),
-    hasAfter: params.has("after"),
-  })
   return params
 }
 
@@ -147,7 +114,7 @@ function firstValue(value: string | string[] | undefined): string | undefined {
 
 function normalizeSelected(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
-    return value.filter(Boolean).join(",")
+    return normalizeSelectedStrings(value).join(",")
   }
 
   return value

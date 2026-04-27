@@ -3,6 +3,7 @@ import "server-only"
 import { eq } from "drizzle-orm"
 
 import { flightOrders, getDbClient } from "@/lib/db"
+import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
 
 export interface FlightOrderRecord {
   id: string
@@ -113,7 +114,7 @@ function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord
     duffelOrderId: row.duffelOrderId,
     partialOfferRequestId: row.partialOfferRequestId,
     offerId: row.offerId,
-    selectedPartialOffers: normalizeSelected(row.selectedPartialOffers),
+    selectedPartialOffers: normalizeUnknownSelectedStrings(row.selectedPartialOffers),
     ownerUserId: row.ownerUserId,
     ownerGuestId: row.ownerGuestId,
     ownerOrgId: row.ownerOrgId,
@@ -131,16 +132,6 @@ function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
-}
-
-function normalizeSelected(value: unknown) {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter(Boolean)
 }
 
 function toDbNumeric(value: number) {

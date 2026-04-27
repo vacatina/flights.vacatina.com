@@ -3,11 +3,12 @@ import {
   SLIDER_TIME_MIN,
 } from "@/modules/flights/search/domain/constants"
 import type { TimeRangeInput } from "@/modules/flights/search/domain/types"
+import { clamp } from "@/lib/shared/number"
 
 export type SliderRange = [number, number]
 
 export function minutesToClockTime(minutesTotal: number): string {
-  const safeMinutes = clamp(minutesTotal)
+  const safeMinutes = clamp(minutesTotal, SLIDER_TIME_MIN, SLIDER_TIME_MAX)
   const hours = Math.floor(safeMinutes / 60)
   const minutes = safeMinutes % 60
 
@@ -16,7 +17,7 @@ export function minutesToClockTime(minutesTotal: number): string {
 
 export function clockTimeToMinutes(value: string): number {
   const [hours, minutes] = value.split(":").map(Number)
-  return clamp(hours * 60 + minutes)
+  return clamp(hours * 60 + minutes, SLIDER_TIME_MIN, SLIDER_TIME_MAX)
 }
 
 export function sliderRangeToTimeRange(range: SliderRange): TimeRangeInput | null {
@@ -48,14 +49,16 @@ export function formatTimeRange(range: TimeRangeInput | null): string {
   return `${range.from} - ${range.to}`
 }
 
-function clamp(value: number): number {
-  return Math.min(Math.max(value, SLIDER_TIME_MIN), SLIDER_TIME_MAX)
-}
-
 function normalizeRange([from, to]: SliderRange): SliderRange {
   if (from <= to) {
-    return [clamp(from), clamp(to)]
+    return [
+      clamp(from, SLIDER_TIME_MIN, SLIDER_TIME_MAX),
+      clamp(to, SLIDER_TIME_MIN, SLIDER_TIME_MAX),
+    ]
   }
 
-  return [clamp(to), clamp(from)]
+  return [
+    clamp(to, SLIDER_TIME_MIN, SLIDER_TIME_MAX),
+    clamp(from, SLIDER_TIME_MIN, SLIDER_TIME_MAX),
+  ]
 }

@@ -1,8 +1,9 @@
 import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm"
 
 import { getDbClient, pricingRules } from "@/lib/db"
+import { toNumeric } from "@/lib/shared/number"
 import type { PricingRule } from "@/modules/flights/pricing/domain"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 export interface PricingRuleRepository {
   listMatchingCandidates(now: Date): Promise<PricingRule[]>
@@ -49,9 +50,4 @@ export const defaultPricingRuleRepository: PricingRuleRepository = {
       updatedAt: row.updatedAt,
     }))
   },
-}
-
-function toNumeric(value: string) {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
 }

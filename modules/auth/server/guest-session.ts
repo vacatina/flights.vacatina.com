@@ -5,7 +5,7 @@ import { cookies } from "next/headers"
 import { getAuthServerConfig } from "@/modules/auth/server/config"
 import { upsertGuestSession } from "@/modules/auth/server/repository"
 import type { GuestSessionPayload } from "@/modules/auth/types"
-import { logFlightFlow, logFlightFlowError } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface GuestSessionCookieStore {
   get: (name: string) => { value: string } | undefined
@@ -49,9 +49,19 @@ export async function resolveGuestSession(
   const cookieStore = options.cookieStore ?? ((await cookies()) as GuestSessionCookieStore)
 
   const currentToken = cookieStore.get(config.guestSessionCookieName)?.value
-  const currentPayload = verifySignedGuestSessionToken(currentToken)
+  const currentPayload = verifySignedGuestSessionToken(currentToken, {
+    now,
+  })
 
   if (currentPayload) {
+    try {
+      await persistGuestSession(currentPayload.guestId, new Date(currentPayload.expiresAt))
+    } catch (error) {
+      logFlightFlowError("auth.guestSession", "persist_existing_cookie_session_failed", error, {
+        guestId: currentPayload.guestId,
+      })
+    }
+
     return {
       guestId: currentPayload.guestId,
       created: false,

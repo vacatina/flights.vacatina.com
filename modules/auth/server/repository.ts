@@ -9,7 +9,7 @@ import {
   guestUserLinks,
   users,
 } from "@/lib/db"
-import { logFlightFlow } from "@/modules/flights/shared/flow-debug"
+import { logFlightFlow } from "@/lib/logging/flow-debug"
 
 export interface UserMirrorRecord {
   id: string

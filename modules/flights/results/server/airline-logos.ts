@@ -5,7 +5,7 @@ import { logDuffelError } from "@/modules/flights/results/server/error-map"
 import {
   logFlightFlow,
   logFlightFlowError,
-} from "@/modules/flights/shared/flow-debug"
+} from "@/lib/logging/flow-debug"
 
 interface AirlineLogoCacheEntry {
   expiresAt: number

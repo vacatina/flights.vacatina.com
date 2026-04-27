@@ -1,5 +1,6 @@
 import { expect, test } from "vitest"
 
+import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
 import { resolveActorContext } from "@/modules/auth/server/actor"
 
 test("resolveActorContext prioritizes authenticated user when user and app IDs exist", () => {
@@ -38,6 +39,6 @@ test("resolveActorContext returns unavailable guest fallback when no identity ex
 
   expect(actor).toEqual({
     type: "guest",
-    guestId: "guest_unavailable",
+    guestId: GUEST_UNAVAILABLE_ID,
   })
 })

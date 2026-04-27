@@ -297,9 +297,25 @@ export const checkoutSessions = pgTable(
     currency: text("currency").notNull(),
     netAmount: numeric("net_amount", { precision: 14, scale: 4 }).notNull(),
     sellAmount: numeric("sell_amount", { precision: 14, scale: 4 }).notNull(),
+    paymentProvider: text("payment_provider"),
+    providerOrderId: text("provider_order_id"),
+    providerPaymentId: text("provider_payment_id"),
+    providerStatusCode: text("provider_status_code"),
+    providerStatusMessage: text("provider_status_message"),
+    paymentCurrency: text("payment_currency"),
+    paymentAmount: numeric("payment_amount", { precision: 14, scale: 4 }),
+    fxSourceCurrency: text("fx_source_currency"),
+    fxTargetCurrency: text("fx_target_currency"),
+    fxBaseRate: numeric("fx_base_rate", { precision: 18, scale: 8 }),
+    fxBufferPercent: numeric("fx_buffer_percent", { precision: 8, scale: 4 }),
+    fxEffectiveRate: numeric("fx_effective_rate", { precision: 18, scale: 8 }),
+    checkoutPayloadSnapshot: jsonb("checkout_payload_snapshot"),
     externalPaymentAuthorizationId: text("external_payment_authorization_id"),
     externalPaymentCaptureId: text("external_payment_capture_id"),
     duffelOrderId: text("duffel_order_id"),
+    paymentInitiatedAt: timestamp("payment_initiated_at", { withTimezone: true }),
+    paymentConfirmedAt: timestamp("payment_confirmed_at", { withTimezone: true }),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
     status: checkoutSessionStatusEnum("status").notNull().default("processing"),
     errorCode: text("error_code"),
     errorMessage: text("error_message"),
@@ -322,6 +338,38 @@ export const checkoutSessions = pgTable(
     requestLookupIdx: index("checkout_sessions_request_lookup_idx").on(
       table.partialOfferRequestId,
       table.offerId,
+      table.createdAt
+    ),
+    providerOrderIdUniqueIdx: uniqueIndex("checkout_sessions_provider_order_id_unique_idx").on(
+      table.providerOrderId
+    ),
+  })
+)
+
+export const paymentWebhookEvents = pgTable(
+  "payment_webhook_events",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    eventKey: text("event_key").notNull(),
+    providerOrderId: text("provider_order_id").notNull(),
+    providerPaymentId: text("provider_payment_id"),
+    payload: jsonb("payload"),
+    processedAt: timestamp("processed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    providerEventUniqueIdx: uniqueIndex("payment_webhook_events_provider_event_unique_idx").on(
+      table.provider,
+      table.eventKey
+    ),
+    providerOrderLookupIdx: index("payment_webhook_events_provider_order_lookup_idx").on(
+      table.provider,
+      table.providerOrderId,
       table.createdAt
     ),
   })
@@ -400,6 +448,9 @@ export type NewCheckoutSessionRow = typeof checkoutSessions.$inferInsert
 
 export type FlightOrderRow = typeof flightOrders.$inferSelect
 export type NewFlightOrderRow = typeof flightOrders.$inferInsert
+
+export type PaymentWebhookEventRow = typeof paymentWebhookEvents.$inferSelect
+export type NewPaymentWebhookEventRow = typeof paymentWebhookEvents.$inferInsert
 
 export type UserRow = typeof users.$inferSelect
 export type NewUserRow = typeof users.$inferInsert
