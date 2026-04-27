@@ -5,14 +5,14 @@ export function FlightSearch() {
     <main className="bg-muted">
       <section className="relative isolate overflow-hidden pb-18">
         <div className="absolute inset-0 bg-[url('/img/hero.jpg')] bg-cover bg-center bg-no-repeat" />
-        <div className="absolute inset-0 bg-foreground/30" />
+        <div className="absolute inset-0 bg-[#05103680]" />
 
         <div className="relative mx-auto w-full max-w-[1900px] px-4 pt-20 md:px-8 lg:px-12 lg:pt-24">
           <div className="mx-auto max-w-4xl text-center text-white">
-            <h1 className="text-balance text-[54px] font-semibold tracking-[-0.02em] md:text-[56px]">
+            <h1 className="text-[54px] font-semibold tracking-[-0.02em] text-balance md:text-[56px]">
               Book Everything in One Place
             </h1>
-            <p className="mt-4 text-balance text-[18px] text-white/85 md:text-[19px]">
+            <p className="mt-4 text-[18px] text-balance text-white/85 md:text-[19px]">
               Book flights, hotels, cruises, cars, and experiences-all from one
               place.
             </p>

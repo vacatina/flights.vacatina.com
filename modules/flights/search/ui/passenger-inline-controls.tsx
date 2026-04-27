@@ -98,14 +98,14 @@ function PassengerStepper({
       <p className="text-[15px] font-medium tracking-[-0.01em] text-foreground">
         {label}
       </p>
-      <div className="flex h-16 w-fit overflow-hidden rounded-[10px] border border-input bg-background shadow-xs">
+      <div className="flex h-16 w-full overflow-hidden rounded-[10px] border border-input bg-background shadow-xs">
         <StepperButton
           symbol="−"
           onClick={onDecrease}
           disabled={!canDecrease}
           rounded="left"
         />
-        <div className="flex min-w-18 items-center justify-center border-x border-input px-4 text-[18px] font-medium text-foreground">
+        <div className="flex flex-1 items-center justify-center border-x border-input px-4 text-[18px] font-medium text-foreground">
           {value}
         </div>
         <StepperButton
@@ -136,7 +136,7 @@ function StepperButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex w-16 items-center justify-center text-[18px] font-normal text-muted-foreground transition-colors",
+        "flex flex-1 items-center justify-center text-[18px] font-normal text-muted-foreground transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground/50"
           : "hover:bg-muted",

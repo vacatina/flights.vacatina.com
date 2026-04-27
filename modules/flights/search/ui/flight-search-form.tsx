@@ -260,7 +260,7 @@ export function FlightSearchForm() {
 
   return (
     <form
-      className="flex w-full flex-col gap-8 rounded-[12px] border border-border bg-white p-4 shadow-xl md:gap-9 md:p-8"
+      className="flex w-full flex-col gap-8 rounded-[12px] border border-border bg-background p-4 shadow-xl md:gap-9 md:p-8"
       onSubmit={onSubmit}
     >
       <FieldGroup className="gap-8">
@@ -296,7 +296,7 @@ export function FlightSearchForm() {
           <div className="flex flex-col gap-7">
             <div
               className={cn(
-                "grid gap-6",
+                "grid items-start gap-6",
                 journeyType === "one_way"
                   ? "xl:grid-cols-[minmax(0,1fr)_80px_minmax(0,1fr)_minmax(0,1fr)]"
                   : "xl:grid-cols-[minmax(0,1fr)_80px_minmax(0,1fr)]"
@@ -312,11 +312,11 @@ export function FlightSearchForm() {
                 inputClassName={textFieldClassName}
               />
 
-              <div className="hidden xl:flex xl:items-end xl:justify-center xl:pb-3">
+              <div className="hidden xl:flex xl:justify-center xl:pt-9">
                 <button
                   type="button"
                   onClick={swapOutboundPlaces}
-                  className="inline-flex size-[68px] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_rgba(53,85,213,0.45)] transition-colors hover:bg-primary/90"
+                  className="inline-flex size-[68px] items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                   aria-label="Swap origin and destination"
                 >
                   <ArrowLeftRightIcon className="size-8" />
@@ -370,7 +370,7 @@ export function FlightSearchForm() {
             {fields.map((sliceField, index) => (
               <div
                 key={sliceField.id}
-                className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_84px] xl:items-end"
+                className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_84px] xl:items-start"
               >
                 <PlaceAutocompleteField
                   control={control}
@@ -399,7 +399,7 @@ export function FlightSearchForm() {
                 />
                 <button
                   type="button"
-                  className="hidden size-[68px] items-center justify-center self-end rounded-full border border-input bg-card transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45 xl:inline-flex"
+                  className="hidden size-[68px] items-center justify-center rounded-full border border-input bg-card transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45 xl:mt-9 xl:inline-flex"
                   disabled={fields.length <= 2}
                   onClick={() => remove(index)}
                   aria-label={`Remove flight ${index + 1}`}
@@ -432,7 +432,7 @@ export function FlightSearchForm() {
 
         <Separator className="bg-border" />
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)] xl:items-end">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] xl:items-end">
           <PassengerInlineControls control={control} />
 
           <Controller
