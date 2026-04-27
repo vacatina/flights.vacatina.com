@@ -18,6 +18,7 @@ import type {
 } from "@/modules/flights/search/domain"
 import { searchPlacesAction } from "@/modules/flights/search/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
 interface PlaceAutocompleteFieldProps {
   control: Control<FlightSearchFormValues>
@@ -89,7 +90,12 @@ export function PlaceAutocompleteField({
             code: result.error.code,
           })
           setOptions([])
-          setSearchError(result.error.message)
+          setSearchError(
+            toSafeUserErrorMessage(
+              result.error.message,
+              "Unable to search places right now. Please try again."
+            )
+          )
           return
         }
 

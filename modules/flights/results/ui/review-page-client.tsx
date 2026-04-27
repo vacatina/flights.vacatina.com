@@ -25,6 +25,7 @@ import {
 } from "@/modules/flights/results/domain"
 import { createCheckoutQuoteAction } from "@/modules/flights/results/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
 export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const router = useRouter()
@@ -104,7 +105,12 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
             partialOfferRequestId: data.partialOfferRequestId,
             code: result.error.code,
           })
-          setCheckoutError(result.error.message)
+          setCheckoutError(
+            toSafeUserErrorMessage(
+              result.error.message,
+              "Unable to start checkout right now. Please try again."
+            )
+          )
           return
         }
 
@@ -158,7 +164,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
             {data.legs.map((leg) => (
               <section key={leg.legIndex} className="space-y-4">
                 <div className="space-y-3">
-                  <p className="text-2xl font-semibold tracking-tight md:text-base">
+                  <p className="text-xl font-semibold tracking-tight md:text-2xl">
                     {leg.title}
                     {leg.dateLabel ? (
                       <span className="ml-3 text-muted-foreground">{leg.dateLabel}</span>
@@ -187,7 +193,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
                         <div className="grid gap-5 md:grid-cols-3 md:gap-8">
                           <div>
-                            <p className="text-3xl font-semibold tracking-tight md:text-2xl">
+                            <p className="text-2xl font-semibold tracking-tight md:text-3xl">
                               {leg.header.departureTimeLabel} - {leg.header.arrivalTimeLabel}
                               {leg.header.arrivalDayOffset > 0
                                 ? `+${leg.header.arrivalDayOffset}`
@@ -228,7 +234,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                 </div>
 
                 {leg.isLocked ? (
-                  <p className="text-3xl text-muted-foreground md:text-base">{leg.lockMessage}</p>
+                  <p className="text-base text-muted-foreground md:text-lg">{leg.lockMessage}</p>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {leg.options.map((option) => (
@@ -257,7 +263,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                               <p className="text-xs tracking-[0.08em] text-muted-foreground uppercase">
                                 {option.cabinLabel}
                               </p>
-                              <p className="text-3xl font-semibold tracking-tight md:text-xl">
+                              <p className="text-xl font-semibold tracking-tight md:text-3xl">
                                 {option.fareLabel}
                               </p>
                             </div>
@@ -278,7 +284,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                             <p className="text-sm text-muted-foreground md:text-base">
                               total amount from
                             </p>
-                            <p className="text-4xl font-semibold tracking-tight md:text-2xl">
+                            <p className="text-2xl font-semibold tracking-tight md:text-3xl">
                               {option.priceFromLabel}
                             </p>
                           </div>
@@ -294,7 +300,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
           <aside className="xl:sticky xl:top-6">
             <Card className="rounded-2xl bg-card/90 py-4 shadow-none">
               <CardHeader className="px-5 pb-4 md:px-6">
-                <CardTitle className="text-2xl md:text-xl">Summary</CardTitle>
+                <CardTitle className="text-xl md:text-2xl">Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 px-5 md:px-6">
                 <p className="text-sm text-muted-foreground md:text-base">{data.summary.soldByLabel}</p>
@@ -312,7 +318,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground md:text-base">total amount</p>
-                  <p className="text-4xl font-semibold tracking-tight md:text-2xl">
+                  <p className="text-2xl font-semibold tracking-tight md:text-3xl">
                     {data.summary.totalAmountLabel ?? "--"}
                   </p>
                 </div>

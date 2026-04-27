@@ -4,4 +4,4 @@ export {
   processPayHereNotification,
   startCheckoutPayment,
   submitCheckout,
-} from "@/modules/flights/checkout/server/use-cases"
+} from "@/modules/flights/checkout/server/service-core"

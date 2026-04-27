@@ -44,6 +44,7 @@ import {
 } from "@/modules/flights/search/domain"
 import { submitFlightSearchAction } from "@/modules/flights/search/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
+import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 import { DatePickerField } from "@/modules/flights/search/ui/date-picker-field"
 import { PassengersPopover } from "@/modules/flights/search/ui/passengers-popover"
 import { PlaceAutocompleteField } from "@/modules/flights/search/ui/place-autocomplete-field"
@@ -158,7 +159,14 @@ export function FlightSearchForm() {
         code: result.error.code,
         fieldErrorCount: appliedFieldErrors,
       })
-      setServerError(appliedFieldErrors > 0 ? null : result.error.message)
+      setServerError(
+        appliedFieldErrors > 0
+          ? null
+          : toSafeUserErrorMessage(
+              result.error.message,
+              "Unable to search flights right now. Please try again."
+            )
+      )
       return
     }
 

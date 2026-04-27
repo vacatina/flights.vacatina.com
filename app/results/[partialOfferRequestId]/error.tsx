@@ -17,7 +17,7 @@ export default function ResultsSegmentError({
 
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="font-heading text-3xl font-semibold md:text-2xl">
+      <h1 className="font-heading text-2xl font-semibold md:text-3xl">
         We could not load these flight results
       </h1>
       <p className="text-base text-muted-foreground">

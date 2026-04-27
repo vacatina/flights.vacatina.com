@@ -350,6 +350,7 @@ test("startCheckoutPayment creates processing session and payload", async () => 
 })
 
 test("submitCheckout succeeds for hold flow", async () => {
+  const sessionRepo = createSessionRepository()
   const result = await submitCheckout(
     {
       actor: {
@@ -365,7 +366,7 @@ test("submitCheckout succeeds for hold flow", async () => {
       getOfferById: async () => createOffer(),
       getSeatMapsByOfferId: async () => [] as SeatMap[],
       createOrder: async () => createDuffelOrder(),
-      sessionRepository: createSessionRepository().repo,
+      sessionRepository: sessionRepo.repo,
       orderRepository: createOrderRepository().repo,
       paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
     }
@@ -373,6 +374,14 @@ test("submitCheckout succeeds for hold flow", async () => {
 
   expect(result.paymentMode).toBe("hold")
   expect(result.duffelOrderId).toBe("ord_1")
+
+  const session = await sessionRepo.repo.findById(result.checkoutSessionId)
+  expect(session?.checkoutPayloadSnapshot).toMatchObject({
+    snapshotType: "checkout_terminal_summary",
+    paymentMode: "hold",
+  })
+  expect(session?.checkoutPayloadSnapshot).not.toHaveProperty("contact")
+  expect(session?.checkoutPayloadSnapshot).not.toHaveProperty("passengers")
 })
 
 test("processPayHereNotification finalizes checkout on success", async () => {
@@ -460,6 +469,12 @@ test("processPayHereNotification finalizes checkout on success", async () => {
 
   const finalized = await sessionRepo.repo.findById(createdSession.id)
   expect(finalized?.status).toBe("completed")
+  expect(finalized?.checkoutPayloadSnapshot).toMatchObject({
+    snapshotType: "checkout_terminal_summary",
+    paymentMode: "pay_now",
+  })
+  expect(finalized?.checkoutPayloadSnapshot).not.toHaveProperty("contact")
+  expect(finalized?.checkoutPayloadSnapshot).not.toHaveProperty("passengers")
 })
 
 test("getCheckoutSessionStatus enforces actor ownership", async () => {

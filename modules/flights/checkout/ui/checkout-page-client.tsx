@@ -158,6 +158,17 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       )
     },
   })
+  const {
+    activePollingSessionId,
+    isSubmitting,
+    onSubmit,
+    paymentProcessingMessage,
+    resumePayNowProcessing,
+    setSubmitError,
+    submitError,
+    submitSuccess,
+    syncPayNowResolution,
+  } = checkoutFlow
   const stepRouting = useCheckoutStepRouting({
     partialOfferRequestId: data.partialOfferRequestId,
     state: data.state,
@@ -172,7 +183,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   const { clearDraft } = useCheckoutDraftPersistence({
     form,
     draftKey,
-    enabled: !checkoutFlow.submitSuccess,
+    enabled: !submitSuccess,
   })
 
   const ancillaryPreviewTotal = useMemo(
@@ -222,12 +233,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   }, [paymentMode, ancillarySelection?.services?.length, form])
 
   useEffect(() => {
-    if (!checkoutFlow.submitSuccess) {
+    if (!submitSuccess) {
       return
     }
 
     clearDraft()
-  }, [checkoutFlow.submitSuccess, clearDraft])
+  }, [submitSuccess, clearDraft])
 
   useEffect(() => {
     logFlightFlow("CheckoutPageClient", "hydrated", {
@@ -263,11 +274,11 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     }
 
     if (data.state.status === "processing") {
-      if (checkoutFlow.activePollingSessionId === data.state.sessionId) {
+      if (activePollingSessionId === data.state.sessionId) {
         return
       }
 
-      void checkoutFlow.resumePayNowProcessing(data.state.sessionId)
+      void resumePayNowProcessing(data.state.sessionId)
       return
     }
 
@@ -280,7 +291,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     }
 
     void (async () => {
-      const resolution = await checkoutFlow.syncPayNowResolution(data.state.sessionId ?? "")
+      const resolution = await syncPayNowResolution(data.state.sessionId ?? "")
 
       if (!resolution) {
         return
@@ -301,12 +312,14 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       }
     })()
   }, [
+    activePollingSessionId,
     buildCheckoutHref,
-    checkoutFlow,
     data.state.sessionId,
     data.state.status,
     payNowResolution,
+    resumePayNowProcessing,
     router,
+    syncPayNowResolution,
   ])
 
   useEffect(() => {
@@ -359,6 +372,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   function onRetryPayStep() {
     setPayNowResolution(null)
+    setSubmitError(null)
     router.replace(
       buildCheckoutHref({
         step: "pay",
@@ -403,7 +417,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
           </div>
 
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-2xl">
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
               {data.tripSummary.routeLabel}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -413,22 +427,22 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </p>
           </div>
 
-          {checkoutFlow.submitSuccess?.paymentMode === "hold" ? (
+      {submitSuccess?.paymentMode === "hold" ? (
             <Card className="rounded-2xl border-emerald-500/40 bg-emerald-50/30">
               <CardHeader>
                 <CardTitle className="text-xl">Order created successfully</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  Duffel order ID: <strong>{checkoutFlow.submitSuccess.duffelOrderId}</strong>
+                  Duffel order ID: <strong>{submitSuccess.duffelOrderId}</strong>
                 </p>
                 <p>
-                  Total charged: <strong>{checkoutFlow.submitSuccess.totalSellAmountLabel}</strong>
+                  Total charged: <strong>{submitSuccess.totalSellAmountLabel}</strong>
                 </p>
-                {checkoutFlow.submitSuccess.paymentRequiredByLabel ? (
+                {submitSuccess.paymentRequiredByLabel ? (
                   <p>
                     Payment required by:{" "}
-                    <strong>{checkoutFlow.submitSuccess.paymentRequiredByLabel}</strong>
+                    <strong>{submitSuccess.paymentRequiredByLabel}</strong>
                   </p>
                 ) : null}
                 <Button className="mt-2" render={<Link href="/" />}>
@@ -443,11 +457,11 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
               status={currentStatus}
               sessionId={currentSessionId}
               resolution={payNowResolution}
-              errorMessage={checkoutFlow.submitError}
+              errorMessage={submitError}
               onRetryPay={onRetryPayStep}
             />
           ) : (
-            <form onSubmit={form.handleSubmit(checkoutFlow.onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <CheckoutWizardShell
                 currentStep={effectiveStep}
                 onStepChange={navigateStep}
@@ -462,7 +476,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     ancillaryServicesCount={ancillarySelection?.services.length ?? 0}
                     stepError={stepError}
                     onContinue={continueFromTraveler}
-                    disabled={checkoutFlow.isSubmitting}
+                    disabled={isSubmitting}
                   />
                 ) : null}
 
@@ -474,7 +488,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     paymentMode={paymentMode}
                     onBack={stepRouting.goPreviousStep}
                     onContinue={continueFromExtras}
-                    disabled={checkoutFlow.isSubmitting}
+                    disabled={isSubmitting}
                   />
                 ) : null}
 
@@ -485,8 +499,8 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     ancillaryPreviewTotal={ancillaryPreviewTotal}
                     totalPreview={totalPreview}
                     submitError={payStepError}
-                    paymentProcessingMessage={checkoutFlow.paymentProcessingMessage}
-                    isSubmitting={checkoutFlow.isSubmitting}
+                    paymentProcessingMessage={paymentProcessingMessage}
+                    isSubmitting={isSubmitting}
                     clerkEnabled={clerkEnabled}
                     signInHref={signInHref}
                     onBack={stepRouting.goPreviousStep}

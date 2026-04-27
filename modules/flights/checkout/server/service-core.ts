@@ -1,15 +1,11 @@
 import "server-only"
 
-import { createHash, randomUUID } from "node:crypto"
-
-import { format, isValid, parseISO } from "date-fns"
+import { format } from "date-fns"
 import type { CreateOrder, Offer, Order, SeatMap } from "@duffel/api/types"
 import { z } from "zod"
 
 import type { ActorContext } from "@/modules/auth/types"
-import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
 import { toNumeric } from "@/lib/shared/number"
-import { normalizeSelectedStrings } from "@/lib/shared/selection"
 import {
   buildCheckoutPageModel,
   computeAncillaryPricing,
@@ -38,8 +34,24 @@ import {
 import {
   defaultCheckoutSessionRepository,
   type CheckoutSessionRepository,
-  type CheckoutSessionStatus,
 } from "@/modules/flights/checkout/server/session-repository"
+import {
+  buildCheckoutIdempotencyKey,
+  createCheckoutSessionId,
+  createFlightOrderId,
+  createTerminalCheckoutSnapshot,
+  createWebhookEventId,
+  doesSessionOwnerMatch,
+  isPaymentAmountMatch,
+  parseOptionalDate,
+  roundToCurrency,
+  statusToMessage,
+  toAmountString,
+  toPayHereEventKey,
+  toPayNowUnavailableReason,
+  toQuoteOwner,
+  toQuoteValidationErrorMessage,
+} from "@/modules/flights/checkout/server/service-helpers"
 import {
   convertToLkr,
   getPayHereConfig,
@@ -60,7 +72,6 @@ import {
   markPricedQuoteConsumed,
   validatePricedQuote,
 } from "@/modules/flights/pricing/server"
-import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface FetchCheckoutPageDataInput {
@@ -108,6 +119,11 @@ interface CheckoutQuoteViewSource {
   netAmount: number
   sellAmount: number
   expiresAt: Date
+}
+
+interface CheckoutStatusSessionViewSource extends CheckoutQuoteViewSource {
+  offerId: string
+  selectedPartialOffers: string[]
 }
 
 const checkoutPayloadSnapshotSchema = z.object({
@@ -245,35 +261,50 @@ export async function fetchCheckoutPageData(
       ? toCheckoutQuoteViewSource(quoteValidation.quote)
       : null
 
-  if (!quoteForView && input.state.status && input.state.sessionId) {
-    const fallbackQuote = await resolveQuoteFromSessionForStatusMode({
-      input,
-      deps,
-    })
+  const statusSessionSource =
+    input.state.status && input.state.sessionId
+      ? await resolveQuoteFromSessionForStatusMode({
+          input,
+          deps,
+        })
+      : null
 
-    if (fallbackQuote) {
-      quoteForView = fallbackQuote
-      logFlightFlow("fetchCheckoutPageData", "quote_fallback_from_session", {
-        partialOfferRequestId: input.partialOfferRequestId,
-        offerId: input.state.offerId,
-        quoteId: fallbackQuote.id,
-        checkoutSessionId: input.state.sessionId,
-        status: input.state.status,
-      })
+  if (!quoteForView && statusSessionSource) {
+    quoteForView = {
+      id: statusSessionSource.id,
+      currency: statusSessionSource.currency,
+      netAmount: statusSessionSource.netAmount,
+      sellAmount: statusSessionSource.sellAmount,
+      expiresAt: statusSessionSource.expiresAt,
     }
+    logFlightFlow("fetchCheckoutPageData", "quote_fallback_from_session", {
+      partialOfferRequestId: input.partialOfferRequestId,
+      offerId: statusSessionSource.offerId,
+      quoteId: statusSessionSource.id,
+      checkoutSessionId: input.state.sessionId,
+      status: input.state.status,
+    })
   }
 
   if (!quoteForView) {
     throw new Error(toQuoteValidationErrorMessage(quoteValidation.reason))
   }
 
-  const offer = await deps.getOfferById(input.state.offerId)
-  const seatMaps = await deps.getSeatMapsByOfferId(input.state.offerId)
+  const effectiveOfferId = statusSessionSource?.offerId ?? input.state.offerId
+  const effectiveSelectedPartialOffers =
+    statusSessionSource?.selectedPartialOffers ?? input.state.selectedPartialOffers
+
+  const offer = await deps.getOfferById(effectiveOfferId)
+  const seatMaps = await deps.getSeatMapsByOfferId(effectiveOfferId)
   const logos = await getAirlineLogosByAirlineId([offer.owner.id])
 
   const model = buildCheckoutPageModel({
     partialOfferRequestId: input.partialOfferRequestId,
-    state: input.state,
+    state: {
+      ...input.state,
+      offerId: effectiveOfferId,
+      selectedPartialOffers: effectiveSelectedPartialOffers,
+    },
     offer,
     seatMaps,
     quote: {
@@ -295,7 +326,7 @@ export async function fetchCheckoutPageData(
 
   logFlightFlow("fetchCheckoutPageData", "completed", {
     partialOfferRequestId: input.partialOfferRequestId,
-    offerId: input.state.offerId,
+    offerId: effectiveOfferId,
     seatMapCount: seatMaps.length,
     passengerCount: model.passengerDefaults.length,
     payNowEnabled: model.payHere.payNowEnabled,
@@ -307,7 +338,7 @@ export async function fetchCheckoutPageData(
 async function resolveQuoteFromSessionForStatusMode(input: {
   input: FetchCheckoutPageDataInput
   deps: CheckoutServiceDeps
-}) {
+}): Promise<CheckoutStatusSessionViewSource | null> {
   const checkoutSessionId = input.input.state.sessionId
 
   if (!checkoutSessionId) {
@@ -328,25 +359,10 @@ async function resolveQuoteFromSessionForStatusMode(input: {
     return null
   }
 
-  if (session.quoteId !== input.input.state.quoteId) {
-    return null
-  }
-
-  if (session.offerId !== input.input.state.offerId) {
-    return null
-  }
-
-  if (
-    !areSelectedPartialOffersEqual(
-      session.selectedPartialOffers,
-      input.input.state.selectedPartialOffers
-    )
-  ) {
-    return null
-  }
-
   return {
     id: session.quoteId,
+    offerId: session.offerId,
+    selectedPartialOffers: session.selectedPartialOffers,
     currency: session.currency,
     netAmount: session.netAmount,
     sellAmount: session.sellAmount,
@@ -618,7 +634,18 @@ export async function submitCheckout(
     fxBaseRate: null,
     fxBufferPercent: null,
     fxEffectiveRate: null,
-    checkoutPayloadSnapshot: null,
+    checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+      partialOfferRequestId: input.payload.partialOfferRequestId,
+      offerId: input.payload.offerId,
+      quoteId: input.payload.quoteId,
+      selectedPartialOffers: input.payload.selectedPartialOffers,
+      paymentMode: "hold",
+      sourceCurrency: prepared.quote.currency,
+      netTotal: prepared.netTotal,
+      sellTotal: prepared.sellTotal,
+      ancillaryServicesCount: prepared.ancillarySelection.services.length,
+      metadataKeys: Object.keys(prepared.metadata),
+    }),
     status: "processing",
     paymentInitiatedAt: null,
     paymentConfirmedAt: null,
@@ -770,7 +797,13 @@ export async function processPayHereNotification(
 
   const payload = input.payload
   const config = getPayHereConfig()
-  const eventKey = toPayHereEventKey(payload)
+  const eventKey = toPayHereEventKey({
+    orderId: payload.order_id,
+    paymentId: payload.payment_id,
+    statusCode: payload.status_code,
+    amount: payload.payhere_amount,
+    currency: payload.payhere_currency,
+  })
 
   if (payload.merchant_id !== config.merchantId) {
     incrementCheckoutMetric("payhere_notify_invalid_sig_total", {
@@ -844,6 +877,19 @@ export async function processPayHereNotification(
       providerPaymentId: payload.payment_id,
       providerStatusCode: payload.status_code,
       providerStatusMessage: payload.status_message ?? mappedStatus,
+      checkoutPayloadSnapshot:
+        mappedStatus === "pending"
+          ? session.checkoutPayloadSnapshot
+          : createTerminalCheckoutSnapshot({
+              partialOfferRequestId: session.partialOfferRequestId,
+              offerId: session.offerId,
+              quoteId: session.quoteId,
+              selectedPartialOffers: session.selectedPartialOffers,
+              paymentMode: session.paymentMode,
+              sourceCurrency: session.currency,
+              netTotal: session.netAmount,
+              sellTotal: session.sellAmount,
+            }),
       errorCode: mappedStatus === "pending" ? null : "payhere_payment_failed",
       errorMessage:
         mappedStatus === "pending"
@@ -875,6 +921,16 @@ export async function processPayHereNotification(
       providerStatusCode: payload.status_code,
       providerStatusMessage: payload.status_message ?? "amount_mismatch",
       paymentConfirmedAt: now,
+      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+        partialOfferRequestId: session.partialOfferRequestId,
+        offerId: session.offerId,
+        quoteId: session.quoteId,
+        selectedPartialOffers: session.selectedPartialOffers,
+        paymentMode: session.paymentMode,
+        sourceCurrency: session.currency,
+        netTotal: session.netAmount,
+        sellTotal: session.sellAmount,
+      }),
       errorCode: "payhere_amount_mismatch",
       errorMessage:
         "Payment amount/currency mismatch detected. Support will reconcile this payment.",
@@ -984,6 +1040,18 @@ export async function processPayHereNotification(
       status: "completed",
       duffelOrderId: duffelOrder.id,
       finalizedAt: now,
+      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+        partialOfferRequestId: snapshot.partialOfferRequestId,
+        offerId: snapshot.offerId,
+        quoteId: snapshot.quoteId,
+        selectedPartialOffers: snapshot.selectedPartialOffers,
+        paymentMode: session.paymentMode,
+        sourceCurrency: snapshot.sourceCurrency,
+        netTotal: snapshot.netTotal,
+        sellTotal: session.sellAmount,
+        ancillaryServicesCount: ancillarySelection.services.length,
+        metadataKeys: Object.keys(metadata),
+      }),
       errorCode: null,
       errorMessage: null,
     })
@@ -1000,6 +1068,16 @@ export async function processPayHereNotification(
 
     await deps.sessionRepository.update(session.id, {
       status: "reconciliation_required",
+      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+        partialOfferRequestId: session.partialOfferRequestId,
+        offerId: session.offerId,
+        quoteId: session.quoteId,
+        selectedPartialOffers: session.selectedPartialOffers,
+        paymentMode: session.paymentMode,
+        sourceCurrency: session.currency,
+        netTotal: session.netAmount,
+        sellTotal: session.sellAmount,
+      }),
       errorCode: "payhere_finalize_failed",
       errorMessage:
         "Payment received but booking confirmation is pending manual reconciliation.",
@@ -1185,129 +1263,6 @@ function deriveNameFromEmail(email: string) {
   return words
 }
 
-function doesSessionOwnerMatch(
-  session: {
-    ownerUserId: string | null
-    ownerGuestId: string | null
-  },
-  actor: ActorContext
-) {
-  if (actor.type === "user") {
-    return session.ownerUserId === actor.appUserId
-  }
-
-  if (actor.guestId === GUEST_UNAVAILABLE_ID) {
-    return false
-  }
-
-  return session.ownerGuestId === actor.guestId
-}
-
-function statusToMessage(input: {
-  status: CheckoutSessionStatus
-  errorCode: string | null
-}) {
-  switch (input.status) {
-    case "processing":
-      return "Payment is processing. Waiting for confirmation."
-    case "payment_authorized":
-      return "Payment received. Finalizing booking."
-    case "failed":
-      if (input.errorCode === "checkout_submit_failed") {
-        return "Checkout could not be completed right now. Please try again."
-      }
-      return "Payment failed. Please retry checkout."
-    case "reconciliation_required":
-      return "Payment received but booking is pending manual reconciliation."
-    case "completed":
-    default:
-      return null
-  }
-}
-
-function toPayNowUnavailableReason(error: unknown) {
-  if (
-    error instanceof Error &&
-    error.message.startsWith("PayHere pay_now is unavailable for")
-  ) {
-    return error.message
-  }
-
-  return "Pay now is unavailable right now. Please try hold order."
-}
-
-function isPaymentAmountMatch(input: {
-  expectedAmount: number | null
-  expectedCurrency: string | null
-  actualAmount: string
-  actualCurrency: string
-}) {
-  if (input.expectedAmount === null || !input.expectedCurrency) {
-    return false
-  }
-
-  const expectedCurrency = input.expectedCurrency.trim().toUpperCase()
-  const actualCurrency = input.actualCurrency.trim().toUpperCase()
-
-  if (expectedCurrency !== actualCurrency) {
-    return false
-  }
-
-  const expectedAmount = roundToCurrency(input.expectedAmount, expectedCurrency)
-  const actualAmount = roundToCurrency(toNumeric(input.actualAmount), actualCurrency)
-
-  return Math.abs(expectedAmount - actualAmount) < 0.01
-}
-
-function toPayHereEventKey(payload: PayHereNotifyPayload) {
-  return `${payload.order_id}:${payload.payment_id}:${payload.status_code}:${payload.payhere_amount}:${payload.payhere_currency}`
-}
-
-function createWebhookEventId() {
-  return `pwe_${randomUUID().replaceAll("-", "")}`
-}
-
-function createCheckoutSessionId() {
-  return `chs_${randomUUID().replaceAll("-", "")}`
-}
-
-function createFlightOrderId() {
-  return `fod_${randomUUID().replaceAll("-", "")}`
-}
-
-function toQuoteOwner(actor: ActorContext) {
-  if (actor.type === "user") {
-    return {
-      userId: actor.appUserId,
-      guestId: null,
-    }
-  }
-
-  return {
-    userId: null,
-    guestId: actor.guestId === GUEST_UNAVAILABLE_ID ? null : actor.guestId,
-  }
-}
-
-function toQuoteValidationErrorMessage(reason: string | null) {
-  switch (reason) {
-    case "not_found":
-      return "Checkout quote not found. Please go back and try again."
-    case "not_active":
-      return "Checkout quote is no longer active. Please regenerate it."
-    case "expired":
-      return "Checkout quote expired. Please return to review."
-    case "owner_mismatch":
-      return "Checkout quote owner mismatch. Please restart checkout."
-    case "offer_mismatch":
-    case "partial_offer_request_mismatch":
-    case "selected_mismatch":
-      return "Checkout quote does not match current selection."
-    default:
-      return "Checkout quote validation failed."
-  }
-}
-
 function toCheckoutQuoteViewSource(quote: {
   id: string
   currency: string
@@ -1322,77 +1277,4 @@ function toCheckoutQuoteViewSource(quote: {
     sellAmount: quote.sellAmount,
     expiresAt: quote.expiresAt,
   }
-}
-
-function areSelectedPartialOffersEqual(a: string[], b: string[]) {
-  const normalizedA = normalizeSelectedStrings(a)
-  const normalizedB = normalizeSelectedStrings(b)
-
-  if (normalizedA.length !== normalizedB.length) {
-    return false
-  }
-
-  for (let i = 0; i < normalizedA.length; i += 1) {
-    if (normalizedA[i] !== normalizedB[i]) {
-      return false
-    }
-  }
-
-  return true
-}
-
-function buildCheckoutIdempotencyKey(input: {
-  partialOfferRequestId: string
-  quoteId: string
-  offerId: string
-  paymentMode: "pay_now" | "hold"
-  owner: {
-    userId: string | null
-    guestId: string | null
-  }
-  selectedPartialOffers: string[]
-  passengers: unknown
-  services: unknown
-  metadata: Record<string, string>
-  netTotal: number
-  sellTotal: number
-  billing: CheckoutSubmitInput["billing"]
-}) {
-  const payload = JSON.stringify({
-    partialOfferRequestId: input.partialOfferRequestId,
-    quoteId: input.quoteId,
-    offerId: input.offerId,
-    paymentMode: input.paymentMode,
-    owner: input.owner,
-    selectedPartialOffers: input.selectedPartialOffers,
-    passengers: input.passengers,
-    services: input.services,
-    metadata: input.metadata,
-    netTotal: input.netTotal,
-    sellTotal: input.sellTotal,
-    billing: input.billing,
-  })
-
-  return createHash("sha256").update(payload).digest("hex")
-}
-
-function parseOptionalDate(value: string | null | undefined) {
-  if (!value) {
-    return null
-  }
-
-  const parsed = parseISO(value)
-  return isValid(parsed) ? parsed : null
-}
-
-function roundToCurrency(value: number, currency: string) {
-  const digits = currencyMinorUnit(currency.trim().toUpperCase())
-  const factor = 10 ** digits
-  return Math.round(value * factor) / factor
-}
-
-function toAmountString(value: number, currency: string) {
-  const rounded = roundToCurrency(value, currency)
-  const digits = currencyMinorUnit(currency.trim().toUpperCase())
-  return rounded.toFixed(digits)
 }

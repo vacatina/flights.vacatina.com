@@ -16,26 +16,70 @@ export type CheckoutMetricName =
   | "checkout_payment_failed_total"
   | "checkout_reconciliation_required_total"
 
-const counters = new Map<CheckoutMetricName, number>()
+export interface CheckoutTelemetryAdapter {
+  increment: (input: {
+    name: CheckoutMetricName
+    metadata?: Record<string, unknown>
+  }) => number | null
+}
+
+function createLogTelemetryAdapter(): CheckoutTelemetryAdapter {
+  return {
+    increment(input) {
+      logFlightFlow("checkout.metrics", "counter_incremented", {
+        name: input.name,
+        value: null,
+        ...input.metadata,
+      })
+
+      return null
+    },
+  }
+}
+
+function createInMemoryTelemetryAdapter(): CheckoutTelemetryAdapter {
+  return {
+    increment(input) {
+      const value = (testCounters.get(input.name) ?? 0) + 1
+      testCounters.set(input.name, value)
+
+      logFlightFlow("checkout.metrics", "counter_incremented", {
+        name: input.name,
+        value,
+        ...input.metadata,
+      })
+
+      return value
+    },
+  }
+}
+
+const testCounters = new Map<CheckoutMetricName, number>()
+let telemetryAdapter: CheckoutTelemetryAdapter = createLogTelemetryAdapter()
 
 export function incrementCheckoutMetric(
   name: CheckoutMetricName,
   metadata?: Record<string, unknown>
 ) {
-  const value = (counters.get(name) ?? 0) + 1
-  counters.set(name, value)
-  logFlightFlow("checkout.metrics", "counter_incremented", {
+  return telemetryAdapter.increment({
     name,
-    value,
-    ...metadata,
+    metadata,
   })
-  return value
+}
+
+export function setCheckoutTelemetryAdapter(adapter: CheckoutTelemetryAdapter) {
+  telemetryAdapter = adapter
+}
+
+export function resetCheckoutTelemetryAdapter() {
+  telemetryAdapter = createLogTelemetryAdapter()
 }
 
 export function getCheckoutMetricValue(name: CheckoutMetricName) {
-  return counters.get(name) ?? 0
+  return testCounters.get(name) ?? 0
 }
 
 export function resetCheckoutMetricsForTests() {
-  counters.clear()
+  testCounters.clear()
+  telemetryAdapter = createInMemoryTelemetryAdapter()
 }
