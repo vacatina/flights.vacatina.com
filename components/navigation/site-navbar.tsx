@@ -331,9 +331,7 @@ function AuthButtons({
       </Show>
 
       <Show when="signed-in">
-        <div className="rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground">
-          <UserButton />
-        </div>
+        <UserButton />
       </Show>
     </>
   )

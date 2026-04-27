@@ -19,6 +19,7 @@ import type {
 import { searchPlacesAction } from "@/modules/flights/search/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
+import { cn } from "@/lib/utils"
 
 interface PlaceAutocompleteFieldProps {
   control: Control<FlightSearchFormValues>
@@ -26,6 +27,10 @@ interface PlaceAutocompleteFieldProps {
   label: string
   placeholder: string
   disabled?: boolean
+  helperText?: string
+  fieldClassName?: string
+  labelClassName?: string
+  inputClassName?: string
 }
 
 export function PlaceAutocompleteField({
@@ -34,6 +39,10 @@ export function PlaceAutocompleteField({
   label,
   placeholder,
   disabled = false,
+  helperText,
+  fieldClassName,
+  labelClassName,
+  inputClassName,
 }: PlaceAutocompleteFieldProps) {
   const { field, fieldState } = useController({ control, name })
 
@@ -151,8 +160,13 @@ export function PlaceAutocompleteField({
   }
 
   return (
-    <Field data-invalid={fieldState.invalid || undefined}>
-      <FieldLabel>{label}</FieldLabel>
+    <Field
+      data-invalid={fieldState.invalid || undefined}
+      className={fieldClassName}
+    >
+      <FieldLabel className={cn("text-sm font-medium", labelClassName)}>
+        {label}
+      </FieldLabel>
       <div className="relative flex flex-col">
         <Input
           value={inputValue}
@@ -166,8 +180,14 @@ export function PlaceAutocompleteField({
           autoComplete="off"
           disabled={disabled}
           aria-invalid={fieldState.invalid || undefined}
-          className="h-14 rounded-xl px-6 text-[1.8rem] font-medium md:text-base"
+          className={cn(
+            "h-14 rounded-xl border-input bg-background px-5 text-base font-medium text-foreground md:text-base",
+            inputClassName
+          )}
         />
+        {helperText ? (
+          <p className="mt-2 text-sm text-muted-foreground">{helperText}</p>
+        ) : null}
 
         {open && !disabled && (
           <div className="absolute top-[calc(100%+6px)] z-40 w-full overflow-hidden rounded-xl border bg-popover shadow-md">

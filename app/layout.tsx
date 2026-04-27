@@ -1,4 +1,8 @@
-import { Figtree, Geist_Mono, Inter } from "next/font/google"
+import {
+  Google_Sans_Flex as Figtree,
+  Geist_Mono,
+  Inter,
+} from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 
 import "./globals.css"
@@ -14,7 +18,7 @@ const figtreeHeading = Figtree({
   variable: "--font-heading",
 })
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+const inter = Figtree({ subsets: ["latin"], variable: "--font-sans" })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],

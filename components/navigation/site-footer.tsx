@@ -52,7 +52,7 @@ export function SiteFooter() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="bg-[#f5f5f5] text-[#17244f]">
+    <footer className="bg-muted text-foreground">
       <div className="mx-auto w-full px-6 pt-14 pb-8 lg:px-20 lg:pt-16 lg:pb-10">
         <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -93,7 +93,7 @@ export function SiteFooter() {
             <p className="text-[16px] leading-none font-medium">
               Follow us on social media
             </p>
-            <div className="mt-6 flex items-center gap-6 text-[#17244f]">
+            <div className="mt-6 flex items-center gap-6 text-foreground">
               {socialItems.map((item) => {
                 const Icon = item.icon
                 return (
@@ -113,7 +113,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-10 border-t border-[#d7d8dc] pt-6">
+        <div className="mt-10 border-t border-border pt-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] lg:text-[15px]">
               <p>© {year} by&nbsp; Vacatina&nbsp; All rights reserved.</p>

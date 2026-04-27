@@ -10,33 +10,52 @@ import { Calendar } from "@/components/ui/calendar"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { FlightSearchFormValues } from "@/modules/flights/search/domain"
+import { cn } from "@/lib/utils"
 
 interface DatePickerFieldProps {
   control: Control<FlightSearchFormValues>
   name: `slices.${number}.departureDate`
   label: string
+  fieldClassName?: string
+  labelClassName?: string
+  triggerClassName?: string
 }
 
-export function DatePickerField({ control, name, label }: DatePickerFieldProps) {
+export function DatePickerField({
+  control,
+  name,
+  label,
+  fieldClassName,
+  labelClassName,
+  triggerClassName,
+}: DatePickerFieldProps) {
   const { field, fieldState } = useController({ control, name })
 
   const selectedDate = field.value ? new Date(`${field.value}T00:00:00`) : undefined
 
-  const displayValue = selectedDate ? format(selectedDate, "dd / MM / yyyy") : "DD / MM / YYYY"
+  const displayValue = selectedDate ? format(selectedDate, "yyyy-MM-dd") : "yyyy-mm-dd"
 
   return (
-    <Field data-invalid={fieldState.invalid || undefined}>
-      <FieldLabel>{label}</FieldLabel>
+    <Field
+      data-invalid={fieldState.invalid || undefined}
+      className={fieldClassName}
+    >
+      <FieldLabel className={cn("text-sm font-medium", labelClassName)}>
+        {label}
+      </FieldLabel>
       <Popover>
         <PopoverTrigger
           className="w-full"
           render={
             <Button
               variant="outline"
-              className="h-14 w-full justify-start rounded-xl px-6 text-[1.8rem] font-normal text-muted-foreground md:text-base"
+              className={cn(
+                "h-14 w-full justify-between rounded-xl border-input bg-background px-5 text-base font-normal text-foreground hover:bg-background",
+                triggerClassName
+              )}
             >
-              <CalendarIcon data-icon="inline-start" />
               <span>{displayValue}</span>
+              <CalendarIcon data-icon="inline-end" />
             </Button>
           }
         />
