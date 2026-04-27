@@ -6,13 +6,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -57,7 +50,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary/80 bg-[#13357b] text-primary-foreground">
-      <div className="mx-auto flex h-[76px] w-full items-center px-4 lg:h-[112px] lg:px-8">
+      <div className="mx-auto flex h-[90px] w-full items-center px-4 lg:px-8">
         <Link href="/" className="shrink-0" aria-label="Vacatina home">
           <Image
             src="/img/logo-light.svg"
@@ -65,16 +58,16 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
             width={230}
             height={50}
             priority
-            className="h-[30px] w-auto lg:h-[50px]"
+            className="h-[26px] w-auto lg:h-[40px]"
           />
         </Link>
 
-        <nav className="ml-12 hidden items-center gap-11 text-[17px] font-medium xl:flex">
+        <nav className="ml-10 hidden items-center gap-8 text-[15px] font-medium xl:flex">
           {primaryNavItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              className="transition-opacity hover:opacity-80"
+              className="whitespace-nowrap transition-opacity hover:opacity-80"
             >
               {item.label}
             </Link>
@@ -88,10 +81,10 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
           />
         </nav>
 
-        <div className="ml-auto hidden items-center gap-7 xl:flex">
+        <div className="ml-auto hidden items-center gap-4 xl:flex">
           <button
             type="button"
-            className="flex items-center gap-2 text-[17px] leading-none font-medium tracking-[0.01em]"
+            className="flex items-center gap-1.5 text-[14px] leading-none font-medium tracking-[0.01em]"
           >
             INR
             <ChevronDownIcon className="size-4" aria-hidden="true" />
@@ -193,35 +186,38 @@ function DesktopDropdown({
   highlightFirst?: boolean
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex items-center gap-2 transition-opacity outline-none hover:opacity-80 data-[popup-open]:opacity-100">
+    <div className="group relative">
+      <button
+        type="button"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap transition-opacity outline-none hover:opacity-80"
+      >
         {label}
         <ChevronDownIcon className="size-4" aria-hidden="true" />
-      </DropdownMenuTrigger>
+      </button>
 
-      <DropdownMenuContent
-        align="center"
-        sideOffset={22}
-        className="relative w-[312px] rounded-[4px] border border-border bg-popover p-7 text-[20px] text-popover-foreground shadow-[0_12px_30px_rgba(8,20,56,0.08)] before:absolute before:-top-[6px] before:left-1/2 before:size-3 before:-translate-x-1/2 before:rotate-45 before:border-t before:border-l before:border-border before:bg-popover before:content-['']"
+      <div
+        className="invisible absolute top-full left-1/2 z-50 mt-3 w-[250px] -translate-x-1/2 rounded-[4px] border border-border bg-popover p-3 text-[16px] text-popover-foreground opacity-0 shadow-md group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+        role="menu"
       >
-        <DropdownMenuGroup className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           {items.map((item, index) => (
-            <DropdownMenuItem
+            <Link
               key={item.label}
+              href={item.href}
               className={cn(
-                "rounded-[4px] px-5 py-4 text-[20px] font-medium text-popover-foreground transition-colors focus:bg-accent focus:text-accent-foreground",
+                "rounded-[4px] px-3 py-2.5 text-[16px] font-medium text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
                 highlightFirst && index === 0
                   ? "bg-accent text-accent-foreground"
                   : ""
               )}
-              render={<Link href={item.href} />}
+              role="menuitem"
             >
               {item.label}
-            </DropdownMenuItem>
+            </Link>
           ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -282,10 +278,12 @@ function AuthButtons({
 }) {
   const size: "sm" | "default" = mobile ? "sm" : "default"
   const signInClassName = cn(
-    "border-border bg-secondary text-secondary-foreground hover:bg-secondary/90"
+    "border-border bg-secondary text-secondary-foreground hover:bg-secondary/90",
+    mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
   )
   const signUpClassName = cn(
-    "border-primary-foreground/45 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+    "border-primary-foreground/45 bg-transparent text-primary-foreground hover:bg-primary-foreground/10",
+    mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
   )
 
   if (!clerkEnabled) {
