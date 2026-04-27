@@ -285,7 +285,7 @@ export function FlightSearchForm() {
               key={option}
               value={option}
               variant="default"
-              className="h-14 rounded-[10px] text-[15px] font-medium text-foreground hover:bg-transparent data-[state=on]:bg-background data-[state=on]:text-primary"
+              className="h-14 rounded-[10px] border border-transparent text-[15px] font-medium text-foreground transition-colors hover:bg-transparent aria-pressed:border-border aria-pressed:bg-background aria-pressed:text-primary aria-pressed:shadow-sm"
             >
               {JOURNEY_TAB_LABELS[option]}
             </ToggleGroupItem>
@@ -449,7 +449,7 @@ export function FlightSearchForm() {
                     field.onChange(nextValue as CabinClass)
                   }
                 >
-                  <SelectTrigger className="h-16 w-full rounded-[10px] border-input bg-background px-5 text-[17px] font-normal text-foreground">
+                  <SelectTrigger className="h-16! w-full rounded-[10px] border-input bg-background px-5 text-[17px] font-normal text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent align="start" className="rounded-[10px]">

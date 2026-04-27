@@ -53,7 +53,7 @@ export function PassengerInlineControls({
       data-invalid={fieldState.invalid || undefined}
       className={cn("flex flex-col gap-3", className)}
     >
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <PassengerStepper
           label="Adults (18+)"
           value={value.adults}
@@ -70,15 +70,6 @@ export function PassengerInlineControls({
           canIncrease={canIncreaseChildren}
           onDecrease={() => update(value.adults, value.children - 1)}
           onIncrease={() => update(value.adults, value.children + 1)}
-        />
-
-        <PassengerStepper
-          label="Infants (Under 2)"
-          value={0}
-          canDecrease={false}
-          canIncrease={false}
-          onDecrease={() => undefined}
-          onIncrease={() => undefined}
         />
       </div>
 
@@ -107,7 +98,7 @@ function PassengerStepper({
       <p className="text-[15px] font-medium tracking-[-0.01em] text-foreground">
         {label}
       </p>
-      <div className="flex h-16 overflow-hidden rounded-[10px] border border-input bg-background">
+      <div className="flex h-16 w-fit overflow-hidden rounded-[10px] border border-input bg-background shadow-xs">
         <StepperButton
           symbol="−"
           onClick={onDecrease}
