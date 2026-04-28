@@ -1,12 +1,13 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm"
 
 import { flightOrders, getDbClient } from "@/lib/db"
 import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
 
 export interface FlightOrderRecord {
   id: string
+  bookingReference: string
   checkoutSessionId: string
   duffelOrderId: string
   partialOfferRequestId: string
@@ -15,6 +16,8 @@ export interface FlightOrderRecord {
   ownerUserId: string | null
   ownerGuestId: string | null
   ownerOrgId: string | null
+  contactEmail: string
+  contactEmailHash: string
   paymentMode: "pay_now" | "hold"
   settlementType: "balance"
   currency: string
@@ -26,12 +29,14 @@ export interface FlightOrderRecord {
   paymentRequiredBy: Date | null
   priceGuaranteeExpiresAt: Date | null
   paidAt: Date | null
+  orderSnapshot: Record<string, unknown>
   createdAt: Date
   updatedAt: Date
 }
 
 interface CreateFlightOrderInput {
   id: string
+  bookingReference: string
   checkoutSessionId: string
   duffelOrderId: string
   partialOfferRequestId: string
@@ -40,6 +45,8 @@ interface CreateFlightOrderInput {
   ownerUserId: string | null
   ownerGuestId: string | null
   ownerOrgId: string | null
+  contactEmail: string
+  contactEmailHash: string
   paymentMode: "pay_now" | "hold"
   settlementType: "balance"
   currency: string
@@ -51,15 +58,34 @@ interface CreateFlightOrderInput {
   paymentRequiredBy: Date | null
   priceGuaranteeExpiresAt: Date | null
   paidAt: Date | null
+  orderSnapshot: Record<string, unknown>
+}
+
+interface ListFlightOrdersByUserInput {
+  ownerUserId: string
+  limit: number
+  offset: number
+}
+
+interface FlightOrderListResult {
+  records: FlightOrderRecord[]
+  total: number
 }
 
 export interface FlightOrderRepository {
   create(input: CreateFlightOrderInput): Promise<FlightOrderRecord>
   findByCheckoutSessionId(checkoutSessionId: string): Promise<FlightOrderRecord | null>
+  findByBookingReference(bookingReference: string): Promise<FlightOrderRecord | null>
+  findByBookingReferenceAndEmailHash(
+    bookingReference: string,
+    contactEmailHash: string
+  ): Promise<FlightOrderRecord | null>
+  listByOwnerUserId(input: ListFlightOrdersByUserInput): Promise<FlightOrderListResult>
 }
 
 const inMemoryOrders = new Map<string, FlightOrderRecord>()
 const inMemoryOrdersByCheckoutSession = new Map<string, string>()
+const inMemoryOrdersByBookingReference = new Map<string, string>()
 
 export const defaultFlightOrderRepository: FlightOrderRepository = {
   async create(input) {
@@ -74,6 +100,7 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
       }
       inMemoryOrders.set(record.id, record)
       inMemoryOrdersByCheckoutSession.set(record.checkoutSessionId, record.id)
+      inMemoryOrdersByBookingReference.set(record.bookingReference, record.id)
       return record
     }
 
@@ -84,6 +111,7 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
         netAmount: toDbNumeric(input.netAmount),
         sellAmount: toDbNumeric(input.sellAmount),
         duffelTotalAmount: toDbNumeric(input.duffelTotalAmount),
+        orderSnapshot: input.orderSnapshot,
         createdAt: now,
         updatedAt: now,
       })
@@ -105,11 +133,81 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
 
     return row ? toOrderRecord(row) : null
   },
+  async findByBookingReference(bookingReference) {
+    const db = getDbClient()
+
+    if (!db) {
+      const orderId = inMemoryOrdersByBookingReference.get(bookingReference)
+      return orderId ? inMemoryOrders.get(orderId) ?? null : null
+    }
+
+    const row = await db.query.flightOrders.findFirst({
+      where: eq(flightOrders.bookingReference, bookingReference),
+    })
+
+    return row ? toOrderRecord(row) : null
+  },
+  async findByBookingReferenceAndEmailHash(bookingReference, contactEmailHash) {
+    const db = getDbClient()
+
+    if (!db) {
+      const orderId = inMemoryOrdersByBookingReference.get(bookingReference)
+      const order = orderId ? inMemoryOrders.get(orderId) ?? null : null
+
+      if (!order) {
+        return null
+      }
+
+      return order.contactEmailHash === contactEmailHash ? order : null
+    }
+
+    const row = await db.query.flightOrders.findFirst({
+      where: and(
+        eq(flightOrders.bookingReference, bookingReference),
+        eq(flightOrders.contactEmailHash, contactEmailHash)
+      ),
+    })
+
+    return row ? toOrderRecord(row) : null
+  },
+  async listByOwnerUserId(input) {
+    const db = getDbClient()
+
+    if (!db) {
+      const records = Array.from(inMemoryOrders.values())
+        .filter((order) => order.ownerUserId === input.ownerUserId)
+        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+
+      return {
+        records: records.slice(input.offset, input.offset + input.limit),
+        total: records.length,
+      }
+    }
+
+    const [rows, totalRows] = await Promise.all([
+      db.query.flightOrders.findMany({
+        where: eq(flightOrders.ownerUserId, input.ownerUserId),
+        orderBy: [desc(flightOrders.createdAt)],
+        limit: input.limit,
+        offset: input.offset,
+      }),
+      db
+        .select({ count: count() })
+        .from(flightOrders)
+        .where(eq(flightOrders.ownerUserId, input.ownerUserId)),
+    ])
+
+    return {
+      records: rows.map(toOrderRecord),
+      total: totalRows[0]?.count ?? 0,
+    }
+  },
 }
 
 function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord {
   return {
     id: row.id,
+    bookingReference: row.bookingReference,
     checkoutSessionId: row.checkoutSessionId,
     duffelOrderId: row.duffelOrderId,
     partialOfferRequestId: row.partialOfferRequestId,
@@ -118,6 +216,8 @@ function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord
     ownerUserId: row.ownerUserId,
     ownerGuestId: row.ownerGuestId,
     ownerOrgId: row.ownerOrgId,
+    contactEmail: row.contactEmail,
+    contactEmailHash: row.contactEmailHash,
     paymentMode: row.paymentMode,
     settlementType: row.settlementType,
     currency: row.currency,
@@ -129,6 +229,7 @@ function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord
     paymentRequiredBy: row.paymentRequiredBy,
     priceGuaranteeExpiresAt: row.priceGuaranteeExpiresAt,
     paidAt: row.paidAt,
+    orderSnapshot: toOrderSnapshot(row.orderSnapshot),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -138,7 +239,16 @@ function toDbNumeric(value: number) {
   return value.toFixed(4)
 }
 
+function toOrderSnapshot(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {}
+  }
+
+  return value as Record<string, unknown>
+}
+
 export function resetInMemoryFlightOrdersForTests() {
   inMemoryOrders.clear()
   inMemoryOrdersByCheckoutSession.clear()
+  inMemoryOrdersByBookingReference.clear()
 }

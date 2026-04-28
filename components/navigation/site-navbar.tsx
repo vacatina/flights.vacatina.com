@@ -49,7 +49,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
   >(null)
 
   return (
-    <header className="sticky top-0 z-40 border-b border-primary/80 bg-[#13357b] text-primary-foreground">
+    <header className="sticky top-0 z-40 bg-[#13357b] text-primary-foreground">
       <div className="mx-auto flex h-[90px] w-full items-center px-4 lg:px-8">
         <Link href="/" className="shrink-0" aria-label="Vacatina home">
           <Image

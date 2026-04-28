@@ -21,6 +21,7 @@ import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
 interface CheckoutSubmitSuccessState {
   duffelOrderId: string
+  bookingReference: string | null
   totalSellAmountLabel: string
   paymentRequiredByLabel: string | null
   paymentMode: "pay_now" | "hold"
@@ -30,6 +31,7 @@ export interface CheckoutPayNowResolution {
   sessionId: string
   status: "processing" | "success" | "failed" | "reconciliation"
   duffelOrderId: string | null
+  bookingReference: string | null
   totalChargeAmountLabel: string | null
   message: string | null
 }
@@ -87,6 +89,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         sessionId: checkoutSessionId,
         status: "success",
         duffelOrderId: result.data.duffelOrderId,
+        bookingReference: result.data.bookingReference,
         totalChargeAmountLabel: result.data.totalChargeAmountLabel,
         message: null,
       }
@@ -97,6 +100,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         sessionId: checkoutSessionId,
         status: "failed",
         duffelOrderId: result.data.duffelOrderId,
+        bookingReference: result.data.bookingReference,
         totalChargeAmountLabel: result.data.totalChargeAmountLabel,
         message: result.data.message,
       }
@@ -107,6 +111,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         sessionId: checkoutSessionId,
         status: "reconciliation",
         duffelOrderId: result.data.duffelOrderId,
+        bookingReference: result.data.bookingReference,
         totalChargeAmountLabel: result.data.totalChargeAmountLabel,
         message: result.data.message,
       }
@@ -116,6 +121,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
       sessionId: checkoutSessionId,
       status: "processing",
       duffelOrderId: result.data.duffelOrderId,
+      bookingReference: result.data.bookingReference,
       totalChargeAmountLabel: result.data.totalChargeAmountLabel,
       message: result.data.message,
     }
@@ -159,6 +165,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
 
           const success: CheckoutSubmitSuccessState = {
             duffelOrderId: resolution.duffelOrderId ?? "unknown",
+            bookingReference: resolution.bookingReference,
             totalSellAmountLabel:
               resolution.totalChargeAmountLabel ?? data.quote.fareSellAmountLabel,
             paymentRequiredByLabel: null,
@@ -355,6 +362,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
 
         const success: CheckoutSubmitSuccessState = {
           duffelOrderId: result.data.duffelOrderId,
+          bookingReference: result.data.bookingReference,
           totalSellAmountLabel: result.data.totalSellAmountLabel,
           paymentRequiredByLabel: result.data.paymentRequiredByLabel,
           paymentMode: result.data.paymentMode,

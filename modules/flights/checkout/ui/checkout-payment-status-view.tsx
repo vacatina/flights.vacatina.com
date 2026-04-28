@@ -62,6 +62,11 @@ export function CheckoutPaymentStatusView({
           <p>
             Duffel order ID: <strong>{resolution?.duffelOrderId ?? "pending"}</strong>
           </p>
+          {resolution?.bookingReference ? (
+            <p>
+              Booking reference: <strong>{resolution.bookingReference}</strong>
+            </p>
+          ) : null}
           <p>
             Total charged:{" "}
             <strong>{resolution?.totalChargeAmountLabel ?? "Amount unavailable"}</strong>

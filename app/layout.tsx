@@ -1,7 +1,6 @@
 import {
   Google_Sans_Flex as Figtree,
   Geist_Mono,
-  Inter,
 } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 

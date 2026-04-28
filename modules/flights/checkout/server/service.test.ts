@@ -26,6 +26,9 @@ const mockFns = vi.hoisted(() => ({
   createPayHereRequestHash: vi.fn(() => "HASH_1"),
   verifyPayHereNotifySignature: vi.fn(() => true),
   mapPayHereStatusCode: vi.fn(() => "success"),
+  createBookingReference: vi.fn(() => "BK-TESTREF001"),
+  enqueueNotification: vi.fn(),
+  dispatchPendingNotifications: vi.fn(),
 }))
 
 vi.mock("server-only", () => ({}))
@@ -55,6 +58,16 @@ vi.mock("@/modules/flights/payments/payhere", () => ({
   verifyPayHereNotifySignature: mockFns.verifyPayHereNotifySignature,
   mapPayHereStatusCode: mockFns.mapPayHereStatusCode,
   toPayHereAmount: (value: number) => value.toFixed(2),
+}))
+
+vi.mock("@/modules/flights/orders/server/identity", () => ({
+  createBookingReference: mockFns.createBookingReference,
+  createEmailHash: (value: string) => `hash:${value.toLowerCase()}`,
+}))
+
+vi.mock("@/modules/notifications/server", () => ({
+  enqueueNotification: mockFns.enqueueNotification,
+  dispatchPendingNotifications: mockFns.dispatchPendingNotifications,
 }))
 
 vi.mock("@/modules/flights/checkout/domain", async () => {
@@ -113,6 +126,13 @@ beforeEach(() => {
   })
   mockFns.getAirlineLogosByAirlineId.mockResolvedValue({})
   mockFns.incrementCheckoutMetric.mockImplementation(() => undefined)
+  mockFns.createBookingReference.mockReturnValue("BK-TESTREF001")
+  mockFns.enqueueNotification.mockResolvedValue(undefined)
+  mockFns.dispatchPendingNotifications.mockResolvedValue({
+    scannedCount: 1,
+    sentCount: 1,
+    failedCount: 0,
+  })
   mockFns.getPayHereConfig.mockReturnValue({
     merchantId: "merchant_1",
     merchantSecret: "secret",
@@ -576,6 +596,37 @@ function createSubmitInput(input: {
 function createOffer(overrides: Record<string, unknown> = {}) {
   return {
     id: "off_1",
+    slices: [
+      {
+        id: "sli_1",
+        origin: {
+          iata_code: "CMB",
+        },
+        destination: {
+          iata_code: "DXB",
+        },
+        duration: "PT4H58M",
+        segments: [
+          {
+            id: "seg_1",
+            origin: {
+              iata_code: "CMB",
+            },
+            destination: {
+              iata_code: "DXB",
+            },
+            departing_at: "2026-04-13T10:00:00.000Z",
+            arriving_at: "2026-04-13T14:58:00.000Z",
+            passengers: [
+              {
+                passenger_id: "pas_1",
+                cabin_class: "economy",
+              },
+            ],
+          },
+        ],
+      },
+    ],
     owner: {
       id: "air_1",
       iata_code: "QR",
@@ -697,11 +748,35 @@ function createOrderRepository() {
   type CreateOrderInput = Parameters<FlightOrderRepository["create"]>[0]
 
   const bySessionId = new Map<string, FlightOrderRecord>()
+  const byBookingReference = new Map<string, FlightOrderRecord>()
 
   const spies = {
     findByCheckoutSessionId: vi.fn(async (checkoutSessionId: string) => {
       return bySessionId.get(checkoutSessionId) ?? null
     }),
+    findByBookingReference: vi.fn(async (bookingReference: string) => {
+      return byBookingReference.get(bookingReference) ?? null
+    }),
+    findByBookingReferenceAndEmailHash: vi.fn(
+      async (bookingReference: string, contactEmailHash: string) => {
+        const order = byBookingReference.get(bookingReference) ?? null
+        if (!order) {
+          return null
+        }
+        return order.contactEmailHash === contactEmailHash ? order : null
+      }
+    ),
+    listByOwnerUserId: vi.fn(
+      async (input: { ownerUserId: string; limit: number; offset: number }) => {
+        const records = Array.from(bySessionId.values())
+          .filter((record) => record.ownerUserId === input.ownerUserId)
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        return {
+          records: records.slice(input.offset, input.offset + input.limit),
+          total: records.length,
+        }
+      }
+    ),
     create: vi.fn(async (record: CreateOrderInput) => {
       const created: FlightOrderRecord = {
         ...record,
@@ -709,12 +784,16 @@ function createOrderRepository() {
         updatedAt: NOW,
       }
       bySessionId.set(record.checkoutSessionId, created)
+      byBookingReference.set(record.bookingReference, created)
       return created
     }),
   }
 
   const repo: FlightOrderRepository = {
     findByCheckoutSessionId: spies.findByCheckoutSessionId,
+    findByBookingReference: spies.findByBookingReference,
+    findByBookingReferenceAndEmailHash: spies.findByBookingReferenceAndEmailHash,
+    listByOwnerUserId: spies.listByOwnerUserId,
     create: spies.create,
   }
 

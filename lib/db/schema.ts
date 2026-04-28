@@ -45,6 +45,18 @@ export const checkoutSettlementTypeEnum = pgEnum("checkout_settlement_type", [
   "balance",
 ])
 
+export const notificationOutboxStatusEnum = pgEnum("notification_outbox_status", [
+  "pending",
+  "sent",
+  "failed",
+])
+
+export const notificationEventTypeEnum = pgEnum("notification_event_type", [
+  "booking_confirmed",
+  "hold_created",
+  "reconciliation_required",
+])
+
 export const guestSessionStatusEnum = pgEnum("guest_session_status", [
   "active",
   "linked",
@@ -379,6 +391,7 @@ export const flightOrders = pgTable(
   "flight_orders",
   {
     id: text("id").primaryKey(),
+    bookingReference: text("booking_reference").notNull(),
     checkoutSessionId: text("checkout_session_id")
       .notNull()
       .references(() => checkoutSessions.id, {
@@ -397,6 +410,8 @@ export const flightOrders = pgTable(
     ownerOrgId: text("owner_org_id").references(() => organizations.id, {
       onDelete: "set null",
     }),
+    contactEmail: text("contact_email").notNull(),
+    contactEmailHash: text("contact_email_hash").notNull(),
     paymentMode: checkoutPaymentModeEnum("payment_mode").notNull(),
     settlementType: checkoutSettlementTypeEnum("settlement_type")
       .notNull()
@@ -415,6 +430,7 @@ export const flightOrders = pgTable(
       withTimezone: true,
     }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    orderSnapshot: jsonb("order_snapshot").$type<Record<string, unknown>>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -426,12 +442,68 @@ export const flightOrders = pgTable(
     checkoutSessionUniqueIdx: uniqueIndex("flight_orders_checkout_session_unique_idx").on(
       table.checkoutSessionId
     ),
+    bookingReferenceUniqueIdx: uniqueIndex("flight_orders_booking_reference_unique_idx").on(
+      table.bookingReference
+    ),
     duffelOrderUniqueIdx: uniqueIndex("flight_orders_duffel_order_unique_idx").on(
       table.duffelOrderId
+    ),
+    contactEmailHashLookupIdx: index("flight_orders_contact_email_hash_lookup_idx").on(
+      table.contactEmailHash
+    ),
+    ownerLookupIdx: index("flight_orders_owner_lookup_idx").on(
+      table.ownerUserId,
+      table.ownerGuestId,
+      table.createdAt
     ),
     requestLookupIdx: index("flight_orders_request_lookup_idx").on(
       table.partialOfferRequestId,
       table.offerId,
+      table.createdAt
+    ),
+  })
+)
+
+export const notificationOutbox = pgTable(
+  "notification_outbox",
+  {
+    id: text("id").primaryKey(),
+    eventType: notificationEventTypeEnum("event_type").notNull(),
+    status: notificationOutboxStatusEnum("status").notNull().default("pending"),
+    flightOrderId: text("flight_order_id").references(() => flightOrders.id, {
+      onDelete: "set null",
+    }),
+    checkoutSessionId: text("checkout_session_id").references(() => checkoutSessions.id, {
+      onDelete: "set null",
+    }),
+    bookingReference: text("booking_reference"),
+    recipientEmail: text("recipient_email").notNull(),
+    recipientEmailHash: text("recipient_email_hash").notNull(),
+    payload: jsonb("payload"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    statusRetryIdx: index("notification_outbox_status_retry_idx").on(
+      table.status,
+      table.nextAttemptAt
+    ),
+    recipientLookupIdx: index("notification_outbox_recipient_lookup_idx").on(
+      table.recipientEmailHash,
+      table.createdAt
+    ),
+    flightOrderLookupIdx: index("notification_outbox_flight_order_lookup_idx").on(
+      table.flightOrderId,
       table.createdAt
     ),
   })
@@ -448,6 +520,9 @@ export type NewCheckoutSessionRow = typeof checkoutSessions.$inferInsert
 
 export type FlightOrderRow = typeof flightOrders.$inferSelect
 export type NewFlightOrderRow = typeof flightOrders.$inferInsert
+
+export type NotificationOutboxRow = typeof notificationOutbox.$inferSelect
+export type NewNotificationOutboxRow = typeof notificationOutbox.$inferInsert
 
 export type PaymentWebhookEventRow = typeof paymentWebhookEvents.$inferSelect
 export type NewPaymentWebhookEventRow = typeof paymentWebhookEvents.$inferInsert

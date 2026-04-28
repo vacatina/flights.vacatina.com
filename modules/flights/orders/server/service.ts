@@ -1,0 +1,200 @@
+import "server-only"
+
+import type { Order } from "@duffel/api/types"
+
+import type { ActorContext } from "@/modules/auth/types"
+import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
+import {
+  bookingDetailInputSchema,
+  bookingListInputSchema,
+  bookingLookupInputSchema,
+  mapFlightOrderToDetailModel,
+  mapFlightOrderToListItem,
+} from "@/modules/flights/orders/domain"
+import {
+  canGuestAccessBooking,
+  setBookingLookupAccessCookie,
+} from "@/modules/flights/orders/server/guest-access"
+import { createEmailHash, isEmailHashMatch } from "@/modules/flights/orders/server/identity"
+import { consumeBookingLookupAttempt } from "@/modules/flights/orders/server/lookup-rate-limit"
+import {
+  defaultFlightOrderRepository,
+  type FlightOrderRepository,
+} from "@/modules/flights/checkout/server/order-repository"
+import { logDuffelError } from "@/modules/flights/results/server/error-map"
+import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
+
+const GENERIC_LOOKUP_ERROR =
+  "Booking not found. Please check your reference and email."
+
+interface OrdersServiceDeps {
+  orderRepository: FlightOrderRepository
+  getDuffelOrderById: (duffelOrderId: string) => Promise<Order | null>
+}
+
+const defaultDeps: OrdersServiceDeps = {
+  orderRepository: defaultFlightOrderRepository,
+  async getDuffelOrderById(duffelOrderId) {
+    try {
+      const { getDuffelClient } = await import("@/lib/duffel")
+      const client = getDuffelClient()
+      const response = await client.orders.get(duffelOrderId)
+      return response.data as Order
+    } catch (error) {
+      logDuffelError("orders.get failed", error, { duffelOrderId })
+      return null
+    }
+  },
+}
+
+export async function listMyBookings(
+  input: {
+    actor: ActorContext
+    page: number
+    pageSize: number
+  },
+  deps: OrdersServiceDeps = defaultDeps
+) {
+  if (input.actor.type !== "user") {
+    throw new Error("Sign in to view your bookings.")
+  }
+
+  const parsed = bookingListInputSchema.parse({
+    page: input.page,
+    pageSize: input.pageSize,
+  })
+  const offset = (parsed.page - 1) * parsed.pageSize
+  const result = await deps.orderRepository.listByOwnerUserId({
+    ownerUserId: input.actor.appUserId,
+    limit: parsed.pageSize,
+    offset,
+  })
+
+  return {
+    page: parsed.page,
+    pageSize: parsed.pageSize,
+    total: result.total,
+    items: result.records.map(mapFlightOrderToListItem),
+  }
+}
+
+export async function lookupBookingByReferenceAndEmail(
+  input: {
+    reference: string
+    email: string
+    ipAddress: string
+  },
+  deps: OrdersServiceDeps = defaultDeps
+) {
+  const parsed = bookingLookupInputSchema.parse(input)
+  const attempt = consumeBookingLookupAttempt({
+    ipAddress: input.ipAddress,
+    bookingReference: parsed.reference,
+  })
+
+  if (!attempt.allowed) {
+    throw new Error("Too many attempts. Please try again in a few minutes.")
+  }
+
+  const order = await deps.orderRepository.findByBookingReference(parsed.reference)
+
+  if (!order) {
+    throw new Error(GENERIC_LOOKUP_ERROR)
+  }
+
+  if (
+    !isEmailHashMatch({
+      expectedHash: order.contactEmailHash,
+      email: parsed.email,
+    })
+  ) {
+    throw new Error(GENERIC_LOOKUP_ERROR)
+  }
+
+  await setBookingLookupAccessCookie({
+    bookingReference: order.bookingReference,
+    contactEmailHash: order.contactEmailHash,
+  })
+
+  logFlightFlow("orders.lookup", "lookup_succeeded", {
+    bookingReference: order.bookingReference,
+  })
+
+  return {
+    bookingReference: order.bookingReference,
+  }
+}
+
+export async function getBookingDetail(
+  input: {
+    reference: string
+    actor: ActorContext
+    refreshFromDuffel?: boolean
+  },
+  deps: OrdersServiceDeps = defaultDeps
+) {
+  const parsed = bookingDetailInputSchema.parse({
+    reference: input.reference,
+  })
+  const order = await deps.orderRepository.findByBookingReference(parsed.reference)
+
+  if (!order) {
+    throw new Error("Booking not found.")
+  }
+
+  const ownerAllowed =
+    input.actor.type === "user"
+      ? order.ownerUserId === input.actor.appUserId
+      : input.actor.guestId !== GUEST_UNAVAILABLE_ID &&
+        order.ownerGuestId === input.actor.guestId
+  const guestLookupAllowed = await canGuestAccessBooking({
+    bookingReference: order.bookingReference,
+    contactEmailHash: order.contactEmailHash,
+  })
+
+  if (!ownerAllowed && !guestLookupAllowed) {
+    throw new Error("Booking access denied.")
+  }
+
+  const detail = mapFlightOrderToDetailModel(order)
+
+  if (input.refreshFromDuffel) {
+    try {
+      const liveOrder = await deps.getDuffelOrderById(order.duffelOrderId)
+
+      if (liveOrder) {
+        logFlightFlow("orders.detail", "duffel_refresh_loaded", {
+          bookingReference: order.bookingReference,
+          duffelOrderId: liveOrder.id,
+        })
+      }
+    } catch (error) {
+      logFlightFlowError("orders.detail", "duffel_refresh_failed", error, {
+        bookingReference: order.bookingReference,
+      })
+    }
+  }
+
+  return detail
+}
+
+export async function getBookingForNotification(
+  input: { bookingReference: string },
+  deps: OrdersServiceDeps = defaultDeps
+) {
+  const parsed = bookingDetailInputSchema.parse({
+    reference: input.bookingReference,
+  })
+  const order = await deps.orderRepository.findByBookingReference(parsed.reference)
+
+  if (!order) {
+    return null
+  }
+
+  return {
+    bookingReference: order.bookingReference,
+    recipientEmail: order.contactEmail,
+    recipientEmailHash: createEmailHash(order.contactEmail),
+    detail: mapFlightOrderToDetailModel(order),
+  }
+}

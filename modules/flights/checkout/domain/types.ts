@@ -193,6 +193,7 @@ export interface CheckoutSubmissionResult {
   checkoutSessionId: string
   flightOrderId: string
   duffelOrderId: string
+  bookingReference: string
   paymentMode: CheckoutPaymentMode
   totalSellAmountLabel: string
   paymentRequiredByLabel: string | null
@@ -212,5 +213,6 @@ export interface CheckoutSessionStatusResult {
   status: "processing" | "payment_authorized" | "completed" | "failed" | "reconciliation_required"
   message: string | null
   duffelOrderId: string | null
+  bookingReference: string | null
   totalChargeAmountLabel: string | null
 }

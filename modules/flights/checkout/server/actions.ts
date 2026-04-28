@@ -26,6 +26,7 @@ interface SubmitCheckoutActionDeps {
     checkoutSessionId: string
     flightOrderId: string
     duffelOrderId: string
+    bookingReference: string
     paymentMode: "pay_now" | "hold"
     totalSellAmountLabel: string
     paymentRequiredByLabel: string | null
@@ -52,6 +53,7 @@ type SubmitCheckoutSuccess = {
   checkoutSessionId: string
   flightOrderId: string
   duffelOrderId: string
+  bookingReference: string
   paymentMode: "pay_now" | "hold"
   totalSellAmountLabel: string
   paymentRequiredByLabel: string | null

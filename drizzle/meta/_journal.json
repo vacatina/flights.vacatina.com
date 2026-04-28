@@ -8,6 +8,13 @@
       "when": 1777026606274,
       "tag": "0000_last_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777315559000,
+      "tag": "0001_post_booking_core",
+      "breakpoints": true
     }
   ]
 }

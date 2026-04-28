@@ -50,6 +50,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   const [payNowResolution, setPayNowResolution] =
     useState<CheckoutPayNowResolution | null>(null)
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
+  const navigateToBookingDetail = useCallback(
+    (bookingReference: string) => {
+      router.push(`/booking/${encodeURIComponent(bookingReference)}`)
+    },
+    [router]
+  )
 
   const form = useForm<CheckoutFormValues>({
     defaultValues: {
@@ -142,6 +148,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     },
     onPayNowResolved: (resolution) => {
       setPayNowResolution(resolution)
+      if (resolution.status === "success" && resolution.bookingReference) {
+        navigateToBookingDetail(resolution.bookingReference)
+        return
+      }
       router.replace(
         buildCheckoutHref({
           step: "pay",
@@ -298,6 +308,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       }
 
       setPayNowResolution(resolution)
+      if (resolution.status === "success" && resolution.bookingReference) {
+        navigateToBookingDetail(resolution.bookingReference)
+        return
+      }
 
       const canonicalStatus = mapResolutionStatusToQueryStatus(resolution.status)
 
@@ -314,6 +328,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   }, [
     activePollingSessionId,
     buildCheckoutHref,
+    navigateToBookingDetail,
     data.state.sessionId,
     data.state.status,
     payNowResolution,
@@ -444,6 +459,18 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     Payment required by:{" "}
                     <strong>{submitSuccess.paymentRequiredByLabel}</strong>
                   </p>
+                ) : null}
+                {submitSuccess.bookingReference ? (
+                  <Button
+                    className="mt-2"
+                    render={
+                      <Link
+                        href={`/booking/${encodeURIComponent(submitSuccess.bookingReference)}`}
+                      />
+                    }
+                  >
+                    View booking
+                  </Button>
                 ) : null}
                 <Button className="mt-2" render={<Link href="/" />}>
                   Start new search

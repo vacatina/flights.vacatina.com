@@ -78,3 +78,29 @@ FLIGHTS_DEBUG=false
 NEXT_PUBLIC_FLIGHTS_DEBUG=false
 
 ```
+
+## Post-booking lookup + notifications
+
+Optional configuration for booking lookup security and transactional emails:
+
+```bash
+# Guest booking lookup token/hash secrets (falls back to AUTH_GUEST_SESSION_SECRET when omitted)
+BOOKING_LOOKUP_TOKEN_SECRET=
+BOOKING_EMAIL_HASH_SECRET=
+BOOKING_LOOKUP_TOKEN_COOKIE_NAME=booking_lookup_access
+BOOKING_LOOKUP_TOKEN_TTL_MS=900000
+
+# Guest lookup rate limiting
+BOOKING_LOOKUP_RATE_LIMIT_WINDOW_MS=300000
+BOOKING_LOOKUP_RATE_LIMIT_MAX_ATTEMPTS=6
+
+# Resend transactional emails
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=Vacatina Flights <bookings@vacatina.com>
+
+# Notifications dispatcher endpoint protection + retry tuning
+NOTIFICATIONS_DISPATCH_SECRET=
+NOTIFICATIONS_DISPATCH_BATCH_LIMIT=25
+NOTIFICATIONS_DISPATCH_MAX_ATTEMPTS=5
+NOTIFICATIONS_DISPATCH_RETRY_DELAY_MS=300000
+```

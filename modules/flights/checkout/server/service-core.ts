@@ -62,6 +62,11 @@ import {
   type PayHereNotifyPayload,
   type PayHereStartPaymentPayload,
 } from "@/modules/flights/payments/payhere"
+import { buildFlightOrderSnapshot } from "@/modules/flights/orders/domain"
+import {
+  createBookingReference,
+  createEmailHash,
+} from "@/modules/flights/orders/server/identity"
 import { getAirlineLogosByAirlineId } from "@/modules/flights/results/server/airline-logos"
 import {
   logDuffelError,
@@ -72,6 +77,7 @@ import {
   markPricedQuoteConsumed,
   validatePricedQuote,
 } from "@/modules/flights/pricing/server"
+import { enqueueNotification, dispatchPendingNotifications } from "@/modules/notifications/server"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
 interface FetchCheckoutPageDataInput {
@@ -98,6 +104,7 @@ interface CheckoutSubmissionSuccess {
   checkoutSessionId: string
   flightOrderId: string
   duffelOrderId: string
+  bookingReference: string
   paymentMode: "pay_now" | "hold"
   totalSellAmountLabel: string
   paymentRequiredByLabel: string | null
@@ -591,6 +598,7 @@ export async function submitCheckout(
           checkoutSessionId: existingSession.id,
           flightOrderId: existingOrder.id,
           duffelOrderId: existingOrder.duffelOrderId,
+          bookingReference: existingOrder.bookingReference,
           paymentMode: existingOrder.paymentMode,
           totalSellAmountLabel: formatCurrencyAmount(
             existingOrder.sellAmount,
@@ -672,30 +680,42 @@ export async function submitCheckout(
       duffelOrderId: duffelOrder.id,
     })
 
-    const flightOrder = await deps.orderRepository.create({
-      id: createFlightOrderId(),
-      checkoutSessionId: session.id,
-      duffelOrderId: duffelOrder.id,
-      partialOfferRequestId: input.payload.partialOfferRequestId,
-      offerId: input.payload.offerId,
-      selectedPartialOffers: input.payload.selectedPartialOffers,
-      ownerUserId: prepared.owner.userId,
-      ownerGuestId: prepared.owner.guestId,
-      ownerOrgId: null,
-      paymentMode: "hold",
-      settlementType: getCheckoutServerConfig().settlementPaymentType,
-      currency: prepared.quote.currency,
-      netAmount: prepared.netTotal,
-      sellAmount: prepared.sellTotal,
-      duffelTotalAmount: toNumeric(duffelOrder.total_amount),
-      duffelTotalCurrency: duffelOrder.total_currency,
-      paymentAwaiting: duffelOrder.payment_status.awaiting_payment,
-      paymentRequiredBy: parseOptionalDate(duffelOrder.payment_status.payment_required_by),
-      priceGuaranteeExpiresAt: parseOptionalDate(
-        duffelOrder.payment_status.price_guarantee_expires_at
-      ),
-      paidAt: parseOptionalDate(duffelOrder.payment_status.paid_at),
-    })
+    const flightOrder = await createFlightOrderWithReference(
+      {
+        id: createFlightOrderId(),
+        checkoutSessionId: session.id,
+        duffelOrderId: duffelOrder.id,
+        partialOfferRequestId: input.payload.partialOfferRequestId,
+        offerId: input.payload.offerId,
+        selectedPartialOffers: input.payload.selectedPartialOffers,
+        ownerUserId: prepared.owner.userId,
+        ownerGuestId: prepared.owner.guestId,
+        ownerOrgId: null,
+        contactEmail: input.payload.contact.email,
+        contactEmailHash: createEmailHash(input.payload.contact.email),
+        paymentMode: "hold",
+        settlementType: getCheckoutServerConfig().settlementPaymentType,
+        currency: prepared.quote.currency,
+        netAmount: prepared.netTotal,
+        sellAmount: prepared.sellTotal,
+        duffelTotalAmount: toNumeric(duffelOrder.total_amount),
+        duffelTotalCurrency: duffelOrder.total_currency,
+        paymentAwaiting: duffelOrder.payment_status.awaiting_payment,
+        paymentRequiredBy: parseOptionalDate(duffelOrder.payment_status.payment_required_by),
+        priceGuaranteeExpiresAt: parseOptionalDate(
+          duffelOrder.payment_status.price_guarantee_expires_at
+        ),
+        paidAt: parseOptionalDate(duffelOrder.payment_status.paid_at),
+        orderSnapshot: buildFlightOrderSnapshot({
+          offer: prepared.offer,
+          paymentMode: "hold",
+          currency: prepared.quote.currency,
+          sellAmount: prepared.sellTotal,
+          now,
+        }),
+      },
+      deps.orderRepository
+    )
 
     await markPricedQuoteConsumed(prepared.quote.id)
     incrementCheckoutMetric("quote_consumed", {
@@ -715,10 +735,18 @@ export async function submitCheckout(
       checkoutSessionId: session.id,
     })
 
+    await tryDispatchOrderNotification({
+      eventType: "hold_created",
+      flightOrder,
+      checkoutSessionId: session.id,
+      statusLabel: "On hold",
+    })
+
     return {
       checkoutSessionId: session.id,
       flightOrderId: flightOrder.id,
       duffelOrderId: duffelOrder.id,
+      bookingReference: flightOrder.bookingReference,
       paymentMode: "hold",
       totalSellAmountLabel: formatCurrencyAmount(prepared.sellTotal, prepared.quote.currency),
       paymentRequiredByLabel: flightOrder.paymentRequiredBy
@@ -765,6 +793,7 @@ export async function getCheckoutSessionStatus(
       status: session.status,
       message: null,
       duffelOrderId: order?.duffelOrderId ?? session.duffelOrderId ?? null,
+      bookingReference: order?.bookingReference ?? null,
       totalChargeAmountLabel:
         session.paymentAmount !== null && session.paymentCurrency
           ? formatCurrencyAmount(session.paymentAmount, session.paymentCurrency)
@@ -782,6 +811,7 @@ export async function getCheckoutSessionStatus(
       errorCode: session.errorCode,
     }),
     duffelOrderId: session.duffelOrderId,
+    bookingReference: null,
     totalChargeAmountLabel:
       session.paymentAmount !== null && session.paymentCurrency
         ? formatCurrencyAmount(session.paymentAmount, session.paymentCurrency)
@@ -939,6 +969,7 @@ export async function processPayHereNotification(
       checkoutSessionId: session.id,
       reason: "amount_mismatch",
     })
+    await queueReconciliationNotificationForSession(session)
     return
   }
 
@@ -1005,30 +1036,42 @@ export async function processPayHereNotification(
       duffelOrderId: duffelOrder.id,
     })
 
-    await deps.orderRepository.create({
-      id: createFlightOrderId(),
-      checkoutSessionId: session.id,
-      duffelOrderId: duffelOrder.id,
-      partialOfferRequestId: snapshot.partialOfferRequestId,
-      offerId: snapshot.offerId,
-      selectedPartialOffers: snapshot.selectedPartialOffers,
-      ownerUserId: session.ownerUserId,
-      ownerGuestId: session.ownerGuestId,
-      ownerOrgId: session.ownerOrgId,
-      paymentMode: "pay_now",
-      settlementType: getCheckoutServerConfig().settlementPaymentType,
-      currency: snapshot.sourceCurrency,
-      netAmount: snapshot.netTotal,
-      sellAmount: session.sellAmount,
-      duffelTotalAmount: toNumeric(duffelOrder.total_amount),
-      duffelTotalCurrency: duffelOrder.total_currency,
-      paymentAwaiting: duffelOrder.payment_status.awaiting_payment,
-      paymentRequiredBy: parseOptionalDate(duffelOrder.payment_status.payment_required_by),
-      priceGuaranteeExpiresAt: parseOptionalDate(
-        duffelOrder.payment_status.price_guarantee_expires_at
-      ),
-      paidAt: parseOptionalDate(duffelOrder.payment_status.paid_at),
-    })
+    const flightOrder = await createFlightOrderWithReference(
+      {
+        id: createFlightOrderId(),
+        checkoutSessionId: session.id,
+        duffelOrderId: duffelOrder.id,
+        partialOfferRequestId: snapshot.partialOfferRequestId,
+        offerId: snapshot.offerId,
+        selectedPartialOffers: snapshot.selectedPartialOffers,
+        ownerUserId: session.ownerUserId,
+        ownerGuestId: session.ownerGuestId,
+        ownerOrgId: session.ownerOrgId,
+        contactEmail: snapshot.contact.email,
+        contactEmailHash: createEmailHash(snapshot.contact.email),
+        paymentMode: "pay_now",
+        settlementType: getCheckoutServerConfig().settlementPaymentType,
+        currency: snapshot.sourceCurrency,
+        netAmount: snapshot.netTotal,
+        sellAmount: session.sellAmount,
+        duffelTotalAmount: toNumeric(duffelOrder.total_amount),
+        duffelTotalCurrency: duffelOrder.total_currency,
+        paymentAwaiting: duffelOrder.payment_status.awaiting_payment,
+        paymentRequiredBy: parseOptionalDate(duffelOrder.payment_status.payment_required_by),
+        priceGuaranteeExpiresAt: parseOptionalDate(
+          duffelOrder.payment_status.price_guarantee_expires_at
+        ),
+        paidAt: parseOptionalDate(duffelOrder.payment_status.paid_at),
+        orderSnapshot: buildFlightOrderSnapshot({
+          offer,
+          paymentMode: "pay_now",
+          currency: snapshot.sourceCurrency,
+          sellAmount: session.sellAmount,
+          now,
+        }),
+      },
+      deps.orderRepository
+    )
 
     await markPricedQuoteConsumed(snapshot.quoteId)
     incrementCheckoutMetric("quote_consumed", {
@@ -1060,6 +1103,13 @@ export async function processPayHereNotification(
       checkoutSessionId: session.id,
       duffelOrderId: duffelOrder.id,
     })
+
+    await tryDispatchOrderNotification({
+      eventType: "booking_confirmed",
+      flightOrder,
+      checkoutSessionId: session.id,
+      statusLabel: "Confirmed",
+    })
   } catch (error) {
     logFlightFlowError("checkout.payhere", "finalize_failed", error, {
       checkoutSessionId: session.id,
@@ -1086,6 +1136,7 @@ export async function processPayHereNotification(
       checkoutSessionId: session.id,
       reason: "finalize_failed",
     })
+    await queueReconciliationNotificationForSession(session)
   }
 }
 
@@ -1154,6 +1205,139 @@ async function prepareCheckoutForSubmission(input: {
     netTotal,
     sellTotal,
   }
+}
+
+async function createFlightOrderWithReference(
+  input: Omit<Parameters<FlightOrderRepository["create"]>[0], "bookingReference">,
+  orderRepository: FlightOrderRepository
+) {
+  let attempts = 0
+
+  while (attempts < 3) {
+    attempts += 1
+
+    try {
+      return await orderRepository.create({
+        ...input,
+        bookingReference: createBookingReference(),
+      })
+    } catch (error) {
+      if (isBookingReferenceConflict(error)) {
+        continue
+      }
+
+      throw error
+    }
+  }
+
+  throw new Error("Could not generate unique booking reference.")
+}
+
+function isBookingReferenceConflict(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false
+  }
+
+  const maybeCode = (error as { code?: string }).code
+  const maybeMessage = (error as { message?: string }).message
+
+  return (
+    maybeCode === "23505" &&
+    typeof maybeMessage === "string" &&
+    maybeMessage.includes("flight_orders_booking_reference_unique_idx")
+  )
+}
+
+async function tryDispatchOrderNotification(input: {
+  eventType: "booking_confirmed" | "hold_created"
+  flightOrder: Awaited<ReturnType<FlightOrderRepository["create"]>>
+  checkoutSessionId: string
+  statusLabel: string
+}) {
+  try {
+    await enqueueNotification({
+      eventType: input.eventType,
+      flightOrderId: input.flightOrder.id,
+      checkoutSessionId: input.checkoutSessionId,
+      bookingReference: input.flightOrder.bookingReference,
+      recipientEmail: input.flightOrder.contactEmail,
+      recipientEmailHash: input.flightOrder.contactEmailHash,
+      payload: {
+        bookingReference: input.flightOrder.bookingReference,
+        routeLabel: readSnapshotRouteLabel(input.flightOrder.orderSnapshot),
+        amountLabel: formatCurrencyAmount(
+          input.flightOrder.sellAmount,
+          input.flightOrder.currency
+        ),
+        statusLabel: input.statusLabel,
+      },
+    })
+    await dispatchPendingNotifications({ limit: 1 })
+  } catch (error) {
+    logFlightFlowError("checkout.notifications", "dispatch_failed", error, {
+      checkoutSessionId: input.checkoutSessionId,
+      flightOrderId: input.flightOrder.id,
+      eventType: input.eventType,
+    })
+  }
+}
+
+async function queueReconciliationNotificationForSession(
+  session: Awaited<ReturnType<CheckoutSessionRepository["findById"]>>
+) {
+  if (!session) {
+    return
+  }
+
+  const contactEmail = extractContactEmailFromSnapshot(session.checkoutPayloadSnapshot)
+
+  if (!contactEmail) {
+    return
+  }
+
+  try {
+    await enqueueNotification({
+      eventType: "reconciliation_required",
+      flightOrderId: null,
+      checkoutSessionId: session.id,
+      bookingReference: null,
+      recipientEmail: contactEmail,
+      recipientEmailHash: createEmailHash(contactEmail),
+      payload: {
+        bookingReference: "Pending confirmation",
+        routeLabel: session.offerId,
+        amountLabel: formatCurrencyAmount(session.sellAmount, session.currency),
+        statusLabel: "Manual reconciliation required",
+      },
+    })
+    await dispatchPendingNotifications({ limit: 1 })
+  } catch (error) {
+    logFlightFlowError("checkout.notifications", "reconciliation_dispatch_failed", error, {
+      checkoutSessionId: session.id,
+    })
+  }
+}
+
+function extractContactEmailFromSnapshot(snapshot: unknown): string | null {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return null
+  }
+
+  const maybeContact = (snapshot as { contact?: unknown }).contact
+
+  if (!maybeContact || typeof maybeContact !== "object" || Array.isArray(maybeContact)) {
+    return null
+  }
+
+  const email = (maybeContact as { email?: unknown }).email
+  return typeof email === "string" && email.trim().length > 0 ? email.trim() : null
+}
+
+function readSnapshotRouteLabel(snapshot: Record<string, unknown>) {
+  const routeLabel = snapshot.routeLabel
+  return typeof routeLabel === "string" && routeLabel.trim().length > 0
+    ? routeLabel
+    : "Route unavailable"
 }
 
 function buildPayHerePreview(input: {

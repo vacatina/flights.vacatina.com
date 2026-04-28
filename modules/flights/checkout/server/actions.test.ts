@@ -53,6 +53,7 @@ test("executeSubmitCheckoutAction returns success for hold payload", async () =>
         checkoutSessionId: "chs_1",
         flightOrderId: "fod_1",
         duffelOrderId: "ord_1",
+        bookingReference: "BK-TESTREF001",
         paymentMode: "hold",
         totalSellAmountLabel: "US$100.00",
         paymentRequiredByLabel: null,
@@ -130,6 +131,7 @@ test("executeGetCheckoutSessionStatusAction returns success for valid input", as
           status: "processing",
           message: "processing",
           duffelOrderId: null,
+          bookingReference: null,
           totalChargeAmountLabel: "LKR 1000.00",
         }
       },
