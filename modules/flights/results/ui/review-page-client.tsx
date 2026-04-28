@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useEffect, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Show } from "@clerk/nextjs"
-import { ArrowRightIcon, BriefcaseIcon, CheckIcon } from "lucide-react"
+import { ArrowRightIcon, BriefcaseIcon, CheckIcon, Loader2Icon } from "lucide-react"
 
 import {
   Breadcrumb,
@@ -32,6 +32,8 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
+  const [isSelectingFare, startSelectingFare] = useTransition()
+  const [pendingFareSelection, setPendingFareSelection] = useState<string | null>(null)
   const [isCreatingQuote, startCreatingQuote] = useTransition()
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
@@ -53,6 +55,13 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   ])
 
   function onSelectFare(legIndex: number, fareKey: string) {
+    if (isSelectingFare) {
+      return
+    }
+
+    const selectionKey = `${legIndex}:${fareKey}`
+    setPendingFareSelection(selectionKey)
+
     logFlightFlow("ReviewPageClient", "fare_selected", {
       partialOfferRequestId: data.partialOfferRequestId,
       legIndex,
@@ -72,7 +81,9 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
       nextFareCount: nextState.fare.length,
     })
 
-    router.replace(`/results/${data.partialOfferRequestId}/review?${query}`)
+    startSelectingFare(() => {
+      router.replace(`/results/${data.partialOfferRequestId}/review?${query}`)
+    })
   }
 
   function onGoToCheckout() {
@@ -237,60 +248,74 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                   <p className="text-base text-muted-foreground md:text-lg">{leg.lockMessage}</p>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {leg.options.map((option) => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => onSelectFare(leg.legIndex, option.key)}
-                        className="text-left"
-                      >
-                        <Card
-                          className={cn(
-                            "relative h-full cursor-pointer rounded-2xl border bg-card py-0 shadow-none transition-all",
-                            option.isSelected
-                              ? "border-primary ring-2 ring-primary/30"
-                              : "hover:border-primary/40"
-                          )}
-                        >
-                          {option.isSelected ? (
-                            <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                              <CheckIcon className="size-4" />
-                            </span>
-                          ) : null}
+                    {leg.options.map((option) => {
+                      const selectionKey = `${leg.legIndex}:${option.key}`
+                      const isPendingSelection =
+                        isSelectingFare && pendingFareSelection === selectionKey
 
-                          <CardContent className="space-y-3 px-5 pt-5 pb-4 md:px-6">
-                            <div>
-                              <p className="text-xs tracking-[0.08em] text-muted-foreground uppercase">
-                                {option.cabinLabel}
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          disabled={isSelectingFare}
+                          aria-busy={isPendingSelection}
+                          onClick={() => onSelectFare(leg.legIndex, option.key)}
+                          className="text-left"
+                        >
+                          <Card
+                            className={cn(
+                              "relative h-full cursor-pointer rounded-2xl border bg-card py-0 shadow-none transition-all",
+                              option.isSelected
+                                ? "border-primary ring-2 ring-primary/30"
+                                : "hover:border-primary/40"
+                            )}
+                          >
+                            {isPendingSelection ? (
+                              <span className="absolute top-4 right-4 flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                                <Loader2Icon className="size-3.5 animate-spin" />
+                                Updating
+                              </span>
+                            ) : option.isSelected ? (
+                              <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <CheckIcon className="size-4" />
+                              </span>
+                            ) : null}
+
+                            <CardContent className="space-y-3 px-5 pt-5 pb-4 md:px-6">
+                              <div>
+                                <p className="text-xs tracking-[0.08em] text-muted-foreground uppercase">
+                                  {option.cabinLabel}
+                                </p>
+                                <p className="text-xl font-semibold tracking-tight md:text-3xl">
+                                  {option.fareLabel}
+                                </p>
+                              </div>
+
+                              <ul className="space-y-2 text-sm text-muted-foreground md:text-base">
+                                {option.lines.map((line) => (
+                                  <li key={line.id} className="flex items-start gap-2">
+                                    {(line.kind === "carry_on" ||
+                                      line.kind === "checked") && (
+                                      <BriefcaseIcon className="mt-0.5 size-4" />
+                                    )}
+                                    <span>{line.label}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </CardContent>
+
+                            <div className="mt-auto flex items-end justify-between rounded-b-2xl bg-muted/40 px-5 py-4 md:px-6">
+                              <p className="text-sm text-muted-foreground md:text-base">
+                                total amount from
                               </p>
-                              <p className="text-xl font-semibold tracking-tight md:text-3xl">
-                                {option.fareLabel}
+                              <p className="text-2xl font-semibold tracking-tight md:text-3xl">
+                                {option.priceFromLabel}
                               </p>
                             </div>
-
-                            <ul className="space-y-2 text-sm text-muted-foreground md:text-base">
-                              {option.lines.map((line) => (
-                                <li key={line.id} className="flex items-start gap-2">
-                                  {(line.kind === "carry_on" || line.kind === "checked") && (
-                                    <BriefcaseIcon className="mt-0.5 size-4" />
-                                  )}
-                                  <span>{line.label}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
-
-                          <div className="mt-auto flex items-end justify-between rounded-b-2xl bg-muted/40 px-5 py-4 md:px-6">
-                            <p className="text-sm text-muted-foreground md:text-base">
-                              total amount from
-                            </p>
-                            <p className="text-2xl font-semibold tracking-tight md:text-3xl">
-                              {option.priceFromLabel}
-                            </p>
-                          </div>
-                        </Card>
-                      </button>
-                    ))}
+                          </Card>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </section>

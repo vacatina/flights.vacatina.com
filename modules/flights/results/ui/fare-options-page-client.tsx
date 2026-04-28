@@ -8,6 +8,7 @@ import {
   AlertCircleIcon,
   BriefcaseIcon,
   FilterIcon,
+  Loader2Icon,
   PlaneLandingIcon,
   PlaneTakeoffIcon,
 } from "lucide-react"
@@ -88,6 +89,8 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [isFilterDialogOpen, setFilterDialogOpen] = useState(false)
   const [isLoadingMore, startLoadingMore] = useTransition()
+  const [isSelectingOffer, startSelectingOffer] = useTransition()
+  const [pendingOfferId, setPendingOfferId] = useState<string | null>(null)
   const [draftFlightNumber, setDraftFlightNumber] = useState(
     data.state.flightNumber ?? ""
   )
@@ -207,6 +210,12 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   ])
 
   function selectOffer(offerId: string) {
+    if (isSelectingOffer) {
+      return
+    }
+
+    setPendingOfferId(offerId)
+
     logFlightFlow("FareOptionsPageClient", "offer_selected", {
       partialOfferRequestId: data.partialOfferRequestId,
       leg: data.leg,
@@ -215,34 +224,36 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
     })
     const nextSelected = [...data.selected, offerId]
 
-    if (data.leg < data.totalLegs - 1) {
-      const nextState = {
-        ...data.state,
-        leg: data.leg + 1,
-        selected: nextSelected,
-        after: undefined,
+    startSelectingOffer(() => {
+      if (data.leg < data.totalLegs - 1) {
+        const nextState = {
+          ...data.state,
+          leg: data.leg + 1,
+          selected: nextSelected,
+          after: undefined,
+        }
+        const search = toResultsUrlSearchParams(nextState).toString()
+        logFlightFlow("FareOptionsPageClient", "navigate_next_leg", {
+          partialOfferRequestId: data.partialOfferRequestId,
+          nextLeg: nextState.leg,
+          selectedCount: nextSelected.length,
+        })
+        router.push(
+          `/results/${data.partialOfferRequestId}/fare-options?${search}`
+        )
+        return
       }
-      const search = toResultsUrlSearchParams(nextState).toString()
-      logFlightFlow("FareOptionsPageClient", "navigate_next_leg", {
+
+      const params = new URLSearchParams()
+      params.set("selected", nextSelected.join(","))
+      logFlightFlow("FareOptionsPageClient", "navigate_review", {
         partialOfferRequestId: data.partialOfferRequestId,
-        nextLeg: nextState.leg,
         selectedCount: nextSelected.length,
       })
       router.push(
-        `/results/${data.partialOfferRequestId}/fare-options?${search}`
+        `/results/${data.partialOfferRequestId}/review?${params.toString()}`
       )
-      return
-    }
-
-    const params = new URLSearchParams()
-    params.set("selected", nextSelected.join(","))
-    logFlightFlow("FareOptionsPageClient", "navigate_review", {
-      partialOfferRequestId: data.partialOfferRequestId,
-      selectedCount: nextSelected.length,
     })
-    router.push(
-      `/results/${data.partialOfferRequestId}/review?${params.toString()}`
-    )
   }
 
   function loadMore() {
@@ -584,8 +595,15 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                       ) : (
                         <Button
                           className="h-11 rounded-xl px-7 text-sm"
+                          disabled={isSelectingOffer}
                           onClick={() => selectOffer(offer.id)}
                         >
+                          {isSelectingOffer && pendingOfferId === offer.id ? (
+                            <Loader2Icon
+                              data-icon="inline-start"
+                              className="size-4 animate-spin"
+                            />
+                          ) : null}
                           Select
                         </Button>
                       )}
