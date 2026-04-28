@@ -63,6 +63,67 @@ test("executeCreateCheckoutQuoteAction creates quote from selected offer", async
   expect(result.ok && result.data.quoteId).toBe("pqt_1")
 })
 
+test("executeCreateCheckoutQuoteAction creates quote for multi-city selected offers", async () => {
+  const getFaresBySelected = async (
+    _partialOfferRequestId: string,
+    selectedPartialOffers: string[]
+  ) => {
+    expect(selectedPartialOffers).toEqual([
+      "off_partial_1",
+      "off_partial_2",
+      "off_partial_3",
+    ])
+
+    return {
+      offers: [offerFixture],
+      slices: [{}, {}, {}],
+    } as unknown as OfferRequest
+  }
+
+  const result = await executeCreateCheckoutQuoteAction(
+    {
+      partialOfferRequestId: "prq_1",
+      selected: ["off_partial_1", "off_partial_2", "off_partial_3"],
+      offerId: "off_1",
+    },
+    {
+      getFaresBySelected,
+      async getOfferPricingMap() {
+        return {
+          off_1: {
+            offerId: "off_1",
+            currency: "USD",
+            netAmount: 1000,
+            sellAmount: 1100,
+            appliedRuleId: "rule_1",
+            appliedRuleSpecificity: 2,
+          },
+        }
+      },
+      async createPricedQuote(input) {
+        expect(input.selectedPartialOffers).toEqual([
+          "off_partial_1",
+          "off_partial_2",
+          "off_partial_3",
+        ])
+        return {
+          id: "pqt_multi_1",
+          expiresAt: new Date("2026-04-11T12:00:00.000Z"),
+        }
+      },
+      async getActorContext() {
+        return {
+          type: "guest" as const,
+          guestId: "gst_test",
+        }
+      },
+    }
+  )
+
+  expect(result.ok).toBe(true)
+  expect(result.ok && result.data.quoteId).toBe("pqt_multi_1")
+})
+
 test("executeCreateCheckoutQuoteAction rejects missing selected offer", async () => {
   const result = await executeCreateCheckoutQuoteAction(
     {

@@ -66,16 +66,12 @@ export default async function BookingDetailPage({
   }
 
   return (
-    <main className="min-h-svh bg-muted/40 py-8 md:py-10">
-      <div className="mx-auto w-full max-w-[1160px] space-y-6 px-4 md:px-8">
+    <main className="min-h-svh bg-background py-6 md:py-8">
+      <div className="mx-auto w-full max-w-[1980px] space-y-6 px-4 md:px-6 xl:px-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>Orders</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/bookings" />}>Bookings</BreadcrumbLink>
+              <BreadcrumbLink render={<Link href="/" />}>Flights</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -84,26 +80,10 @@ export default async function BookingDetailPage({
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              Booking details
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Reference: {detail.bookingReference}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            render={
-              <Link href={`/booking/${encodeURIComponent(detail.bookingReference)}?refresh=1`} />
-            }
-          >
-            Refresh status
-          </Button>
-        </div>
-
-        <BookingDetailView detail={detail} />
+        <BookingDetailView
+          detail={detail}
+          refreshHref={`/booking/${encodeURIComponent(detail.bookingReference)}?refresh=1`}
+        />
       </div>
     </main>
   )

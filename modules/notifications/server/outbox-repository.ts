@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, eq, lte } from "drizzle-orm"
+import { and, asc, desc, eq, lte } from "drizzle-orm"
 
 import { getDbClient, notificationOutbox } from "@/lib/db"
 import type {
@@ -41,6 +41,10 @@ interface CreateOutboxRecordInput {
 export interface NotificationOutboxRepository {
   create(input: CreateOutboxRecordInput): Promise<NotificationOutboxRecord>
   findPending(now: Date, limit: number): Promise<NotificationOutboxRecord[]>
+  listRecentByFlightOrderId(input: {
+    flightOrderId: string
+    limit: number
+  }): Promise<NotificationOutboxRecord[]>
   markSent(input: { id: string; sentAt: Date }): Promise<void>
   markFailed(input: {
     id: string
@@ -113,6 +117,24 @@ export const defaultNotificationOutboxRepository: NotificationOutboxRepository =
       ),
       orderBy: [asc(notificationOutbox.createdAt)],
       limit,
+    })
+
+    return rows.map(toRecord)
+  },
+  async listRecentByFlightOrderId(input) {
+    const db = getDbClient()
+
+    if (!db) {
+      return Array.from(inMemoryOutbox.values())
+        .filter((record) => record.flightOrderId === input.flightOrderId)
+        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        .slice(0, input.limit)
+    }
+
+    const rows = await db.query.notificationOutbox.findMany({
+      where: eq(notificationOutbox.flightOrderId, input.flightOrderId),
+      orderBy: [desc(notificationOutbox.createdAt)],
+      limit: input.limit,
     })
 
     return rows.map(toRecord)

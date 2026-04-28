@@ -285,6 +285,10 @@ function AuthButtons({
     "border-primary-foreground/45 bg-transparent text-primary-foreground hover:bg-primary-foreground/10",
     mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
   )
+  const dashboardClassName = cn(
+    "border-border bg-secondary text-secondary-foreground hover:bg-secondary/90",
+    mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
+  )
 
   if (!clerkEnabled) {
     return (
@@ -331,6 +335,14 @@ function AuthButtons({
       </Show>
 
       <Show when="signed-in">
+        <Button
+          variant="secondary"
+          size={size}
+          className={dashboardClassName}
+          render={<Link href="/bookings" />}
+        >
+          Dashboard
+        </Button>
         <UserButton />
       </Show>
     </>

@@ -80,6 +80,7 @@ NEXT_PUBLIC_FLIGHTS_DEBUG=false
 
 Multi-city search is enabled by default and supports 2 to 6 legs.
 For labeling: 2-leg mirrored journeys render `Outbound`/`Inbound`; 3+ legs render `Leg 1..N`.
+Manual verification steps: `docs/search/multi-city-runtime-checklist.md`.
 
 ## Post-booking lookup + notifications
 
