@@ -150,6 +150,92 @@ test("buildReviewPageModel maps fare condition lines", () => {
   expect(comfortOptionLines).toContain("Refunds not allowed")
 })
 
+test("buildReviewPageModel uses neutral leg labels for multi-city itineraries", () => {
+  const multiCityRequest = {
+    ...offerRequestFixture,
+    slices: [
+      {
+        origin: { iata_code: "CMB" },
+        destination: { iata_code: "DXB" },
+        departure_date: "2026-04-04",
+      },
+      {
+        origin: { iata_code: "DXB" },
+        destination: { iata_code: "LHR" },
+        departure_date: "2026-04-07",
+      },
+      {
+        origin: { iata_code: "LHR" },
+        destination: { iata_code: "SFO" },
+        departure_date: "2026-04-10",
+      },
+    ],
+    offers: [
+      {
+        ...createOffer({
+          id: "off_multi_1",
+          totalAmount: "1500.00",
+          outboundComparisonKey: "cmp_multi_1",
+          outboundFareBrand: "Economy",
+          outboundCabinClass: "economy",
+          inboundComparisonKey: "cmp_multi_2",
+          inboundFareBrand: "Economy",
+          inboundCabinClass: "economy",
+          requiresInstantPayment: false,
+          changeCondition: null,
+          refundCondition: null,
+        }),
+        slices: [
+          createSlice({
+            id: "multi_sli_1",
+            comparisonKey: "cmp_multi_1",
+            fareBrand: "Economy",
+            cabinClass: "economy",
+            originIata: "CMB",
+            destinationIata: "DXB",
+            originName: "Bandaranaike International Airport",
+            destinationName: "Dubai International Airport",
+            departingAt: "2026-04-04T20:20:00+05:30",
+            arrivingAt: "2026-04-05T03:25:00+04:00",
+          }),
+          createSlice({
+            id: "multi_sli_2",
+            comparisonKey: "cmp_multi_2",
+            fareBrand: "Economy",
+            cabinClass: "economy",
+            originIata: "DXB",
+            destinationIata: "LHR",
+            originName: "Dubai International Airport",
+            destinationName: "Heathrow Airport",
+            departingAt: "2026-04-07T11:00:00+04:00",
+            arrivingAt: "2026-04-07T15:00:00+01:00",
+          }),
+          createSlice({
+            id: "multi_sli_3",
+            comparisonKey: "cmp_multi_3",
+            fareBrand: "Economy",
+            cabinClass: "economy",
+            originIata: "LHR",
+            destinationIata: "SFO",
+            originName: "Heathrow Airport",
+            destinationName: "San Francisco International Airport",
+            departingAt: "2026-04-10T10:00:00+01:00",
+            arrivingAt: "2026-04-10T13:00:00-07:00",
+          }),
+        ],
+      },
+    ],
+  } as unknown as OfferRequest
+
+  const result = buildReviewPageModel({
+    offerRequest: multiCityRequest,
+    selected: ["off_partial_1", "off_partial_2", "off_partial_3"],
+    requestedFare: [],
+  })
+
+  expect(result.legs.map((leg) => leg.title)).toEqual(["Leg 1", "Leg 2", "Leg 3"])
+})
+
 function createOffer(input: {
   id: string
   totalAmount: string

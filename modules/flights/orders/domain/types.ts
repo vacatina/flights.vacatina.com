@@ -1,9 +1,22 @@
-import type { Offer } from "@duffel/api/types"
+import type { Offer, Order } from "@duffel/api/types"
 
 export type BookingNotificationEventType =
   | "booking_confirmed"
   | "hold_created"
   | "reconciliation_required"
+
+export interface FlightOrderSnapshotTimelineEvent {
+  id: string
+  dateTimeLabel: string
+  description: string
+  segmentDurationLabel?: string
+  meta: string[]
+}
+
+export interface FlightOrderSnapshotLayover {
+  id: string
+  label: string
+}
 
 export interface FlightOrderSnapshotLeg {
   legIndex: number
@@ -13,12 +26,59 @@ export interface FlightOrderSnapshotLeg {
   departureIata: string
   arrivalIata: string
   routeLabel: string
+  subtitle: string
+  departureTimeLabel: string
+  arrivalTimeLabel: string
   departureAtIso: string | null
   arrivalAtIso: string | null
   departureLabel: string
   arrivalLabel: string
   durationLabel: string
   stopsLabel: string
+  stopsDetails: string
+  timeline: FlightOrderSnapshotTimelineEvent[]
+  layovers: FlightOrderSnapshotLayover[]
+}
+
+export interface FlightOrderSnapshotPassenger {
+  id: string
+  label: string
+  typeLabel: string
+  fullName: string | null
+  dateOfBirthLabel: string | null
+  genderLabel: string | null
+  email: string | null
+  phoneNumber: string | null
+}
+
+export interface FlightOrderSnapshotBillingSummary {
+  fareAmountLabel: string | null
+  taxesAmountLabel: string | null
+  totalAmountLabel: string
+}
+
+export interface FlightOrderSnapshotTicketDocument {
+  uniqueIdentifier: string
+  type: string
+  passengerIds: string[]
+}
+
+export interface FlightOrderSnapshotBookedService {
+  id: string
+  type: string
+  totalAmountLabel: string
+  passengerIds: string[]
+  segmentIds: string[]
+}
+
+export interface FlightOrderSnapshotMetadataEntry {
+  key: string
+  value: string
+}
+
+export interface FlightOrderSnapshotConditionsSummary {
+  changes: string
+  refunds: string
 }
 
 export interface FlightOrderSnapshot extends Record<string, unknown> {
@@ -31,7 +91,15 @@ export interface FlightOrderSnapshot extends Record<string, unknown> {
   sellAmount: number
   sellAmountLabel: string
   createdAtIso: string
+  airlineBookingReference: string | null
+  availableActions: string[]
+  ticketDocuments: FlightOrderSnapshotTicketDocument[]
+  bookedServices: FlightOrderSnapshotBookedService[]
+  metadataEntries: FlightOrderSnapshotMetadataEntry[]
+  conditions: FlightOrderSnapshotConditionsSummary
   legs: FlightOrderSnapshotLeg[]
+  passengers: FlightOrderSnapshotPassenger[]
+  billingSummary: FlightOrderSnapshotBillingSummary
 }
 
 export interface BuildFlightOrderSnapshotInput {
@@ -39,6 +107,22 @@ export interface BuildFlightOrderSnapshotInput {
   paymentMode: "pay_now" | "hold"
   currency: string
   sellAmount: number
+  contact?: {
+    email?: string
+    phoneNumber?: string
+  }
+  order?: Order | null
+  travelers?: Array<{
+    id: string
+    type: "adult" | "child" | "infant_without_seat"
+    title?: string
+    givenName?: string
+    familyName?: string
+    bornOn?: string
+    gender?: string
+    email?: string
+    phoneNumber?: string
+  }>
   now?: Date
 }
 
@@ -53,6 +137,7 @@ export interface BookingListItem {
 
 export interface BookingDetailModel {
   bookingReference: string
+  checkoutSessionId: string
   duffelOrderId: string
   paymentMode: "pay_now" | "hold"
   statusLabel: string
@@ -61,5 +146,27 @@ export interface BookingDetailModel {
   paymentRequiredByLabel: string | null
   priceGuaranteeExpiresAtLabel: string | null
   paidAtLabel: string | null
+  checkoutSessionStatus: string | null
+  paymentProvider: string | null
+  providerOrderId: string | null
+  providerPaymentId: string | null
+  providerStatusCode: string | null
+  providerStatusMessage: string | null
+  paymentCurrency: string | null
+  paymentAmountLabel: string | null
+  fxSourceCurrency: string | null
+  fxTargetCurrency: string | null
+  fxEffectiveRate: number | null
+  checkoutErrorMessage: string | null
+  notifications: BookingDetailNotificationItem[]
   snapshot: FlightOrderSnapshot
+}
+
+export interface BookingDetailNotificationItem {
+  id: string
+  eventType: BookingNotificationEventType
+  status: "pending" | "sent" | "failed"
+  createdAtLabel: string
+  sentAtLabel: string | null
+  lastError: string | null
 }

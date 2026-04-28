@@ -73,11 +73,14 @@ DUFFEL_SUPPLIER_TIMEOUT_MS=10000
 DUFFEL_RESULTS_PAGE_SIZE=20
 
 # Feature/debug flags
-NEXT_PUBLIC_MULTI_CITY_ENABLED=false
 FLIGHTS_DEBUG=false
 NEXT_PUBLIC_FLIGHTS_DEBUG=false
 
 ```
+
+Multi-city search is enabled by default and supports 2 to 6 legs.
+For labeling: 2-leg mirrored journeys render `Outbound`/`Inbound`; 3+ legs render `Leg 1..N`.
+Manual verification steps: `docs/search/multi-city-runtime-checklist.md`.
 
 ## Post-booking lookup + notifications
 

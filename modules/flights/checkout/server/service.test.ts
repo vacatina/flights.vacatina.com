@@ -369,6 +369,59 @@ test("startCheckoutPayment creates processing session and payload", async () => 
   expect(sessionRepo.spies.create).toHaveBeenCalledTimes(1)
 })
 
+test("startCheckoutPayment preserves multi-city selected partial offers in checkout session", async () => {
+  const sessionRepo = createSessionRepository()
+  const selectedPartialOffers = [
+    "off_partial_1",
+    "off_partial_2",
+    "off_partial_3",
+  ]
+  const payload = createSubmitInput({
+    paymentMode: "pay_now",
+    selectedPartialOffers,
+  })
+
+  await startCheckoutPayment(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload,
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer({
+        slices: [
+          createSlice({
+            id: "sli_1",
+            originIata: "CMB",
+            destinationIata: "DXB",
+          }),
+          createSlice({
+            id: "sli_2",
+            originIata: "DXB",
+            destinationIata: "LHR",
+          }),
+          createSlice({
+            id: "sli_3",
+            originIata: "LHR",
+            destinationIata: "SFO",
+          }),
+        ],
+      }),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => createDuffelOrder(),
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  const createdSessionInput = sessionRepo.spies.create.mock.calls[0]?.[0]
+  expect(createdSessionInput?.selectedPartialOffers).toEqual(selectedPartialOffers)
+})
+
 test("submitCheckout succeeds for hold flow", async () => {
   const sessionRepo = createSessionRepository()
   const result = await submitCheckout(
@@ -557,12 +610,13 @@ test("getCheckoutSessionStatus enforces actor ownership", async () => {
 
 function createSubmitInput(input: {
   paymentMode: "pay_now" | "hold"
+  selectedPartialOffers?: string[]
 }): CheckoutSubmitInput {
   return {
     partialOfferRequestId: "prq_1",
     offerId: "off_1",
     quoteId: "pqt_1",
-    selectedPartialOffers: ["off_partial_1"],
+    selectedPartialOffers: input.selectedPartialOffers ?? ["off_partial_1"],
     paymentMode: input.paymentMode,
     contact: {
       email: "guest@example.com",
@@ -644,6 +698,42 @@ function createOffer(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   } as unknown as Offer
+}
+
+function createSlice(input: {
+  id: string
+  originIata: string
+  destinationIata: string
+}) {
+  return {
+    id: input.id,
+    origin: {
+      iata_code: input.originIata,
+    },
+    destination: {
+      iata_code: input.destinationIata,
+    },
+    duration: "PT4H58M",
+    segments: [
+      {
+        id: `${input.id}_seg_1`,
+        origin: {
+          iata_code: input.originIata,
+        },
+        destination: {
+          iata_code: input.destinationIata,
+        },
+        departing_at: "2026-04-13T10:00:00.000Z",
+        arriving_at: "2026-04-13T14:58:00.000Z",
+        passengers: [
+          {
+            passenger_id: "pas_1",
+            cabin_class: "economy",
+          },
+        ],
+      },
+    ],
+  }
 }
 
 function createDuffelOrder() {

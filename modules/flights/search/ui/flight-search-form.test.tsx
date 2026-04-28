@@ -23,8 +23,8 @@ vi.mock("@/modules/flights/search/server/actions", () => ({
   })),
 }))
 
-test("FlightSearchForm does not render multi-city journey option", () => {
+test("FlightSearchForm renders multi-city journey option", () => {
   render(<FlightSearchForm />)
 
-  expect(screen.queryByText("Multi-city")).toBeNull()
+  expect(screen.getByText("Multi City")).toBeTruthy()
 })

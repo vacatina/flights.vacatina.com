@@ -8,6 +8,10 @@ import {
 
 import { clockTimeToMinutes } from "@/modules/flights/search/domain"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
+import {
+  buildJourneyRouteSummary,
+  getJourneyTypeLabelFromSlices,
+} from "@/lib/shared/journey-display"
 import type {
   OfferCardLayover,
   OfferCardTimelineEvent,
@@ -141,8 +145,12 @@ export function createSearchSummary(
 ): ResultsSearchSummary {
   const firstSlice = offerRequest.slices[0]
   const lastSlice = offerRequest.slices[offerRequest.slices.length - 1]
-  const routeLabel = `${firstSlice.origin.iata_code} ⇄ ${firstSlice.destination.iata_code}`
-  const title = offerRequest.slices.length > 1 ? "Round trip" : "One way"
+  const journeySlices = offerRequest.slices.map((slice) => ({
+    originIataCode: slice.origin.iata_code,
+    destinationIataCode: slice.destination.iata_code,
+  }))
+  const routeLabel = buildJourneyRouteSummary(journeySlices)
+  const journeyTypeLabel = getJourneyTypeLabelFromSlices(journeySlices)
   const dateRangeLabel =
     offerRequest.slices.length > 1
       ? `${formatDateOnly(firstSlice.departure_date)} - ${formatDateOnly(lastSlice.departure_date)}`
@@ -150,7 +158,10 @@ export function createSearchSummary(
   const passengerCount = offerRequest.passengers.length
 
   return {
-    title: `${title} to ${offerRequest.slices[currentLeg]?.destination.iata_code ?? firstSlice.destination.iata_code}`,
+    title: `${journeyTypeLabel} to ${
+      offerRequest.slices[currentLeg]?.destination.iata_code ??
+      firstSlice.destination.iata_code
+    }`,
     routeLabel,
     dateRangeLabel: `${dateRangeLabel} · ${passengerCount} passenger${passengerCount > 1 ? "s" : ""}`,
     passengersLabel: `${passengerCount} passenger${passengerCount > 1 ? "s" : ""}`,

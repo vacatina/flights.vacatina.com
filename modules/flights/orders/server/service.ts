@@ -18,9 +18,17 @@ import {
 import { createEmailHash, isEmailHashMatch } from "@/modules/flights/orders/server/identity"
 import { consumeBookingLookupAttempt } from "@/modules/flights/orders/server/lookup-rate-limit"
 import {
+  defaultCheckoutSessionRepository,
+  type CheckoutSessionRepository,
+} from "@/modules/flights/checkout/server/session-repository"
+import {
   defaultFlightOrderRepository,
   type FlightOrderRepository,
 } from "@/modules/flights/checkout/server/order-repository"
+import {
+  defaultNotificationOutboxRepository,
+  type NotificationOutboxRepository,
+} from "@/modules/notifications/server/outbox-repository"
 import { logDuffelError } from "@/modules/flights/results/server/error-map"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
@@ -29,11 +37,15 @@ const GENERIC_LOOKUP_ERROR =
 
 interface OrdersServiceDeps {
   orderRepository: FlightOrderRepository
+  checkoutSessionRepository: CheckoutSessionRepository
+  notificationOutboxRepository: NotificationOutboxRepository
   getDuffelOrderById: (duffelOrderId: string) => Promise<Order | null>
 }
 
 const defaultDeps: OrdersServiceDeps = {
   orderRepository: defaultFlightOrderRepository,
+  checkoutSessionRepository: defaultCheckoutSessionRepository,
+  notificationOutboxRepository: defaultNotificationOutboxRepository,
   async getDuffelOrderById(duffelOrderId) {
     try {
       const { getDuffelClient } = await import("@/lib/duffel")
@@ -156,7 +168,18 @@ export async function getBookingDetail(
     throw new Error("Booking access denied.")
   }
 
-  const detail = mapFlightOrderToDetailModel(order)
+  const [checkoutSession, notifications] = await Promise.all([
+    deps.checkoutSessionRepository.findById(order.checkoutSessionId),
+    deps.notificationOutboxRepository.listRecentByFlightOrderId({
+      flightOrderId: order.id,
+      limit: 20,
+    }),
+  ])
+
+  const detail = mapFlightOrderToDetailModel(order, {
+    checkoutSession,
+    notifications,
+  })
 
   if (input.refreshFromDuffel) {
     try {
