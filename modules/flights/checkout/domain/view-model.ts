@@ -3,6 +3,12 @@ import type { Offer, SeatMap } from "@duffel/api/types"
 
 import { normalizeOfferForLeg } from "@/modules/flights/results/domain/offer-view-model"
 import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
+import {
+  buildJourneyRouteSummary,
+  getJourneyLegTitle,
+  getJourneyTypeLabelFromSlices,
+  inferJourneyTypeFromSlices,
+} from "@/lib/shared/journey-display"
 import type {
   CheckoutPageData,
   CheckoutPassengerDefaultViewModel,
@@ -35,13 +41,23 @@ export function buildCheckoutPageModel({
   quote,
   airlineLogosByAirlineId = {},
 }: BuildCheckoutPageModelInput): CheckoutPageData {
+  const journeySlices = offer.slices.map((slice) => ({
+    originIataCode: slice.origin.iata_code,
+    destinationIataCode: slice.destination.iata_code,
+  }))
+  const journeyType = inferJourneyTypeFromSlices(journeySlices)
   const selectedFlights = offer.slices.map((_, legIndex) => {
     const normalized = normalizeOfferForLeg(offer, legIndex, airlineLogosByAirlineId)
 
     if (!normalized) {
       return {
         legIndex,
-        legTitle: offer.slices.length > 1 ? legIndexToTitle(legIndex) : "Selected flight",
+        legTitle: getJourneyLegTitle({
+          journeyType,
+          legIndex,
+          totalLegs: offer.slices.length,
+          singleLegTitle: "Selected flight",
+        }),
         dateLabel: "",
         ownerName: offer.owner.name ?? "Unknown airline",
         ownerLogoSymbolUrl:
@@ -63,7 +79,12 @@ export function buildCheckoutPageModel({
 
     return {
       legIndex,
-      legTitle: offer.slices.length > 1 ? legIndexToTitle(legIndex) : "Selected flight",
+      legTitle: getJourneyLegTitle({
+        journeyType,
+        legIndex,
+        totalLegs: offer.slices.length,
+        singleLegTitle: "Selected flight",
+      }),
       dateLabel: firstDeparture ? format(firstDeparture, "EEE, d MMM yyyy") : "",
       ownerName: normalized.ownerName,
       ownerLogoSymbolUrl: normalized.ownerLogoSymbolUrl,
@@ -83,7 +104,7 @@ export function buildCheckoutPageModel({
     partialOfferRequestId,
     state,
     quote: toQuoteViewModel(quote),
-    tripSummary: createTripSummary(offer),
+    tripSummary: createTripSummary(offer, journeySlices),
     selectedFlights,
     paymentRequirements: createPaymentRequirements(offer),
     identityDocumentsRequired: offer.passenger_identity_documents_required,
@@ -109,7 +130,10 @@ export function buildCheckoutPageModel({
   }
 }
 
-function createTripSummary(offer: Offer): CheckoutTripSummaryViewModel {
+function createTripSummary(
+  offer: Offer,
+  journeySlices: { originIataCode: string | null; destinationIataCode: string | null }[]
+): CheckoutTripSummaryViewModel {
   const firstSlice = offer.slices[0]
   const lastSlice = offer.slices[offer.slices.length - 1]
   const firstDeparture = parseDateTime(firstSlice?.segments[0]?.departing_at)
@@ -118,7 +142,7 @@ function createTripSummary(offer: Offer): CheckoutTripSummaryViewModel {
   const passengerCount = offer.passengers.length
 
   return {
-    journeyTypeLabel: offer.slices.length > 1 ? "Return" : "One way",
+    journeyTypeLabel: getJourneyTypeLabelFromSlices(journeySlices),
     dateRangeLabel:
       firstDeparture && lastDeparture
         ? `${format(firstDeparture, "EEE, d MMM yyyy")} - ${format(lastDeparture, "EEE, d MMM yyyy")}`
@@ -127,9 +151,7 @@ function createTripSummary(offer: Offer): CheckoutTripSummaryViewModel {
     cabinLabel: firstPassenger?.cabin_class
       ? formatCabinClass(firstPassenger.cabin_class)
       : "Economy",
-    routeLabel: `${firstSlice?.origin.iata_code ?? "--"} ⇄ ${
-      firstSlice?.destination.iata_code ?? "--"
-    }`,
+    routeLabel: buildJourneyRouteSummary(journeySlices),
     offerExpiresAtLabel: toOfferExpiresAtLabel(offer),
   }
 }
@@ -203,18 +225,6 @@ function passengerLabel(
   }
 
   return `Infant ${index + 1}`
-}
-
-function legIndexToTitle(legIndex: number) {
-  if (legIndex === 0) {
-    return "Outbound"
-  }
-
-  if (legIndex === 1) {
-    return "Inbound"
-  }
-
-  return `Leg ${legIndex + 1}`
 }
 
 function formatCabinClass(value: string) {

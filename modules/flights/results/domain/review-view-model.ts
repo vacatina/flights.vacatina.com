@@ -14,6 +14,11 @@ import {
 } from "@/modules/flights/results/domain/offer-view-model"
 import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
+import {
+  getJourneyLegTitle,
+  inferJourneyTypeFromSlices,
+  type JourneyDisplayType,
+} from "@/lib/shared/journey-display"
 import type {
   ReviewFareOptionLine,
   ReviewFareOptionViewModel,
@@ -69,6 +74,12 @@ export function buildReviewPageModel({
     (offer) => offer.slices.length > 0
   )
   const totalLegs = Math.max(offerRequest.slices.length, 1)
+  const journeyType = inferJourneyTypeFromSlices(
+    offerRequest.slices.map((slice) => ({
+      originIataCode: slice.origin.iata_code,
+      destinationIataCode: slice.destination.iata_code,
+    }))
+  )
   const breadcrumbs = createLegBreadcrumbs(offerRequest)
   const normalizedFare: string[] = []
   const legs: ReviewLegSectionViewModel[] = []
@@ -82,6 +93,7 @@ export function buildReviewPageModel({
     const header = createLegHeaderViewModel({
       legIndex,
       totalLegs,
+      journeyType,
       offer: pickCheapestOffer(legOffers, offerPricingByOfferId) ?? offers[0],
       airlineLogosByAirlineId,
     })
@@ -184,17 +196,24 @@ export function buildReviewPageModel({
 function createLegHeaderViewModel({
   legIndex,
   totalLegs,
+  journeyType,
   offer,
   airlineLogosByAirlineId,
 }: {
   legIndex: number
   totalLegs: number
+  journeyType: JourneyDisplayType
   offer: Offer | undefined
   airlineLogosByAirlineId: Readonly<Record<string, string>>
 }): ReviewLegHeaderViewModel {
   const fallback: ReviewLegHeaderViewModel = {
     legIndex,
-    title: legTitle(totalLegs, legIndex),
+    title: getJourneyLegTitle({
+      journeyType,
+      legIndex,
+      totalLegs,
+      singleLegTitle: "Flight",
+    }),
     dateLabel: "",
     ownerName: "Unknown airline",
     ownerLogoSymbolUrl: null,
@@ -243,7 +262,12 @@ function createLegHeaderViewModel({
     title:
       totalLegs === 1
         ? `Flight to ${slice.destination.iata_code}`
-        : legTitle(totalLegs, legIndex),
+        : getJourneyLegTitle({
+            journeyType,
+            legIndex,
+            totalLegs,
+            singleLegTitle: "Flight",
+          }),
     dateLabel,
     ownerName: offer.owner.name?.trim() || offer.owner.iata_code || "Unknown airline",
     ownerLogoSymbolUrl:
@@ -264,22 +288,6 @@ function createLegHeaderViewModel({
             firstStopCode ?? ""
           }`.trim(),
   }
-}
-
-function legTitle(totalLegs: number, legIndex: number) {
-  if (totalLegs <= 1) {
-    return "Flight"
-  }
-
-  if (legIndex === 0) {
-    return "Outbound"
-  }
-
-  if (legIndex === 1) {
-    return "Inbound"
-  }
-
-  return `Leg ${legIndex + 1}`
 }
 
 function groupFareOptionsByLeg(

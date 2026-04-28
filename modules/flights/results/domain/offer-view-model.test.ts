@@ -219,3 +219,36 @@ test("createSearchSummary formats date-only labels without timezone shifting", (
 
   expect(summary.dateRangeLabel).toBe("04 Apr - 07 Apr · 1 passenger")
 })
+
+test("createSearchSummary uses multi-city journey label and route summary for 3+ legs", () => {
+  const offerRequest = {
+    id: "orq_2",
+    created_at: "2026-04-01T00:00:00Z",
+    live_mode: false,
+    cabin_class: "economy",
+    passengers: [{ id: "pas_1", type: "adult" }],
+    slices: [
+      {
+        origin: { iata_code: "CMB" },
+        destination: { iata_code: "DXB" },
+        departure_date: "2026-04-04",
+      },
+      {
+        origin: { iata_code: "DXB" },
+        destination: { iata_code: "LHR" },
+        departure_date: "2026-04-06",
+      },
+      {
+        origin: { iata_code: "LHR" },
+        destination: { iata_code: "SFO" },
+        departure_date: "2026-04-08",
+      },
+    ],
+    offers: [],
+  } as unknown as OfferRequest
+
+  const summary = createSearchSummary(offerRequest, 1)
+
+  expect(summary.title).toBe("Multi-city to LHR")
+  expect(summary.routeLabel).toBe("CMB → SFO · 3 legs")
+})

@@ -1,6 +1,12 @@
 import { format, isValid, parseISO } from "date-fns"
 
 import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
+import {
+  buildJourneyRouteSummary,
+  getJourneyLegTitle,
+  getJourneyTypeLabelFromSlices,
+  inferJourneyTypeFromSlices,
+} from "@/lib/shared/journey-display"
 import type {
   BookingDetailModel,
   BookingListItem,
@@ -15,18 +21,16 @@ export function buildFlightOrderSnapshot(
   const firstSlice = input.offer.slices[0]
   const firstSegment = firstSlice?.segments[0]
   const firstPassenger = firstSegment?.passengers[0]
-  const firstOrigin = firstSlice?.origin.iata_code ?? "--"
-  const firstDestination = firstSlice?.destination.iata_code ?? "--"
+  const journeySlices = input.offer.slices.map((slice) => ({
+    originIataCode: slice.origin.iata_code,
+    destinationIataCode: slice.destination.iata_code,
+  }))
+  const journeyType = inferJourneyTypeFromSlices(journeySlices)
 
   return {
     schemaVersion: 1,
-    journeyTypeLabel:
-      input.offer.slices.length === 1
-        ? "One way"
-        : input.offer.slices.length === 2
-          ? "Return"
-          : "Multi-leg",
-    routeLabel: `${firstOrigin} ⇄ ${firstDestination}`,
+    journeyTypeLabel: getJourneyTypeLabelFromSlices(journeySlices),
+    routeLabel: buildJourneyRouteSummary(journeySlices),
     passengerCount: input.offer.passengers.length,
     cabinClassLabel: firstPassenger?.cabin_class
       ? formatCabinClass(firstPassenger.cabin_class)
@@ -44,14 +48,12 @@ export function buildFlightOrderSnapshot(
 
       return {
         legIndex,
-        title:
-          input.offer.slices.length === 1
-            ? "Selected flight"
-            : legIndex === 0
-              ? "Outbound"
-              : legIndex === 1
-                ? "Inbound"
-                : `Leg ${legIndex + 1}`,
+        title: getJourneyLegTitle({
+          journeyType,
+          legIndex,
+          totalLegs: input.offer.slices.length,
+          singleLegTitle: "Selected flight",
+        }),
         ownerName,
         ownerLogoSymbolUrl: input.offer.owner.logo_symbol_url ?? null,
         departureIata: firstLegSegment?.origin.iata_code ?? "--",

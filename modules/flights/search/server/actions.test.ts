@@ -128,7 +128,7 @@ test("executeSubmitFlightSearchAction returns partial offer request id", async (
   })
 })
 
-test("executeSubmitFlightSearchAction blocks multi-city for now", async () => {
+test("executeSubmitFlightSearchAction accepts multi-city payload", async () => {
   const input = buildValidInput()
   input.journeyType = "multi_city"
   input.slices.push({
@@ -141,7 +141,7 @@ test("executeSubmitFlightSearchAction blocks multi-city for now", async () => {
 
   const result = await executeSubmitFlightSearchAction(input, {
     createPartialOfferRequest: async () => ({
-      partialOfferRequestId: "por_test_123",
+      partialOfferRequestId: "por_test_multi_city",
     }),
     logError: () => undefined,
     getActorContext: async () => ({
@@ -150,10 +150,10 @@ test("executeSubmitFlightSearchAction blocks multi-city for now", async () => {
     }),
   })
 
-  expect(result.ok).toBe(false)
-  if (!result.ok) {
-    expect(result.error.fieldErrors?.journeyType).toBe(
-      "Multi-city search is temporarily unavailable."
-    )
-  }
+  expect(result).toEqual({
+    ok: true,
+    data: {
+      partialOfferRequestId: "por_test_multi_city",
+    },
+  })
 })

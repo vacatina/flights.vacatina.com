@@ -4,7 +4,6 @@ import { ZodError, type ZodIssue } from "zod"
 
 import { resolveActionActorContext } from "@/modules/auth/server"
 import {
-  isMultiCitySearchEnabled,
   parseFlightSearchForm,
   parsePlaceSearchInput,
   toFlightSearchCommand,
@@ -135,19 +134,6 @@ export async function executeSubmitFlightSearchAction(
       "VALIDATION_ERROR",
       formatValidationErrors(parsed.error),
       fieldErrors
-    )
-  }
-
-  if (parsed.data.journeyType === "multi_city" && !isMultiCitySearchEnabled()) {
-    logFlightFlow("submitFlightSearchAction", "blocked_multi_city", {
-      journeyType: parsed.data.journeyType,
-    })
-    return actionFailure(
-      "VALIDATION_ERROR",
-      "Multi-city search is temporarily unavailable.",
-      {
-        journeyType: "Multi-city search is temporarily unavailable.",
-      }
     )
   }
 

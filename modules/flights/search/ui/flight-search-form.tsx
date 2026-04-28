@@ -35,7 +35,6 @@ import {
   createEmptySlice,
   ensureSlicesForJourneyType,
   flightSearchFormSchema,
-  isMultiCitySearchEnabled,
   MAX_MULTI_CITY_SLICES,
   type CabinClass,
   type FlightSearchFormValues,
@@ -49,10 +48,7 @@ import { PassengerInlineControls } from "@/modules/flights/search/ui/passenger-i
 import { PlaceAutocompleteField } from "@/modules/flights/search/ui/place-autocomplete-field"
 import { cn } from "@/lib/utils"
 
-const MULTI_CITY_ENABLED = isMultiCitySearchEnabled()
-const JOURNEY_OPTIONS: JourneyType[] = MULTI_CITY_ENABLED
-  ? ["one_way", "return", "multi_city"]
-  : ["one_way", "return"]
+const JOURNEY_OPTIONS: JourneyType[] = ["one_way", "return", "multi_city"]
 const CHILD_AGE_OPTIONS = Array.from({ length: 18 }, (_, index) => index)
 const JOURNEY_TAB_LABELS: Record<JourneyType, string> = {
   one_way: "One Way",
@@ -233,7 +229,7 @@ export function FlightSearchForm() {
     return appliedCount
   }
 
-  const isMultiCityJourney = MULTI_CITY_ENABLED && journeyType === "multi_city"
+  const isMultiCityJourney = journeyType === "multi_city"
   const canAddMultiCitySlice =
     isMultiCityJourney && fields.length < MAX_MULTI_CITY_SLICES
 
