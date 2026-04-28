@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ interface CheckoutTravelerStepProps {
   stepError: string | null
   onContinue: () => void
   disabled?: boolean
+  isNavigating?: boolean
 }
 
 export function CheckoutTravelerStep({
@@ -40,6 +42,7 @@ export function CheckoutTravelerStep({
   stepError,
   onContinue,
   disabled = false,
+  isNavigating = false,
 }: CheckoutTravelerStepProps) {
   return (
     <div className="space-y-7">
@@ -385,6 +388,9 @@ export function CheckoutTravelerStep({
 
       <div className="flex justify-end">
         <Button type="button" className="h-11 rounded-xl px-6" onClick={onContinue} disabled={disabled}>
+          {isNavigating ? (
+            <Spinner data-icon="inline-start" size="sm" />
+          ) : null}
           Continue to extras
         </Button>
       </div>

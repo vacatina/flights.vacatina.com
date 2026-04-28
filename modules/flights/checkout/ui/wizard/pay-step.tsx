@@ -7,6 +7,7 @@ import { ArrowRightIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import type { CheckoutPageData } from "@/modules/flights/checkout/domain"
 import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
 
@@ -21,6 +22,7 @@ interface CheckoutPayStepProps {
   clerkEnabled: boolean
   signInHref: string
   onBack: () => void
+  isBackNavigating?: boolean
 }
 
 export function CheckoutPayStep({
@@ -34,6 +36,7 @@ export function CheckoutPayStep({
   clerkEnabled,
   signInHref,
   onBack,
+  isBackNavigating = false,
 }: CheckoutPayStepProps) {
   return (
     <div className="space-y-7">
@@ -92,11 +95,17 @@ export function CheckoutPayStep({
           variant="outline"
           className="h-11 rounded-xl px-6"
           onClick={onBack}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isBackNavigating}
         >
+          {isBackNavigating ? (
+            <Spinner data-icon="inline-start" size="sm" />
+          ) : null}
           Back
         </Button>
         <Button type="submit" className="h-12 rounded-xl px-6 text-sm md:text-base" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <Spinner data-icon="inline-start" size="sm" />
+          ) : null}
           {isSubmitting
             ? "Confirming..."
             : paymentMode === "hold"

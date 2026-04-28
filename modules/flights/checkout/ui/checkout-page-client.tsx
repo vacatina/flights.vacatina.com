@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useFieldArray, useForm, useWatch } from "react-hook-form"
 
@@ -47,6 +47,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   const searchParams = useSearchParams()
   const router = useRouter()
   const [stepError, setStepError] = useState<string | null>(null)
+  const [isStepNavigating, startStepNavigation] = useTransition()
+  const [stepNavigationIntent, setStepNavigationIntent] = useState<
+    "traveler_continue" | "extras_back" | "extras_continue" | "pay_back" | "wizard_step" | null
+  >(null)
   const [payNowResolution, setPayNowResolution] =
     useState<CheckoutPayNowResolution | null>(null)
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
@@ -355,6 +359,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   ])
 
   function canNavigateToStep(step: CheckoutWizardStep) {
+    if (isSubmitting || isStepNavigating) {
+      return false
+    }
+
     if (step === "traveler") {
       return true
     }
@@ -369,7 +377,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     }
 
     setStepError(null)
-    stepRouting.navigateStep(step)
+    setStepNavigationIntent("wizard_step")
+    startStepNavigation(() => {
+      stepRouting.navigateStep(step)
+    })
   }
 
   function continueFromTraveler() {
@@ -378,11 +389,35 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       return
     }
 
-    stepRouting.goNextStep()
+    setStepError(null)
+    setStepNavigationIntent("traveler_continue")
+    startStepNavigation(() => {
+      stepRouting.goNextStep()
+    })
   }
 
   function continueFromExtras() {
-    stepRouting.goNextStep()
+    setStepError(null)
+    setStepNavigationIntent("extras_continue")
+    startStepNavigation(() => {
+      stepRouting.goNextStep()
+    })
+  }
+
+  function backFromExtras() {
+    setStepError(null)
+    setStepNavigationIntent("extras_back")
+    startStepNavigation(() => {
+      stepRouting.goPreviousStep()
+    })
+  }
+
+  function backFromPay() {
+    setStepError(null)
+    setStepNavigationIntent("pay_back")
+    startStepNavigation(() => {
+      stepRouting.goPreviousStep()
+    })
   }
 
   function onRetryPayStep() {
@@ -503,7 +538,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     ancillaryServicesCount={ancillarySelection?.services.length ?? 0}
                     stepError={stepError}
                     onContinue={continueFromTraveler}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isStepNavigating}
+                    isNavigating={
+                      isStepNavigating && stepNavigationIntent === "traveler_continue"
+                    }
                   />
                 ) : null}
 
@@ -513,9 +551,15 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     form={form}
                     metadataFieldArray={metadataFieldArray}
                     paymentMode={paymentMode}
-                    onBack={stepRouting.goPreviousStep}
+                    onBack={backFromExtras}
                     onContinue={continueFromExtras}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isStepNavigating}
+                    isBackNavigating={
+                      isStepNavigating && stepNavigationIntent === "extras_back"
+                    }
+                    isContinueNavigating={
+                      isStepNavigating && stepNavigationIntent === "extras_continue"
+                    }
                   />
                 ) : null}
 
@@ -530,7 +574,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     isSubmitting={isSubmitting}
                     clerkEnabled={clerkEnabled}
                     signInHref={signInHref}
-                    onBack={stepRouting.goPreviousStep}
+                    onBack={backFromPay}
+                    isBackNavigating={
+                      isStepNavigating && stepNavigationIntent === "pay_back"
+                    }
                   />
                 ) : null}
               </CheckoutWizardShell>

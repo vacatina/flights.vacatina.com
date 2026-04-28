@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import {
   extractServicesFromAncillariesPayload,
   type CheckoutPageData,
@@ -22,6 +23,8 @@ interface CheckoutExtrasStepProps {
   onBack: () => void
   onContinue: () => void
   disabled?: boolean
+  isBackNavigating?: boolean
+  isContinueNavigating?: boolean
 }
 
 export function CheckoutExtrasStep({
@@ -32,6 +35,8 @@ export function CheckoutExtrasStep({
   onBack,
   onContinue,
   disabled = false,
+  isBackNavigating = false,
+  isContinueNavigating = false,
 }: CheckoutExtrasStepProps) {
   return (
     <div className="space-y-7">
@@ -101,6 +106,9 @@ export function CheckoutExtrasStep({
           onClick={onBack}
           disabled={disabled}
         >
+          {isBackNavigating ? (
+            <Spinner data-icon="inline-start" size="sm" />
+          ) : null}
           Back
         </Button>
         <Button
@@ -109,6 +117,9 @@ export function CheckoutExtrasStep({
           onClick={onContinue}
           disabled={disabled}
         >
+          {isContinueNavigating ? (
+            <Spinner data-icon="inline-start" size="sm" />
+          ) : null}
           Continue to pay
         </Button>
       </div>
