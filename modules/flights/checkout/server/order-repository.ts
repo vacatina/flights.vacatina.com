@@ -1,9 +1,13 @@
 import "server-only"
 
-import { and, count, desc, eq } from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike } from "drizzle-orm"
 
 import { flightOrders, getDbClient } from "@/lib/db"
 import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
+import type {
+  BookingListSort,
+  BookingListStatusFilter,
+} from "@/modules/flights/orders/domain"
 
 export interface FlightOrderRecord {
   id: string
@@ -65,6 +69,9 @@ interface ListFlightOrdersByUserInput {
   ownerUserId: string
   limit: number
   offset: number
+  q?: string
+  status: BookingListStatusFilter
+  sort: BookingListSort
 }
 
 interface FlightOrderListResult {
@@ -176,7 +183,9 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
     if (!db) {
       const records = Array.from(inMemoryOrders.values())
         .filter((order) => order.ownerUserId === input.ownerUserId)
-        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        .filter((order) => matchesStatusFilter(order, input.status))
+        .filter((order) => matchesQuery(order, input.q))
+        .sort((left, right) => compareOrdersForSort(left, right, input.sort))
 
       return {
         records: records.slice(input.offset, input.offset + input.limit),
@@ -184,17 +193,23 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
       }
     }
 
+    const ownerCondition = eq(flightOrders.ownerUserId, input.ownerUserId)
+    const statusCondition = toStatusFilterCondition(input.status)
+    const queryCondition = toQueryCondition(input.q)
+    const whereCondition = and(ownerCondition, statusCondition, queryCondition)
+    const orderBy = toOrderBy(input.sort)
+
     const [rows, totalRows] = await Promise.all([
       db.query.flightOrders.findMany({
-        where: eq(flightOrders.ownerUserId, input.ownerUserId),
-        orderBy: [desc(flightOrders.createdAt)],
+        where: whereCondition,
+        orderBy,
         limit: input.limit,
         offset: input.offset,
       }),
       db
         .select({ count: count() })
         .from(flightOrders)
-        .where(eq(flightOrders.ownerUserId, input.ownerUserId)),
+        .where(whereCondition),
     ])
 
     return {
@@ -237,6 +252,85 @@ function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord
 
 function toDbNumeric(value: number) {
   return value.toFixed(4)
+}
+
+function matchesQuery(order: FlightOrderRecord, query: string | undefined) {
+  if (!query) {
+    return true
+  }
+
+  return order.bookingReference.toLowerCase().includes(query.toLowerCase())
+}
+
+function matchesStatusFilter(
+  order: FlightOrderRecord,
+  status: BookingListStatusFilter
+) {
+  switch (status) {
+    case "confirmed":
+      return order.paymentMode === "pay_now" && !order.paymentAwaiting
+    case "payment_pending":
+      return order.paymentMode === "pay_now" && order.paymentAwaiting
+    case "on_hold":
+      return order.paymentMode === "hold"
+    case "all":
+    default:
+      return true
+  }
+}
+
+function compareOrdersForSort(
+  left: FlightOrderRecord,
+  right: FlightOrderRecord,
+  sort: BookingListSort
+) {
+  switch (sort) {
+    case "oldest":
+      return left.createdAt.getTime() - right.createdAt.getTime()
+    case "amount_high":
+      return right.sellAmount - left.sellAmount || right.createdAt.getTime() - left.createdAt.getTime()
+    case "amount_low":
+      return left.sellAmount - right.sellAmount || right.createdAt.getTime() - left.createdAt.getTime()
+    case "newest":
+    default:
+      return right.createdAt.getTime() - left.createdAt.getTime()
+  }
+}
+
+function toStatusFilterCondition(status: BookingListStatusFilter) {
+  switch (status) {
+    case "confirmed":
+      return and(eq(flightOrders.paymentMode, "pay_now"), eq(flightOrders.paymentAwaiting, false))
+    case "payment_pending":
+      return and(eq(flightOrders.paymentMode, "pay_now"), eq(flightOrders.paymentAwaiting, true))
+    case "on_hold":
+      return eq(flightOrders.paymentMode, "hold")
+    case "all":
+    default:
+      return undefined
+  }
+}
+
+function toQueryCondition(query: string | undefined) {
+  if (!query) {
+    return undefined
+  }
+
+  return ilike(flightOrders.bookingReference, `%${query}%`)
+}
+
+function toOrderBy(sort: BookingListSort) {
+  switch (sort) {
+    case "oldest":
+      return [asc(flightOrders.createdAt)]
+    case "amount_high":
+      return [desc(flightOrders.sellAmount), desc(flightOrders.createdAt)]
+    case "amount_low":
+      return [asc(flightOrders.sellAmount), desc(flightOrders.createdAt)]
+    case "newest":
+    default:
+      return [desc(flightOrders.createdAt)]
+  }
 }
 
 function toOrderSnapshot(value: unknown): Record<string, unknown> {

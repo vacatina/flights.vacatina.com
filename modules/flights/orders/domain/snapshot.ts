@@ -11,6 +11,7 @@ import type {
   BookingDetailModel,
   BookingDetailNotificationItem,
   BookingListItem,
+  BookingListStatusCode,
   BuildFlightOrderSnapshotInput,
   FlightOrderSnapshot,
   FlightOrderSnapshotBookedService,
@@ -150,9 +151,24 @@ export function buildFlightOrderSnapshot(
 
 export function mapFlightOrderToListItem(order: FlightOrderRecord): BookingListItem {
   const snapshot = normalizeSnapshot(order.orderSnapshot)
+  const firstLeg = snapshot.legs[0] ?? null
+  const lastLeg = snapshot.legs[snapshot.legs.length - 1] ?? null
+  const statusCode = toBookingListStatusCode(order)
+
   return {
     bookingReference: order.bookingReference,
     routeLabel: snapshot.routeLabel ?? `${order.partialOfferRequestId}`,
+    journeyTypeLabel: snapshot.journeyTypeLabel || "Trip",
+    legCount: snapshot.legs.length,
+    passengerCount: snapshot.passengerCount,
+    airlineName: firstLeg?.ownerName ?? "Airline unavailable",
+    airlineLogoSymbolUrl: firstLeg?.ownerLogoSymbolUrl ?? null,
+    departureDateLabel: toLegDateLabel(firstLeg?.departureAtIso, firstLeg?.departureLabel),
+    returnDateLabel:
+      snapshot.legs.length > 1
+        ? toLegDateLabel(lastLeg?.departureAtIso, lastLeg?.departureLabel)
+        : null,
+    statusCode,
     createdAtLabel: format(order.createdAt, "d MMM yyyy, HH:mm"),
     paymentMode: order.paymentMode,
     statusLabel: toStatusLabel(order),
@@ -762,6 +778,41 @@ function createFallbackSnapshot(): FlightOrderSnapshot {
       totalAmountLabel: "USD0.00",
     },
   }
+}
+
+function toBookingListStatusCode(order: FlightOrderRecord): BookingListStatusCode {
+  if (order.paymentMode === "hold") {
+    return "on_hold"
+  }
+
+  if (order.paymentAwaiting) {
+    return "payment_pending"
+  }
+
+  return "confirmed"
+}
+
+function toLegDateLabel(
+  dateIso: string | null | undefined,
+  fallbackLabel: string | null | undefined
+) {
+  if (dateIso) {
+    const parsed = parseDateTime(dateIso)
+
+    if (parsed) {
+      return format(parsed, "d MMM yyyy")
+    }
+  }
+
+  if (fallbackLabel) {
+    const parsed = parseDateTime(fallbackLabel)
+
+    if (parsed) {
+      return format(parsed, "d MMM yyyy")
+    }
+  }
+
+  return null
 }
 
 function toStatusLabel(order: FlightOrderRecord) {

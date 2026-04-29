@@ -64,6 +64,9 @@ export async function listMyBookings(
     actor: ActorContext
     page: number
     pageSize: number
+    q?: string
+    status?: "all" | "confirmed" | "payment_pending" | "on_hold"
+    sort?: "newest" | "oldest" | "amount_high" | "amount_low"
   },
   deps: OrdersServiceDeps = defaultDeps
 ) {
@@ -74,17 +77,26 @@ export async function listMyBookings(
   const parsed = bookingListInputSchema.parse({
     page: input.page,
     pageSize: input.pageSize,
+    q: input.q,
+    status: input.status,
+    sort: input.sort,
   })
   const offset = (parsed.page - 1) * parsed.pageSize
   const result = await deps.orderRepository.listByOwnerUserId({
     ownerUserId: input.actor.appUserId,
     limit: parsed.pageSize,
     offset,
+    q: parsed.q,
+    status: parsed.status,
+    sort: parsed.sort,
   })
 
   return {
     page: parsed.page,
     pageSize: parsed.pageSize,
+    q: parsed.q,
+    status: parsed.status,
+    sort: parsed.sort,
     total: result.total,
     items: result.records.map(mapFlightOrderToListItem),
   }
