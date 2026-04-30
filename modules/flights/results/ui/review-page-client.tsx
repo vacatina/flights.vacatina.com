@@ -147,11 +147,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>Orders</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>New order</BreadcrumbLink>
+              <BreadcrumbLink render={<Link href="/" />}>Flights</BreadcrumbLink>
             </BreadcrumbItem>
             {data.breadcrumbs.map((breadcrumb) => (
               <div key={breadcrumb} className="contents">

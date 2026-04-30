@@ -342,13 +342,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>Orders</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>
-                New order
-              </BreadcrumbLink>
+              <BreadcrumbLink render={<Link href="/" />}>Flights</BreadcrumbLink>
             </BreadcrumbItem>
             {data.breadcrumbs.map((breadcrumb, index) => (
               <div key={breadcrumb} className="contents">

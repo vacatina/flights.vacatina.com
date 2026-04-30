@@ -442,19 +442,17 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink render={<Link href="/" />}>Orders</BreadcrumbLink>
+                <BreadcrumbLink render={<Link href="/" />}>Flights</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink render={<Link href="/" />}>New order</BreadcrumbLink>
+                <BreadcrumbLink className="text-muted-foreground">
+                  {data.tripSummary.routeLabel}
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink>Checkout</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Confirm</BreadcrumbPage>
+                <BreadcrumbPage>Checkout</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
