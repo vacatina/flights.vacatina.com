@@ -33,10 +33,7 @@ export function getPayHereConfig(): PayHereConfig {
   const merchantId = requiredEnv("PAYHERE_MERCHANT_ID")
   const merchantSecret = requiredEnv("PAYHERE_MERCHANT_SECRET")
   const appBaseUrl = requiredEnv("PAYHERE_APP_BASE_URL")
-  const sandbox = parseBooleanEnv(
-    "PAYHERE_SANDBOX",
-    !isProductionEnvironment()
-  )
+  const sandbox = parseBooleanEnv("PAYHERE_SANDBOX", !isProductionEnvironment())
   const scriptUrl = process.env.PAYHERE_SCRIPT_URL?.trim() || DEFAULT_SCRIPT_URL
   const notifyUrl = withPath(
     process.env.PAYHERE_NOTIFY_URL?.trim() || appBaseUrl,
@@ -53,9 +50,27 @@ export function getPayHereConfig(): PayHereConfig {
     notifyUrl,
     returnUrl,
     cancelUrl,
-    fxBufferPercent: clamp(parseNumberFromEnv("PAYHERE_FX_BUFFER_PERCENT", DEFAULT_FX_BUFFER_PERCENT), 0, 20),
-    markupRatePercent: clamp(parseNumberFromEnv("PAYHERE_MARKUP_RATE_PERCENT", DEFAULT_MARKUP_RATE_PERCENT), 0, 200),
-    markupFixedLkr: clamp(parseNumberFromEnv("PAYHERE_MARKUP_FIXED_LKR", DEFAULT_MARKUP_FIXED_LKR), 0, 1_000_000),
+    fxBufferPercent: clamp(
+      parseNumberFromEnv(
+        "PAYHERE_FX_BUFFER_PERCENT",
+        DEFAULT_FX_BUFFER_PERCENT
+      ),
+      0,
+      20
+    ),
+    markupRatePercent: clamp(
+      parseNumberFromEnv(
+        "PAYHERE_MARKUP_RATE_PERCENT",
+        DEFAULT_MARKUP_RATE_PERCENT
+      ),
+      0,
+      200
+    ),
+    markupFixedLkr: clamp(
+      parseNumberFromEnv("PAYHERE_MARKUP_FIXED_LKR", DEFAULT_MARKUP_FIXED_LKR),
+      0,
+      1_000_000
+    ),
     testFixedAmountLkr: resolveTestFixedAmount(),
   }
 
@@ -64,12 +79,15 @@ export function getPayHereConfig(): PayHereConfig {
 
 function resolveTestFixedAmount() {
   // Guardrail: never allow test amount override in production.
-  if (isProductionEnvironment()) {
+  if (!isProductionEnvironment()) {
     return null
   }
 
   const value = clamp(
-    parseNumberFromEnv("PAYHERE_TEST_FIXED_AMOUNT_LKR", DEFAULT_TEST_FIXED_AMOUNT_LKR),
+    parseNumberFromEnv(
+      "PAYHERE_TEST_FIXED_AMOUNT_LKR",
+      DEFAULT_TEST_FIXED_AMOUNT_LKR
+    ),
     0,
     1_000_000
   )
