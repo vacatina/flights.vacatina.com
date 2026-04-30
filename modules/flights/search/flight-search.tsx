@@ -1,13 +1,18 @@
 import { FlightSearchForm } from "@/modules/flights/search/ui"
+import type { FlightSearchFormValues } from "@/modules/flights/search/domain"
 
-export function FlightSearch() {
+interface FlightSearchProps {
+  initialValues?: FlightSearchFormValues
+}
+
+export function FlightSearch({ initialValues }: FlightSearchProps) {
   return (
     <main className="bg-muted">
-      <section className="relative isolate overflow-hidden pb-18">
+      <section className="relative isolate -mt-[90px] overflow-hidden pb-18 pt-[90px]">
         <div className="absolute inset-0 bg-[url('/img/hero.jpg')] bg-cover bg-center bg-no-repeat" />
         <div className="absolute inset-0 bg-[#05103680]" />
 
-        <div className="relative mx-auto w-full max-w-[1900px] px-4 pt-20 md:px-8 lg:px-12 lg:pt-24">
+        <div className="relative mx-auto w-full max-w-7xl px-4 pt-12 md:px-8 md:pt-14 lg:px-12 lg:pt-16">
           <div className="mx-auto max-w-4xl text-center text-white">
             <h1 className="text-[54px] font-semibold tracking-[-0.02em] text-balance md:text-[56px]">
               Book Everything in One Place
@@ -18,8 +23,8 @@ export function FlightSearch() {
             </p>
           </div>
 
-          <div className="mx-auto mt-8 w-full max-w-[1720px] md:mt-10">
-            <FlightSearchForm />
+          <div className="mx-auto mt-8 w-full max-w-7xl md:mt-10">
+            <FlightSearchForm initialValues={initialValues} />
           </div>
         </div>
       </section>

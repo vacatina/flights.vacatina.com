@@ -13,7 +13,7 @@ import {
 export default function BookingLookupPage() {
   return (
     <main className="min-h-svh bg-muted/40 py-8 md:py-10">
-      <div className="mx-auto w-full max-w-[720px] space-y-6 px-4 md:px-8">
+      <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>

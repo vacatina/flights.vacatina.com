@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeftRightIcon, PlusIcon, XIcon } from "lucide-react"
@@ -56,14 +56,28 @@ const JOURNEY_TAB_LABELS: Record<JourneyType, string> = {
   multi_city: "Multi City",
 }
 
-export function FlightSearchForm() {
+interface FlightSearchFormProps {
+  initialValues?: FlightSearchFormValues
+}
+
+export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
   const router = useRouter()
   const [isSubmitting, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const defaultValues = useMemo(() => createDefaultFlightSearchValues(), [])
+  const resolvedInitialValues = useMemo(
+    () => cloneFlightSearchFormValues(initialValues ?? defaultValues),
+    [defaultValues, initialValues]
+  )
+  const initialValuesSignature = useMemo(
+    () => JSON.stringify(resolvedInitialValues),
+    [resolvedInitialValues]
+  )
+  const lastAppliedInitialValuesSignatureRef = useRef(initialValuesSignature)
 
   const form = useForm<FlightSearchFormValues>({
     resolver: zodResolver(flightSearchFormSchema),
-    defaultValues: createDefaultFlightSearchValues(),
+    defaultValues: resolvedInitialValues,
     mode: "onSubmit",
   })
 
@@ -104,6 +118,15 @@ export function FlightSearchForm() {
       defaultJourneyType: form.getValues("journeyType"),
     })
   }, [form])
+
+  useEffect(() => {
+    if (lastAppliedInitialValuesSignatureRef.current === initialValuesSignature) {
+      return
+    }
+
+    lastAppliedInitialValuesSignatureRef.current = initialValuesSignature
+    form.reset(cloneFlightSearchFormValues(resolvedInitialValues))
+  }, [form, initialValuesSignature, resolvedInitialValues])
 
   useEffect(() => {
     if (journeyType !== "return") {
@@ -547,4 +570,25 @@ function toFormFieldPath(path: string): Path<FlightSearchFormValues> | null {
   }
 
   return null
+}
+
+function cloneFlightSearchFormValues(
+  values: FlightSearchFormValues
+): FlightSearchFormValues {
+  return {
+    journeyType: values.journeyType,
+    cabinClass: values.cabinClass,
+    passengers: {
+      adults: values.passengers.adults,
+      children: values.passengers.children,
+      childrenAges: [...values.passengers.childrenAges],
+    },
+    slices: values.slices.map((slice) => ({
+      origin: slice.origin ? { ...slice.origin } : null,
+      destination: slice.destination ? { ...slice.destination } : null,
+      departureDate: slice.departureDate,
+      departureTime: slice.departureTime ? { ...slice.departureTime } : null,
+      arrivalTime: slice.arrivalTime ? { ...slice.arrivalTime } : null,
+    })),
+  }
 }

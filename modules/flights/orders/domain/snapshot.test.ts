@@ -1,7 +1,11 @@
 import { expect, test } from "vitest"
 import type { Offer } from "@duffel/api/types"
+import type { FlightOrderRecord } from "@/modules/flights/checkout/server/order-repository"
 
-import { buildFlightOrderSnapshot } from "@/modules/flights/orders/domain"
+import {
+  buildFlightOrderSnapshot,
+  mapFlightOrderToListItem,
+} from "@/modules/flights/orders/domain"
 
 test("buildFlightOrderSnapshot uses multi-city summary and leg titles for 3+ legs", () => {
   const offer = createOffer({
@@ -64,6 +68,59 @@ test("buildFlightOrderSnapshot keeps outbound/inbound labels for mirrored return
   expect(snapshot.legs.map((leg) => leg.title)).toEqual(["Outbound", "Inbound"])
 })
 
+test("mapFlightOrderToListItem includes enriched booking list fields", () => {
+  const offer = createOffer({
+    slices: [
+      createSlice({
+        id: "sli_1",
+        originIata: "CMB",
+        destinationIata: "DXB",
+      }),
+      createSlice({
+        id: "sli_2",
+        originIata: "DXB",
+        destinationIata: "CMB",
+      }),
+    ],
+  })
+  const snapshot = buildFlightOrderSnapshot({
+    offer,
+    paymentMode: "pay_now",
+    currency: "USD",
+    sellAmount: 915.6,
+  })
+  const order = createFlightOrderRecord({
+    paymentMode: "pay_now",
+    paymentAwaiting: false,
+    orderSnapshot: snapshot,
+  })
+
+  const item = mapFlightOrderToListItem(order)
+
+  expect(item.bookingReference).toBe("BK-F60F36ABAD")
+  expect(item.journeyTypeLabel).toBe("Return")
+  expect(item.legCount).toBe(2)
+  expect(item.passengerCount).toBe(1)
+  expect(item.airlineName).toBe("Duffel Airways")
+  expect(item.statusCode).toBe("confirmed")
+  expect(item.departureDateLabel).toBe("4 Apr 2026")
+  expect(item.returnDateLabel).toBe("4 Apr 2026")
+})
+
+test("mapFlightOrderToListItem maps payment pending status code", () => {
+  const order = createFlightOrderRecord({
+    paymentMode: "pay_now",
+    paymentAwaiting: true,
+    orderSnapshot: {},
+  })
+
+  const item = mapFlightOrderToListItem(order)
+
+  expect(item.statusCode).toBe("payment_pending")
+  expect(item.departureDateLabel).toBeNull()
+  expect(item.returnDateLabel).toBeNull()
+})
+
 function createOffer(input: { slices: Offer["slices"] }) {
   return {
     id: "off_snapshot_1",
@@ -78,6 +135,41 @@ function createOffer(input: { slices: Offer["slices"] }) {
     passengers: [{ id: "pas_1", type: "adult" }],
     slices: input.slices,
   } as unknown as Offer
+}
+
+function createFlightOrderRecord(input: {
+  paymentMode: "pay_now" | "hold"
+  paymentAwaiting: boolean
+  orderSnapshot: Record<string, unknown>
+}): FlightOrderRecord {
+  return {
+    id: "ordr_1",
+    bookingReference: "BK-F60F36ABAD",
+    checkoutSessionId: "chs_1",
+    duffelOrderId: "ord_1",
+    partialOfferRequestId: "prq_1",
+    offerId: "off_1",
+    selectedPartialOffers: ["off_partial_1"],
+    ownerUserId: "usr_1",
+    ownerGuestId: null,
+    ownerOrgId: null,
+    contactEmail: "hashsandbox@gmail.com",
+    contactEmailHash: "hash_1",
+    paymentMode: input.paymentMode,
+    settlementType: "balance",
+    currency: "USD",
+    netAmount: 800,
+    sellAmount: 915.6,
+    duffelTotalAmount: 800,
+    duffelTotalCurrency: "USD",
+    paymentAwaiting: input.paymentAwaiting,
+    paymentRequiredBy: null,
+    priceGuaranteeExpiresAt: null,
+    paidAt: null,
+    orderSnapshot: input.orderSnapshot,
+    createdAt: new Date("2026-04-28T13:04:00.000Z"),
+    updatedAt: new Date("2026-04-28T13:04:00.000Z"),
+  }
 }
 
 function createSlice(input: {

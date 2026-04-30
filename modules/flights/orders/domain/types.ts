@@ -126,9 +126,34 @@ export interface BuildFlightOrderSnapshotInput {
   now?: Date
 }
 
+export type BookingListStatusFilter =
+  | "all"
+  | "confirmed"
+  | "payment_pending"
+  | "on_hold"
+
+export type BookingListSort =
+  | "newest"
+  | "oldest"
+  | "amount_high"
+  | "amount_low"
+
+export type BookingListStatusCode =
+  | "confirmed"
+  | "payment_pending"
+  | "on_hold"
+
 export interface BookingListItem {
   bookingReference: string
   routeLabel: string
+  journeyTypeLabel: string
+  legCount: number
+  passengerCount: number
+  airlineName: string
+  airlineLogoSymbolUrl: string | null
+  departureDateLabel: string | null
+  returnDateLabel: string | null
+  statusCode: BookingListStatusCode
   createdAtLabel: string
   paymentMode: "pay_now" | "hold"
   statusLabel: string

@@ -1,6 +1,7 @@
 import { expect, test } from "vitest"
 
 import { fetchFareOptionsData } from "@/modules/flights/results/server/service"
+import { parseSearchPrefillToken } from "@/modules/flights/search/domain"
 import type { OfferRequest, Offer } from "@duffel/api/types"
 
 const offerRequestFixture = {
@@ -103,6 +104,17 @@ const offerFixture = {
   ],
 } as unknown as Offer
 
+const getOfferPricingMapFixture = async () => ({
+  off_1: {
+    offerId: "off_1",
+    netAmount: 352.85,
+    sellAmount: 352.85,
+    currency: "USD",
+    appliedRuleId: null,
+    appliedRuleSpecificity: null,
+  },
+})
+
 test("fetchFareOptionsData uses selected offers and returns normalized data", async () => {
   let selectedParam: string[] | null = null
 
@@ -131,6 +143,7 @@ test("fetchFareOptionsData uses selected offers and returns normalized data", as
       async getAirlineLogosByAirlineId() {
         return {}
       },
+      getOfferPricingMap: getOfferPricingMapFixture,
       async listOffers() {
         return {
           data: [offerFixture],
@@ -147,6 +160,15 @@ test("fetchFareOptionsData uses selected offers and returns normalized data", as
   expect(result.breadcrumbs.length).toBe(2)
   expect(result.offers.length).toBe(1)
   expect(result.after).toBe("cursor_2")
+  expect(result.editSearchHref.startsWith("/?prefill=")).toBe(true)
+
+  const token = new URLSearchParams(result.editSearchHref.split("?")[1]).get("prefill")
+  const prefillValues = parseSearchPrefillToken(token)
+
+  expect(prefillValues).not.toBeNull()
+  expect(prefillValues?.journeyType).toBe("return")
+  expect(prefillValues?.slices[0]?.departureDate).toBe("2026-04-18")
+  expect(prefillValues?.slices[1]?.departureDate).toBe("2026-04-25")
 })
 
 test("fetchFareOptionsData applies priced sell amount to offer cards", async () => {
@@ -223,6 +245,7 @@ test("fetchFareOptionsData clamps leg into valid range", async () => {
       async getAirlineLogosByAirlineId() {
         return {}
       },
+      getOfferPricingMap: getOfferPricingMapFixture,
       async listOffers() {
         return {
           data: [offerFixture],
@@ -260,6 +283,7 @@ test("fetchFareOptionsData rejects missing selected offers for the requested leg
         async getAirlineLogosByAirlineId() {
           return {}
         },
+        getOfferPricingMap: getOfferPricingMapFixture,
         async listOffers() {
           return {
             data: [offerFixture],
@@ -296,6 +320,7 @@ test("fetchFareOptionsData rejects too many selected offers for the journey", as
         async getAirlineLogosByAirlineId() {
           return {}
         },
+        getOfferPricingMap: getOfferPricingMapFixture,
         async listOffers() {
           return {
             data: [offerFixture],
@@ -332,6 +357,7 @@ test("fetchFareOptionsData rejects duplicate selected offer IDs", async () => {
         async getAirlineLogosByAirlineId() {
           return {}
         },
+        getOfferPricingMap: getOfferPricingMapFixture,
         async listOffers() {
           return {
             data: [offerFixture],
@@ -376,6 +402,7 @@ test("fetchFareOptionsData omits undefined pagination cursor in list params", as
       async getAirlineLogosByAirlineId() {
         return {}
       },
+      getOfferPricingMap: getOfferPricingMapFixture,
       async listOffers(params) {
         receivedListParams = params
         return {
@@ -418,6 +445,7 @@ test("fetchFareOptionsData applies fetched airline logos", async () => {
           air_zz: logoUrl,
         }
       },
+      getOfferPricingMap: getOfferPricingMapFixture,
       async listOffers() {
         return {
           data: [offerFixture],

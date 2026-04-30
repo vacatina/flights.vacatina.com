@@ -8,7 +8,6 @@ import {
   FileDownIcon,
   PlaneTakeoffIcon,
   TicketIcon,
-  TriangleAlertIcon,
   UserIcon,
 } from "lucide-react"
 

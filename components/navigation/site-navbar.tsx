@@ -4,7 +4,8 @@ import { Show, UserButton } from "@clerk/nextjs"
 import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useState } from "react"
+import { usePathname } from "next/navigation"
+import { useState, useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -42,14 +43,32 @@ const resourceItems: NavLinkItem[] = [
   { href: "#", label: "Contact Us" },
 ]
 
+const transparentNavbarRoutes = ["/"]
+const scrollThresholdPx = 12
+
 export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
+  const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileOpenSection, setMobileOpenSection] = useState<
     "addons" | "resources" | null
   >(null)
+  const scrollY = useSyncExternalStore(
+    subscribeToScrollPosition,
+    readScrollPosition,
+    readServerScrollPosition
+  )
+  const isScrolled = scrollY > scrollThresholdPx
+  const routeUsesTransparentNavbar = matchesTransparentNavbarRoute(pathname)
+  const shouldShowTransparentNavbar =
+    routeUsesTransparentNavbar && !isScrolled && !mobileMenuOpen
 
   return (
-    <header className="sticky top-0 z-40 bg-[#13357b] text-primary-foreground">
+    <header
+      className={cn(
+        "sticky top-0 z-40 text-primary-foreground transition-colors duration-200",
+        shouldShowTransparentNavbar ? "bg-transparent" : "bg-[#13357b]"
+      )}
+    >
       <div className="mx-auto flex h-[90px] w-full items-center px-4 lg:px-8">
         <Link href="/" className="shrink-0" aria-label="Vacatina home">
           <Image
@@ -174,6 +193,35 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
       ) : null}
     </header>
   )
+}
+
+function matchesTransparentNavbarRoute(pathname: string | null) {
+  if (!pathname) {
+    return false
+  }
+
+  return transparentNavbarRoutes.some((route) => {
+    if (route === "/") {
+      return pathname === "/"
+    }
+
+    return pathname === route || pathname.startsWith(`${route}/`)
+  })
+}
+
+function subscribeToScrollPosition(onStoreChange: () => void) {
+  window.addEventListener("scroll", onStoreChange, { passive: true })
+  return () => {
+    window.removeEventListener("scroll", onStoreChange)
+  }
+}
+
+function readScrollPosition() {
+  return window.scrollY
+}
+
+function readServerScrollPosition() {
+  return 0
 }
 
 function DesktopDropdown({

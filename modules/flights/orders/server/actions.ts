@@ -37,7 +37,15 @@ export async function lookupBookingAction(
 
 export async function listMyBookingsAction(
   input: unknown
-): Promise<ActionResult<{ page: number; pageSize: number; total: number; items: BookingListItem[] }>> {
+): Promise<ActionResult<{
+  page: number
+  pageSize: number
+  q?: string
+  status: "all" | "confirmed" | "payment_pending" | "on_hold"
+  sort: "newest" | "oldest" | "amount_high" | "amount_low"
+  total: number
+  items: BookingListItem[]
+}>> {
   return executeListMyBookingsAction(input)
 }
 
@@ -82,7 +90,15 @@ export async function executeLookupBookingAction(
 export async function executeListMyBookingsAction(
   input: unknown,
   deps: OrdersActionDeps = {}
-): Promise<ActionResult<{ page: number; pageSize: number; total: number; items: BookingListItem[] }>> {
+): Promise<ActionResult<{
+  page: number
+  pageSize: number
+  q?: string
+  status: "all" | "confirmed" | "payment_pending" | "on_hold"
+  sort: "newest" | "oldest" | "amount_high" | "amount_low"
+  total: number
+  items: BookingListItem[]
+}>> {
   const actor = await resolveActionActorContext({
     scope: "orders.actions",
     resolveActor: deps.getActorContext,
@@ -101,6 +117,9 @@ export async function executeListMyBookingsAction(
       actor,
       page: parsed.data.page,
       pageSize: parsed.data.pageSize,
+      q: parsed.data.q,
+      status: parsed.data.status,
+      sort: parsed.data.sort,
     })
     return actionSuccess(result)
   } catch (error) {

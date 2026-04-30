@@ -1,6 +1,7 @@
 import type { Offer, OfferRequest } from "@duffel/api/types"
 
 import { getDuffelFlightConfig } from "@/lib/duffel/config"
+import { createSearchPrefillHrefFromOfferRequest } from "@/modules/flights/search/domain"
 import {
   applyOfferClientFilters,
   applyOfferClientSorting,
@@ -210,6 +211,7 @@ export async function fetchFareOptionsData(
     leg,
     totalLegs,
     selected: selectedForLeg,
+    editSearchHref: createSearchPrefillHrefFromOfferRequest(baseOfferRequest),
     breadcrumbs: createLegBreadcrumbs(offerRequest),
     searchSummary: createSearchSummary(offerRequest, leg),
     offers: sortedOffers,

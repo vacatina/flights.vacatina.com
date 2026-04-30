@@ -74,6 +74,7 @@ export interface FareOptionsPageData {
   leg: number
   totalLegs: number
   selected: string[]
+  editSearchHref: string
   breadcrumbs: string[]
   searchSummary: ResultsSearchSummary
   offers: OfferCardViewModel[]
