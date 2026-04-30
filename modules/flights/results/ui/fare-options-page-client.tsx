@@ -103,27 +103,30 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
     data.state.landingTo,
   ])
 
-  const updateQuery = useCallback(function updateQuery(
-    patch: Partial<Omit<FareOptionsPageData["state"], "selected">> & {
-      selected?: string[]
-    }
-  ) {
-    const nextState = {
-      ...data.state,
-      ...patch,
-      after: undefined,
-      selected: patch.selected ?? data.state.selected,
-    }
+  const updateQuery = useCallback(
+    function updateQuery(
+      patch: Partial<Omit<FareOptionsPageData["state"], "selected">> & {
+        selected?: string[]
+      }
+    ) {
+      const nextState = {
+        ...data.state,
+        ...patch,
+        after: undefined,
+        selected: patch.selected ?? data.state.selected,
+      }
 
-    if (isResultsStateEqual(nextState, data.state)) {
-      return
-    }
+      if (isResultsStateEqual(nextState, data.state)) {
+        return
+      }
 
-    const search = toResultsUrlSearchParams(nextState).toString()
-    router.replace(
-      `/results/${data.partialOfferRequestId}/fare-options?${search}`
-    )
-  }, [data.partialOfferRequestId, data.state, router])
+      const search = toResultsUrlSearchParams(nextState).toString()
+      router.replace(
+        `/results/${data.partialOfferRequestId}/fare-options?${search}`
+      )
+    },
+    [data.partialOfferRequestId, data.state, router]
+  )
 
   useEffect(() => {
     const nextValue = data.state.flightNumber ?? ""
@@ -134,15 +137,25 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   }, [data.state.flightNumber])
 
   useEffect(() => {
-    const nextRange: [number, number] = [data.state.takeoffFrom, data.state.takeoffTo]
+    const nextRange: [number, number] = [
+      data.state.takeoffFrom,
+      data.state.takeoffTo,
+    ]
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDraftTakeoffRange((current) => (sameRange(current, nextRange) ? current : nextRange))
+    setDraftTakeoffRange((current) =>
+      sameRange(current, nextRange) ? current : nextRange
+    )
   }, [data.state.takeoffFrom, data.state.takeoffTo])
 
   useEffect(() => {
-    const nextRange: [number, number] = [data.state.landingFrom, data.state.landingTo]
+    const nextRange: [number, number] = [
+      data.state.landingFrom,
+      data.state.landingTo,
+    ]
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDraftLandingRange((current) => (sameRange(current, nextRange) ? current : nextRange))
+    setDraftLandingRange((current) =>
+      sameRange(current, nextRange) ? current : nextRange
+    )
   }, [data.state.landingFrom, data.state.landingTo])
 
   useEffect(() => {
@@ -163,7 +176,10 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
   useEffect(() => {
     if (
-      sameRange(draftTakeoffRange, [data.state.takeoffFrom, data.state.takeoffTo])
+      sameRange(draftTakeoffRange, [
+        data.state.takeoffFrom,
+        data.state.takeoffTo,
+      ])
     ) {
       return
     }
@@ -187,7 +203,10 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
   useEffect(() => {
     if (
-      sameRange(draftLandingRange, [data.state.landingFrom, data.state.landingTo])
+      sameRange(draftLandingRange, [
+        data.state.landingFrom,
+        data.state.landingTo,
+      ])
     ) {
       return
     }
@@ -382,7 +401,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
 
         <div className="grid items-start gap-7 lg:grid-cols-[320px_1fr]">
           <aside className="hidden lg:sticky lg:top-6 lg:block lg:self-start">
-            <div className="max-h-[calc(100svh-3rem)] overflow-y-auto pr-2">
+            <div className="max-h-[calc(100svh-3rem)] overflow-y-auto p-0.5">
               <FiltersSidebar
                 data={data}
                 onChange={updateQuery}
@@ -410,9 +429,9 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                 {offers.map((offer) => (
                   <Card
                     key={offer.id}
-                    className="group/card overflow-hidden rounded-2xl border bg-card/95 transition-shadow duration-200 hover:shadow-md"
+                    className="group/card overflow-hidden rounded-2xl border bg-card/95 shadow-none duration-200 hover:shadow-md"
                   >
-                    <AccordionItem value={offer.id} className="border-b-0">
+                    <AccordionItem value={offer.id} className="border-none">
                       <CardHeader className="p-0">
                         <AccordionTrigger className="w-full px-6 py-5 no-underline hover:no-underline md:px-8 md:py-5">
                           <div className="grid w-full gap-8 text-left md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -579,11 +598,6 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                             {offer.totalAmountLabel}
                           </span>
                         </p>
-                        {!offer.isExpired && (
-                          <span className="text-xs text-muted-foreground">
-                            Includes taxes and fees
-                          </span>
-                        )}
                       </div>
                       {offer.isExpired ? (
                         <div className="inline-flex items-center gap-3 rounded-full bg-muted px-4 py-2 text-foreground">
@@ -685,7 +699,7 @@ function FiltersSidebar({
           <Button
             variant="outline"
             className="w-full rounded-xl"
-            render={<Link href="/" />}
+            render={<Link href={data.editSearchHref} />}
           >
             Edit search
           </Button>

@@ -165,6 +165,7 @@ function createFareOptionsData(
     leg: 0,
     totalLegs: 1,
     selected: [],
+    editSearchHref: "/?prefill=test_token",
     breadcrumbs: ["CMB to DXB"],
     searchSummary: {
       title: "One way to DXB",

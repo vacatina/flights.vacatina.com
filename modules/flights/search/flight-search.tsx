@@ -1,6 +1,11 @@
 import { FlightSearchForm } from "@/modules/flights/search/ui"
+import type { FlightSearchFormValues } from "@/modules/flights/search/domain"
 
-export function FlightSearch() {
+interface FlightSearchProps {
+  initialValues?: FlightSearchFormValues
+}
+
+export function FlightSearch({ initialValues }: FlightSearchProps) {
   return (
     <main className="bg-muted">
       <section className="relative isolate -mt-[90px] overflow-hidden pb-18 pt-[90px]">
@@ -19,7 +24,7 @@ export function FlightSearch() {
           </div>
 
           <div className="mx-auto mt-8 w-full max-w-7xl md:mt-10">
-            <FlightSearchForm />
+            <FlightSearchForm initialValues={initialValues} />
           </div>
         </div>
       </section>
