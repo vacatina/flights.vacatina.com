@@ -52,7 +52,7 @@ export default async function BookingDetailPage({
   if (!detail) {
     return (
       <main className="min-h-svh bg-muted/40 py-8 md:py-10">
-        <div className="mx-auto w-full max-w-[780px] space-y-4 px-4 md:px-8">
+        <div className="mx-auto w-full max-w-3xl space-y-4 px-4 md:px-8">
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
             Unable to load booking
           </h1>
@@ -67,7 +67,7 @@ export default async function BookingDetailPage({
 
   return (
     <main className="min-h-svh bg-background py-6 md:py-8">
-      <div className="mx-auto w-full max-w-[1980px] space-y-6 px-4 md:px-6 xl:px-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 md:px-6 xl:px-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>

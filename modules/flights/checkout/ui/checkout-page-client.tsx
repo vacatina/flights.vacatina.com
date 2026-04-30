@@ -437,7 +437,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   return (
     <main className="min-h-svh bg-muted/40 py-6 md:py-10">
-      <div className="mx-auto w-full max-w-[1320px] px-4 md:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
         <div className="space-y-6">
           <Breadcrumb>
             <BreadcrumbList>

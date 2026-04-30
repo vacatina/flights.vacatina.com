@@ -7,7 +7,7 @@ export function FlightSearch() {
         <div className="absolute inset-0 bg-[url('/img/hero.jpg')] bg-cover bg-center bg-no-repeat" />
         <div className="absolute inset-0 bg-[#05103680]" />
 
-        <div className="relative mx-auto w-full max-w-[1900px] px-4 pt-20 md:px-8 lg:px-12 lg:pt-24">
+        <div className="relative mx-auto w-full max-w-7xl px-4 pt-20 md:px-8 lg:px-12 lg:pt-24">
           <div className="mx-auto max-w-4xl text-center text-white">
             <h1 className="text-[54px] font-semibold tracking-[-0.02em] text-balance md:text-[56px]">
               Book Everything in One Place
@@ -18,7 +18,7 @@ export function FlightSearch() {
             </p>
           </div>
 
-          <div className="mx-auto mt-8 w-full max-w-[1720px] md:mt-10">
+          <div className="mx-auto mt-8 w-full max-w-7xl md:mt-10">
             <FlightSearchForm />
           </div>
         </div>

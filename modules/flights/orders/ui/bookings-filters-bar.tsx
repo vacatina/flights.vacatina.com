@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { ArrowUpDownIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react"
 
 import type {
   BookingListSort,
@@ -89,22 +90,30 @@ export function BookingsFiltersBar({
 
   return (
     <section
-      className="rounded-xl border border-border bg-card p-4"
+      className="rounded-2xl border border-border/80 bg-card/70 p-4 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/60"
       aria-label="Bookings filters"
     >
+      <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <SlidersHorizontalIcon className="size-4" />
+        <span>Refine bookings</span>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px_auto] md:items-center">
         <div className="space-y-1">
           <label htmlFor="bookings-search" className="text-sm text-muted-foreground">
             Search booking reference
           </label>
-          <Input
-            id="bookings-search"
-            value={queryDraft}
-            onChange={(event) => setQueryDraft(event.target.value)}
-            placeholder="e.g. BK-F60F36ABAD"
-            className="h-10 text-base md:text-base"
-            autoComplete="off"
-          />
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="bookings-search"
+              value={queryDraft}
+              onChange={(event) => setQueryDraft(event.target.value)}
+              placeholder="e.g. BK-F60F36ABAD"
+              className="h-10 pl-9 text-base md:text-base"
+              autoComplete="off"
+            />
+          </div>
         </div>
 
         <div className="space-y-1">
@@ -143,6 +152,7 @@ export function BookingsFiltersBar({
             }
           >
             <SelectTrigger id="bookings-sort" className="h-10 w-full text-base">
+              <ArrowUpDownIcon className="mr-1 size-4 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -165,6 +175,7 @@ export function BookingsFiltersBar({
               router.replace(pathname, { scroll: false })
             }}
           >
+            <XIcon className="mr-1 size-4" />
             Clear filters
           </Button>
         </div>

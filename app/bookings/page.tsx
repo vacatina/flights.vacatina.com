@@ -64,7 +64,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
 
   return (
     <main className="min-h-svh bg-muted/40 py-8 md:py-10">
-      <div className="mx-auto w-full max-w-[1160px] space-y-6 px-4 md:px-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 md:px-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -77,8 +77,9 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">My bookings</h1>
+        <div className="space-y-1">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">Bookings center</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">My bookings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             View and manage your previous bookings.
           </p>
