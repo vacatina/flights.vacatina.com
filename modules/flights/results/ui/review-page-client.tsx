@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Show } from "@clerk/nextjs"
 import { ArrowRightIcon, BriefcaseIcon, CheckIcon, Loader2Icon } from "lucide-react"
@@ -27,6 +27,8 @@ import { createCheckoutQuoteAction } from "@/modules/flights/results/server/acti
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
+const REVIEW_FOCUS_LEG_QUERY_PARAM = "focusLeg"
+
 export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -36,7 +38,20 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
   const [pendingFareSelection, setPendingFareSelection] = useState<string | null>(null)
   const [isCreatingQuote, startCreatingQuote] = useTransition()
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const legSectionRefs = useRef(new Map<number, HTMLElement>())
+  const focusLegIndex = parseFocusLegIndex(
+    searchParams.get(REVIEW_FOCUS_LEG_QUERY_PARAM)
+  )
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
+
+  const setLegSectionRef = useCallback((legIndex: number, node: HTMLElement | null) => {
+    if (node) {
+      legSectionRefs.current.set(legIndex, node)
+      return
+    }
+
+    legSectionRefs.current.delete(legIndex)
+  }, [])
 
   useEffect(() => {
     logFlightFlow("ReviewPageClient", "hydrated", {
@@ -54,6 +69,59 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
     data.totalLegs,
   ])
 
+  useEffect(() => {
+    if (focusLegIndex === null) {
+      return
+    }
+
+    const targetLeg = data.legs.find((leg) => leg.legIndex === focusLegIndex)
+
+    if (!targetLeg || targetLeg.isLocked) {
+      return
+    }
+
+    const sectionNode = legSectionRefs.current.get(focusLegIndex)
+
+    if (!sectionNode) {
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      sectionNode.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+
+      const firstOptionButton = sectionNode.querySelector<HTMLButtonElement>(
+        "button[data-review-fare-option='true']"
+      )
+      firstOptionButton?.focus({ preventScroll: true })
+
+      logFlightFlow("ReviewPageClient", "auto_scrolled_to_next_leg", {
+        partialOfferRequestId: data.partialOfferRequestId,
+        nextLegIndex: focusLegIndex,
+      })
+
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete(REVIEW_FOCUS_LEG_QUERY_PARAM)
+      const nextQuery = nextParams.toString()
+      const nextHref = nextQuery ? `${pathname}?${nextQuery}` : pathname
+
+      router.replace(nextHref, { scroll: false })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
+  }, [
+    data.legs,
+    data.partialOfferRequestId,
+    focusLegIndex,
+    pathname,
+    router,
+    searchParams,
+  ])
+
   function onSelectFare(legIndex: number, fareKey: string) {
     if (isSelectingFare) {
       return
@@ -69,11 +137,18 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
       fareCountBefore: data.state.fare.length,
     })
     const nextFare = [...data.state.fare.slice(0, legIndex), fareKey]
+    const nextLegIndex = legIndex + 1
     const nextState = {
       ...data.state,
       fare: nextFare,
     }
-    const query = toReviewUrlSearchParams(nextState).toString()
+    const nextParams = toReviewUrlSearchParams(nextState)
+
+    if (nextLegIndex < data.totalLegs) {
+      nextParams.set(REVIEW_FOCUS_LEG_QUERY_PARAM, String(nextLegIndex))
+    }
+
+    const query = nextParams.toString()
 
     logFlightFlow("ReviewPageClient", "navigate_with_fare_selection", {
       partialOfferRequestId: data.partialOfferRequestId,
@@ -169,7 +244,12 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_290px]">
           <div className="space-y-10">
             {data.legs.map((leg) => (
-              <section key={leg.legIndex} className="space-y-4">
+              <section
+                key={leg.legIndex}
+                ref={(node) => setLegSectionRef(leg.legIndex, node)}
+                data-review-leg={leg.legIndex}
+                className="space-y-4 scroll-mt-24"
+              >
                 <div className="space-y-3">
                   <p className="text-xl font-semibold tracking-tight md:text-2xl">
                     {leg.title}
@@ -253,6 +333,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                         <button
                           key={option.key}
                           type="button"
+                          data-review-fare-option="true"
                           disabled={isSelectingFare}
                           aria-busy={isPendingSelection}
                           onClick={() => onSelectFare(leg.legIndex, option.key)}
@@ -391,4 +472,18 @@ function buildRedirectPath(pathname: string | null, search: string) {
   }
 
   return `${normalizedPathname}?${search}`
+}
+
+function parseFocusLegIndex(rawValue: string | null): number | null {
+  if (!rawValue) {
+    return null
+  }
+
+  const parsed = Number.parseInt(rawValue, 10)
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null
+  }
+
+  return parsed
 }

@@ -7,6 +7,7 @@ import { ReviewPageClient } from "@/modules/flights/results/ui/review-page-clien
 
 const replaceMock = vi.fn()
 const pushMock = vi.fn()
+let searchParamsValue = "selected=off_partial_1%2Coff_partial_2"
 const createCheckoutQuoteActionMock = vi.fn<
   (input: unknown) => Promise<{ ok: true; data: { quoteId: string; expiresAt: string } }>
 >(async () => ({
@@ -22,16 +23,24 @@ afterEach(() => {
   replaceMock.mockClear()
   pushMock.mockClear()
   createCheckoutQuoteActionMock.mockClear()
+  searchParamsValue = "selected=off_partial_1%2Coff_partial_2"
 })
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
-    replace: replaceMock,
+    replace: (...args: unknown[]) => {
+      replaceMock(...args)
+      const href = args[0]
+
+      if (typeof href === "string") {
+        const query = href.split("?")[1]
+        searchParamsValue = query ?? ""
+      }
+    },
     push: pushMock,
   }),
   usePathname: () => "/results/prq_1/review",
-  useSearchParams: () =>
-    new URLSearchParams("selected=off_partial_1%2Coff_partial_2"),
+  useSearchParams: () => new URLSearchParams(searchParamsValue),
 }))
 
 vi.mock("@/modules/flights/results/server/actions", () => ({
@@ -60,9 +69,15 @@ test("ReviewPageClient updates URL when selecting a fare", () => {
   })
   fireEvent.click(fareButton)
 
-  expect(replaceMock).toHaveBeenCalledWith(
-    "/results/prq_1/review?selected=off_partial_1%2Coff_partial_2&fare=fare_out_eco"
-  )
+  expect(replaceMock).toHaveBeenCalledTimes(1)
+  const navigationUrl = replaceMock.mock.calls[0]?.[0] as string
+  const search = navigationUrl.split("?")[1]
+
+  expect(search).toBeTruthy()
+  const params = new URLSearchParams(search)
+  expect(params.get("selected")).toBe("off_partial_1,off_partial_2")
+  expect(params.getAll("fare")).toEqual(["fare_out_eco"])
+  expect(params.get("focusLeg")).toBe("1")
 })
 
 test("ReviewPageClient navigates to checkout when summary is complete", async () => {
@@ -99,6 +114,72 @@ test("ReviewPageClient navigates to checkout when summary is complete", async ()
     partialOfferRequestId: "prq_1",
     selected: ["off_partial_1", "off_partial_2"],
     offerId: "off_1",
+  })
+})
+
+test("ReviewPageClient auto-scrolls to next leg after fare selection", async () => {
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+  const scrollIntoViewMock = vi.fn()
+
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: scrollIntoViewMock,
+  })
+
+  const { rerender } = render(<ReviewPageClient data={createReviewData()} />)
+
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /Economy Convenience/i,
+    })
+  )
+
+  const inboundUnlockedData = createReviewData({
+    state: {
+      selected: ["off_partial_1", "off_partial_2"],
+      fare: ["fare_out_eco"],
+    },
+    legs: [
+      {
+        ...createReviewData().legs[0],
+      },
+      {
+        ...createReviewData().legs[1],
+        isLocked: false,
+        lockMessage: undefined,
+        options: [
+          {
+            key: "fare_in_classic",
+            legIndex: 1,
+            cabinLabel: "ECONOMY",
+            fareLabel: "Economy Classic",
+            lines: [
+              {
+                id: "changes",
+                label: "No data on changes",
+                kind: "change",
+              },
+            ],
+            priceFromLabel: "US$943.60",
+            priceFromValue: 943.6,
+            currency: "USD",
+            isSelected: false,
+            isSelectable: true,
+          },
+        ],
+      },
+    ],
+  })
+
+  rerender(<ReviewPageClient data={inboundUnlockedData} />)
+
+  await waitFor(() => {
+    expect(scrollIntoViewMock).toHaveBeenCalled()
+  })
+
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: originalScrollIntoView,
   })
 })
 
