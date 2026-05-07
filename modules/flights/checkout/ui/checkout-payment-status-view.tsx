@@ -39,10 +39,8 @@ export function CheckoutPaymentStatusView({
             </div>
             <p className="text-sm font-medium text-foreground">Processing payment...</p>
           </div>
-          <p>Payment was received. We are confirming your order with the airline.</p>
-          <p>
-            This can take a few moments. Keep this page open or refresh if needed.
-          </p>
+          <p>Stripe payment was received. We are confirming your order with the airline.</p>
+          <p>This can take a few moments. Keep this page open or refresh if needed.</p>
           {sessionId ? <p>Checkout session: {sessionId}</p> : null}
         </CardContent>
       </Card>

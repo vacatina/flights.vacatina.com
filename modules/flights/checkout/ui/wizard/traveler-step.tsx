@@ -128,17 +128,17 @@ export function CheckoutTravelerStep({
         <div className="grid gap-3 md:grid-cols-2">
           <button
             type="button"
-            disabled={!data.payHere.payNowEnabled}
+            disabled={!data.payment.payNowEnabled}
             onClick={() => form.setValue("paymentMode", "pay_now")}
             className={cn(
               "rounded-2xl border px-4 py-4 text-left",
               paymentMode === "pay_now" ? "border-emerald-500 bg-emerald-50/50" : "bg-card",
-              !data.payHere.payNowEnabled && "cursor-not-allowed opacity-60"
+              !data.payment.payNowEnabled && "cursor-not-allowed opacity-60"
             )}
           >
             <p className="text-lg font-semibold md:text-base">Pay now</p>
             <p className="text-sm text-muted-foreground">
-              Pay with PayHere ({data.payHere.chargeCurrency})
+              Pay with Stripe ({data.payment.chargeCurrency})
             </p>
           </button>
           <button
@@ -162,15 +162,14 @@ export function CheckoutTravelerStep({
             Payment required by {data.paymentRequirements.paymentRequiredByLabel}
           </p>
         ) : null}
-        {paymentMode === "pay_now" && !data.payHere.payNowEnabled ? (
+        {paymentMode === "pay_now" && !data.payment.payNowEnabled ? (
           <p className="text-sm text-destructive">
-            {data.payHere.unavailableReason ?? "Pay now is unavailable for this fare."}
+            {data.payment.unavailableReason ?? "Pay now is unavailable for this fare."}
           </p>
         ) : null}
-        {paymentMode === "pay_now" && data.payHere.payNowEnabled ? (
+        {paymentMode === "pay_now" && data.payment.payNowEnabled ? (
           <p className="text-sm text-muted-foreground">
-            Charges are settled in {data.payHere.chargeCurrency}. FX includes a{" "}
-            {data.payHere.fxBufferPercent}% buffer.
+            You will be redirected to Stripe Checkout to complete payment securely.
           </p>
         ) : null}
       </section>
@@ -195,32 +194,6 @@ export function CheckoutTravelerStep({
               id="checkout-contact-phone"
               placeholder="+94771234567"
               {...form.register("contact.phoneNumber")}
-            />
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2 md:col-span-3">
-            <Label htmlFor="checkout-billing-address">Billing address</Label>
-            <Input
-              id="checkout-billing-address"
-              placeholder="123 Main Street"
-              {...form.register("billing.address")}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="checkout-billing-city">City</Label>
-            <Input
-              id="checkout-billing-city"
-              placeholder="Colombo"
-              {...form.register("billing.city")}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="checkout-billing-country">Country</Label>
-            <Input
-              id="checkout-billing-country"
-              placeholder="Sri Lanka"
-              {...form.register("billing.country")}
             />
           </div>
         </div>

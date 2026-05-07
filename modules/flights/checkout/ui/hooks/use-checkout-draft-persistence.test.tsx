@@ -31,7 +31,6 @@ describe("useCheckoutDraftPersistence", () => {
         },
       })
       expect(stored.contact).toBeUndefined()
-      expect(stored.billing).toBeUndefined()
       expect(stored.passengers).toBeUndefined()
       expect(stored.metadata).toBeUndefined()
     })
@@ -90,11 +89,6 @@ function DraftHarness({ draftKey }: { draftKey: string }) {
               email: "pii@example.com",
               phoneNumber: "+94710000000",
             },
-            billing: {
-              address: "123 Sensitive Street",
-              city: "Colombo",
-              country: "Sri Lanka",
-            },
             passengers: [
               {
                 id: "pas_1",
@@ -133,11 +127,6 @@ function createDefaultValues(): CheckoutFormValues {
     contact: {
       email: "",
       phoneNumber: "",
-    },
-    billing: {
-      address: "",
-      city: "",
-      country: "Sri Lanka",
     },
     passengers: [
       {

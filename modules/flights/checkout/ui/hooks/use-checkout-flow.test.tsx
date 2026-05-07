@@ -9,8 +9,6 @@ const mocks = vi.hoisted(() => ({
   getCheckoutSessionStatusActionMock: vi.fn(),
   startCheckoutPaymentActionMock: vi.fn(),
   submitCheckoutActionMock: vi.fn(),
-  ensurePayHereSdkMock: vi.fn(),
-  startPayHerePaymentMock: vi.fn(),
 }))
 
 vi.mock("@/modules/flights/checkout/server/actions", () => ({
@@ -19,51 +17,56 @@ vi.mock("@/modules/flights/checkout/server/actions", () => ({
   submitCheckoutAction: mocks.submitCheckoutActionMock,
 }))
 
-vi.mock("@/modules/flights/checkout/ui/payhere-client", () => ({
-  ensurePayHereSdk: mocks.ensurePayHereSdkMock,
-  startPayHerePayment: mocks.startPayHerePaymentMock,
-}))
-
 describe("useCheckoutFlow", () => {
+  const assignSpy = vi.fn()
+  const originalLocation = window.location
+
   beforeEach(() => {
     vi.clearAllMocks()
+    assignSpy.mockReset()
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        ...originalLocation,
+        assign: (url: string | URL) => {
+          assignSpy(String(url))
+        },
+      },
+    })
   })
 
   afterEach(() => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    })
     cleanup()
   })
 
-  test("keeps a single polling loop for the same checkout session", async () => {
+  test("pay_now redirects to Stripe Checkout", async () => {
     mocks.startCheckoutPaymentActionMock.mockResolvedValue({
       ok: true,
       data: {
         checkoutSessionId: "chs_1",
-        payment: {
-          sandbox: true,
-          merchant_id: "merchant",
-          return_url: "https://example.com/return",
-          cancel_url: "https://example.com/cancel",
-          notify_url: "https://example.com/notify",
-          order_id: "chs_1",
-          items: "Flight booking",
-          amount: "123.00",
-          currency: "LKR",
-          first_name: "John",
-          last_name: "Doe",
-          email: "john@example.com",
-          phone: "+94710000000",
-          address: "Colombo",
-          city: "Colombo",
-          country: "Sri Lanka",
-          hash: "hash",
-        },
+        redirectUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
         chargeAmount: 123,
-        chargeCurrency: "LKR",
-        chargeAmountLabel: "LKR123.00",
+        chargeCurrency: "USD",
+        chargeAmountLabel: "USD 123.00",
         status: "processing",
       },
     })
-    mocks.ensurePayHereSdkMock.mockResolvedValue(undefined)
+
+    render(<CheckoutFlowHarness />)
+    fireEvent.click(screen.getByRole("button", { name: "Submit pay now" }))
+
+    await waitFor(() => {
+      expect(assignSpy).toHaveBeenCalledWith(
+        "https://checkout.stripe.com/c/pay/cs_test_1"
+      )
+    })
+  })
+
+  test("resumePayNowProcessing polls checkout status until completion", async () => {
     mocks.getCheckoutSessionStatusActionMock.mockResolvedValue({
       ok: true,
       data: {
@@ -71,19 +74,22 @@ describe("useCheckoutFlow", () => {
         status: "completed",
         message: null,
         duffelOrderId: "ord_1",
-        totalChargeAmountLabel: "LKR123.00",
+        bookingReference: "BK-TESTREF001",
+        totalChargeAmountLabel: "USD 123.00",
       },
-    })
-    mocks.startPayHerePaymentMock.mockImplementation((input) => {
-      input.onCompleted()
-      input.onCompleted()
     })
 
     render(<CheckoutFlowHarness />)
-    fireEvent.click(screen.getByRole("button", { name: "Submit pay now" }))
+    fireEvent.click(screen.getByRole("button", { name: "Resume pay now" }))
 
     await waitFor(() => {
-      expect(mocks.getCheckoutSessionStatusActionMock).toHaveBeenCalledTimes(1)
+      expect(mocks.getCheckoutSessionStatusActionMock).toHaveBeenCalledWith({
+        checkoutSessionId: "chs_1",
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submit-success").textContent).toContain("ord_1")
     })
   })
 })
@@ -94,14 +100,28 @@ function CheckoutFlowHarness() {
   })
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        flow.onSubmit(createPayNowValues())
-      }}
-    >
-      Submit pay now
-    </button>
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          flow.onSubmit(createPayNowValues())
+        }}
+      >
+        Submit pay now
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void flow.resumePayNowProcessing("chs_1")
+        }}
+      >
+        Resume pay now
+      </button>
+      <output data-testid="submit-error">{flow.submitError}</output>
+      <output data-testid="submit-success">
+        {flow.submitSuccess ? `${flow.submitSuccess.duffelOrderId}:${flow.submitSuccess.bookingReference}` : ""}
+      </output>
+    </div>
   )
 }
 
@@ -111,11 +131,6 @@ function createPayNowValues(): CheckoutFormValues {
     contact: {
       email: "john@example.com",
       phoneNumber: "+94710000000",
-    },
-    billing: {
-      address: "No 1",
-      city: "Colombo",
-      country: "Sri Lanka",
     },
     passengers: [
       {
@@ -153,8 +168,8 @@ function createCheckoutData(): CheckoutPageData {
       quoteId: "pqt_1",
       currency: "USD",
       fareNetAmount: 100,
-      fareSellAmount: 110,
-      fareSellAmountLabel: "US$110.00",
+      fareSellAmount: 123,
+      fareSellAmountLabel: "US$123.00",
       expiresAtIso: "2026-04-25T10:00:00.000Z",
       expiresAtLabel: "25 Apr 2026, 15:30",
     },
@@ -182,18 +197,14 @@ function createCheckoutData(): CheckoutPageData {
       offer: {} as CheckoutPageData["ancillary"]["offer"],
       seatMaps: [],
     },
-    payHere: {
+    payment: {
+      provider: "stripe",
+      checkoutUi: "hosted",
       payNowEnabled: true,
       unavailableReason: null,
-      chargeCurrency: "LKR",
-      estimatedFareAmountLkr: 123,
-      estimatedFareAmountLkrLabel: "LKR123.00",
-      fxSourceCurrency: "USD",
-      fxTargetCurrency: "LKR",
-      fxBaseRate: 300,
-      fxBufferPercent: 3,
-      fxEffectiveRate: 309,
-      scriptUrl: "https://www.payhere.lk/lib/payhere.js",
+      chargeAmount: 123,
+      chargeCurrency: "USD",
+      chargeAmountLabel: "USD 123.00",
     },
   }
 }

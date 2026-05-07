@@ -59,14 +59,13 @@ export function CheckoutPayStep({
               <span>Total</span>
               <span>
                 {paymentMode === "pay_now"
-                  ? data.payHere.estimatedFareAmountLkrLabel ??
-                    `${data.payHere.chargeCurrency} --`
+                  ? formatPreviewCurrency(totalPreview, data.payment.chargeCurrency)
                   : formatPreviewCurrency(totalPreview, data.quote.currency)}
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
               {paymentMode === "pay_now"
-                ? "Final PayHere charge is recalculated server-side from latest fare and selected extras."
+                ? "Stripe Checkout charges the exact displayed booking total for this itinerary."
                 : "Final amount is revalidated on confirm before order creation."}
             </p>
           </CardContent>
@@ -110,7 +109,7 @@ export function CheckoutPayStep({
             ? "Confirming..."
             : paymentMode === "hold"
               ? "Confirm and hold"
-              : "Pay with PayHere"}
+              : "Pay with Stripe"}
           <ArrowRightIcon data-icon="inline-end" />
         </Button>
       </div>

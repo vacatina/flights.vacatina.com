@@ -1,5 +1,4 @@
 import type { CreateOrderService, Offer, SeatMap } from "@duffel/api/types"
-import type { PayHereStartPaymentPayload } from "@/modules/flights/payments/payhere"
 
 export type CheckoutPaymentMode = "pay_now" | "hold"
 export type CheckoutWizardStep = "traveler" | "extras" | "pay"
@@ -16,17 +15,12 @@ export interface CheckoutUrlState {
   step: CheckoutWizardStep
   status?: CheckoutPaymentUiStatus
   sessionId?: string
+  cancelled?: boolean
 }
 
 export interface CheckoutContactInput {
   email: string
   phoneNumber: string
-}
-
-export interface CheckoutBillingInput {
-  address: string
-  city: string
-  country: string
 }
 
 export interface CheckoutIdentityDocumentInput {
@@ -78,7 +72,6 @@ export interface CheckoutSubmitInput {
   selectedPartialOffers: string[]
   paymentMode: CheckoutPaymentMode
   contact: CheckoutContactInput
-  billing: CheckoutBillingInput | null
   passengers: CheckoutPassengerInput[]
   metadata: CheckoutMetadataPairInput[]
   ancillarySelection?: CheckoutAncillarySelectionInput | null
@@ -157,18 +150,14 @@ export interface CheckoutPageData {
     offer: Offer
     seatMaps: SeatMap[]
   }
-  payHere: {
+  payment: {
+    provider: "stripe"
+    checkoutUi: "hosted"
     payNowEnabled: boolean
     unavailableReason: string | null
-    chargeCurrency: "LKR"
-    estimatedFareAmountLkr: number | null
-    estimatedFareAmountLkrLabel: string | null
-    fxSourceCurrency: string
-    fxTargetCurrency: "LKR"
-    fxBaseRate: number | null
-    fxBufferPercent: number
-    fxEffectiveRate: number | null
-    scriptUrl: string
+    chargeAmount: number | null
+    chargeCurrency: string
+    chargeAmountLabel: string | null
   }
 }
 
@@ -201,9 +190,9 @@ export interface CheckoutSubmissionResult {
 
 export interface CheckoutPaymentStartResult {
   checkoutSessionId: string
-  payment: PayHereStartPaymentPayload
+  redirectUrl: string
   chargeAmount: number
-  chargeCurrency: "LKR"
+  chargeCurrency: string
   chargeAmountLabel: string
   status: "processing"
 }

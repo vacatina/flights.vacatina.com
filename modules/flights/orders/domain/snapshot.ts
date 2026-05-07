@@ -34,9 +34,6 @@ interface BookingDetailMapContext {
     providerStatusMessage: string | null
     paymentCurrency: string | null
     paymentAmount: number | null
-    fxSourceCurrency: string | null
-    fxTargetCurrency: string | null
-    fxEffectiveRate: number | null
     errorMessage: string | null
   } | null
   notifications: Array<{
@@ -215,9 +212,6 @@ export function mapFlightOrderToDetailModel(
             checkoutSession.paymentCurrency
           )
         : null,
-    fxSourceCurrency: checkoutSession?.fxSourceCurrency ?? null,
-    fxTargetCurrency: checkoutSession?.fxTargetCurrency ?? null,
-    fxEffectiveRate: checkoutSession?.fxEffectiveRate ?? null,
     checkoutErrorMessage: checkoutSession?.errorMessage ?? null,
     notifications,
     snapshot,

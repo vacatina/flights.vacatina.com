@@ -179,9 +179,6 @@ export interface BookingDetailModel {
   providerStatusMessage: string | null
   paymentCurrency: string | null
   paymentAmountLabel: string | null
-  fxSourceCurrency: string | null
-  fxTargetCurrency: string | null
-  fxEffectiveRate: number | null
   checkoutErrorMessage: string | null
   notifications: BookingDetailNotificationItem[]
   snapshot: FlightOrderSnapshot

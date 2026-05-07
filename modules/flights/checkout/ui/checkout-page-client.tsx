@@ -64,17 +64,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   const form = useForm<CheckoutFormValues>({
     defaultValues: {
       paymentMode:
-        data.payHere.payNowEnabled || !data.paymentRequirements.canHold
+        data.payment.payNowEnabled || !data.paymentRequirements.canHold
           ? "pay_now"
           : "hold",
       contact: {
         email: "",
         phoneNumber: "",
-      },
-      billing: {
-        address: "",
-        city: "",
-        country: "Sri Lanka",
       },
       passengers: data.passengerDefaults.map((passenger) => ({
         id: passenger.id,
@@ -117,22 +112,20 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     control: form.control,
     name: "contact",
   })
-  const billingWatch = useWatch({
-    control: form.control,
-    name: "billing",
-  })
 
   const buildCheckoutHref = useCallback(
     (input: {
       step: CheckoutWizardStep
       status?: CheckoutPaymentUiStatus
       sessionId?: string
+      cancelled?: boolean
     }) => {
       const params = toCheckoutUrlSearchParams({
         ...data.state,
         step: input.step,
         status: input.status,
         sessionId: input.sessionId,
+        cancelled: input.cancelled,
       })
       return `/results/${data.partialOfferRequestId}/checkout?${params.toString()}`
     },
@@ -141,15 +134,6 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   const checkoutFlow = useCheckoutFlow({
     data,
-    onPayNowProcessingStart: (sessionId) => {
-      router.replace(
-        buildCheckoutHref({
-          step: "pay",
-          status: "processing",
-          sessionId,
-        })
-      )
-    },
     onPayNowResolved: (resolution) => {
       setPayNowResolution(resolution)
       if (resolution.status === "success" && resolution.bookingReference) {
@@ -161,13 +145,6 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
           step: "pay",
           status: mapResolutionStatusToQueryStatus(resolution.status),
           sessionId: resolution.sessionId,
-        })
-      )
-    },
-    onPayNowDismissed: () => {
-      router.replace(
-        buildCheckoutHref({
-          step: "pay",
         })
       )
     },
@@ -218,12 +195,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       validateTravelerStep({
         paymentMode,
         contact: contactWatch,
-        billing: billingWatch,
         passengers: passengersWatch,
         identityDocumentsRequired: data.identityDocumentsRequired,
       }),
     [
-      billingWatch,
       contactWatch,
       data.identityDocumentsRequired,
       passengersWatch,
@@ -260,12 +235,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       step: stepRouting.currentStep,
       status: currentStatus,
       selectedCount: data.state.selectedPartialOffers.length,
-      payNowEnabled: data.payHere.payNowEnabled,
+      payNowEnabled: data.payment.payNowEnabled,
     })
   }, [
     currentStatus,
     data.partialOfferRequestId,
-    data.payHere.payNowEnabled,
+    data.payment.payNowEnabled,
     data.state.selectedPartialOffers.length,
     stepRouting.currentStep,
   ])
@@ -434,6 +409,9 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     data.state.status && !data.state.sessionId ? "pay" : stepRouting.currentStep
 
   const payStepError = checkoutFlow.submitError ?? fallbackMissingSessionMessage
+  const payStepBanner = data.state.cancelled
+    ? "Stripe checkout was cancelled before payment confirmation."
+    : null
 
   return (
     <main className="min-h-svh bg-muted/40 py-6 md:py-10">
@@ -567,7 +545,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     paymentMode={paymentMode}
                     ancillaryPreviewTotal={ancillaryPreviewTotal}
                     totalPreview={totalPreview}
-                    submitError={payStepError}
+                    submitError={payStepError ?? payStepBanner}
                     paymentProcessingMessage={paymentProcessingMessage}
                     isSubmitting={isSubmitting}
                     clerkEnabled={clerkEnabled}
@@ -631,22 +609,11 @@ function computeAncillaryPreviewTotal(
 function validateTravelerStep(input: {
   paymentMode: CheckoutFormValues["paymentMode"] | undefined
   contact: CheckoutFormValues["contact"] | undefined
-  billing: CheckoutFormValues["billing"] | undefined
   passengers: CheckoutFormValues["passengers"] | undefined
   identityDocumentsRequired: boolean
 }) {
   if (!input.contact?.email?.trim() || !input.contact.phoneNumber?.trim()) {
     return false
-  }
-
-  if (input.paymentMode === "pay_now") {
-    if (
-      !input.billing?.address?.trim() ||
-      !input.billing.city?.trim() ||
-      !input.billing.country?.trim()
-    ) {
-      return false
-    }
   }
 
   if (!input.passengers || input.passengers.length === 0) {

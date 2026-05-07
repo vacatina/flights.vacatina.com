@@ -1,6 +1,9 @@
 import { describe, expect, test, vi } from "vitest"
 
-import { createTerminalCheckoutSnapshot, toPayHereEventKey } from "@/modules/flights/checkout/server/service-helpers"
+import {
+  createTerminalCheckoutSnapshot,
+  toStripeEventKey,
+} from "@/modules/flights/checkout/server/service-helpers"
 
 vi.mock("server-only", () => ({}))
 
@@ -36,21 +39,12 @@ describe("createTerminalCheckoutSnapshot", () => {
 
     expect(snapshot).not.toHaveProperty("contact")
     expect(snapshot).not.toHaveProperty("passengers")
-    expect(snapshot).not.toHaveProperty("billing")
     expect(snapshot).not.toHaveProperty("metadata")
   })
 })
 
-describe("toPayHereEventKey", () => {
-  test("builds deterministic idempotency fingerprint", () => {
-    expect(
-      toPayHereEventKey({
-        orderId: "chs_1",
-        paymentId: "pay_1",
-        statusCode: "2",
-        amount: "100.00",
-        currency: "LKR",
-      })
-    ).toBe("chs_1:pay_1:2:100.00:LKR")
+describe("toStripeEventKey", () => {
+  test("normalizes the event id for idempotency", () => {
+    expect(toStripeEventKey(" evt_123 ")).toBe("evt_123")
   })
 })

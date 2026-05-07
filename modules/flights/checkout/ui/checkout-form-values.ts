@@ -6,11 +6,6 @@ export interface CheckoutFormValues {
     email: string
     phoneNumber: string
   }
-  billing: {
-    address: string
-    city: string
-    country: string
-  }
   passengers: Array<{
     id: string
     type: "adult" | "child" | "infant_without_seat"
@@ -33,4 +28,3 @@ export interface CheckoutFormValues {
     metadata: CheckoutAncillaryPayloadMetadata | null
   }
 }
-

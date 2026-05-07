@@ -12,10 +12,6 @@ import {
   submitCheckoutAction,
 } from "@/modules/flights/checkout/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
-import {
-  ensurePayHereSdk,
-  startPayHerePayment,
-} from "@/modules/flights/checkout/ui/payhere-client"
 import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
@@ -39,19 +35,11 @@ export interface CheckoutPayNowResolution {
 interface UseCheckoutFlowInput {
   data: CheckoutPageData
   onSuccess?: (result: CheckoutSubmitSuccessState) => void
-  onPayNowProcessingStart?: (sessionId: string) => void
   onPayNowResolved?: (resolution: CheckoutPayNowResolution) => void
-  onPayNowDismissed?: () => void
 }
 
 export function useCheckoutFlow(input: UseCheckoutFlowInput) {
-  const {
-    data,
-    onSuccess,
-    onPayNowDismissed,
-    onPayNowProcessingStart,
-    onPayNowResolved,
-  } = input
+  const { data, onSuccess, onPayNowResolved } = input
 
   const [isSubmitting, startSubmit] = useTransition()
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -259,7 +247,6 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
       selectedPartialOffers: data.state.selectedPartialOffers,
       paymentMode: values.paymentMode,
       contact: values.contact,
-      billing: values.billing,
       passengers,
       metadata: values.metadata,
       ancillarySelection:
@@ -278,9 +265,9 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
     startSubmit(() => {
       void (async () => {
         if (values.paymentMode === "pay_now") {
-          if (!data.payHere.payNowEnabled) {
+          if (!data.payment.payNowEnabled) {
             setSubmitError(
-              data.payHere.unavailableReason ?? "Pay now is unavailable for this fare."
+              data.payment.unavailableReason ?? "Pay now is unavailable for this fare."
             )
             return
           }
@@ -297,54 +284,12 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
             return
           }
 
-          setPaymentProcessingMessage("Opening PayHere payment window...")
-
-          try {
-            await ensurePayHereSdk(data.payHere.scriptUrl)
-          } catch (error) {
-            setSubmitError(
-              error instanceof Error
-                ? toSafeActionMessage(
-                    error.message,
-                    "Could not load PayHere payment SDK."
-                  )
-                : "Could not load PayHere payment SDK."
-            )
-            setPaymentProcessingMessage(null)
-            return
-          }
-
-          startPayHerePayment({
-            payload: startResult.data.payment,
-            onCompleted: () => {
-              logFlightFlow("CheckoutPageClient", "payment_popup_completed_redirected_processing", {
-                partialOfferRequestId: data.partialOfferRequestId,
-                checkoutSessionId: startResult.data.checkoutSessionId,
-              })
-              setPaymentProcessingMessage(
-                "Payment received. Finalizing booking with airline..."
-              )
-              onPayNowProcessingStart?.(startResult.data.checkoutSessionId)
-              void pollCheckoutCompletion(startResult.data.checkoutSessionId)
-            },
-            onDismissed: () => {
-              logFlightFlow("CheckoutPageClient", "checkout_popup_dismissed_returned_pay_step", {
-                partialOfferRequestId: data.partialOfferRequestId,
-              })
-              setPaymentProcessingMessage(null)
-              setSubmitError("Payment window was dismissed before confirmation.")
-              onPayNowDismissed?.()
-            },
-            onError: (error) => {
-              logFlightFlow("CheckoutPageClient", "payhere_sdk_error", {
-                partialOfferRequestId: data.partialOfferRequestId,
-                errorType: typeof error,
-              })
-              setPaymentProcessingMessage(null)
-              setSubmitError("Payment failed to start. Please try again.")
-              onPayNowDismissed?.()
-            },
+          setPaymentProcessingMessage("Redirecting to Stripe Checkout...")
+          logFlightFlow("CheckoutPageClient", "stripe_checkout_redirect_started", {
+            partialOfferRequestId: data.partialOfferRequestId,
+            checkoutSessionId: startResult.data.checkoutSessionId,
           })
+          redirectToCheckout(startResult.data.redirectUrl)
           return
         }
 
@@ -373,14 +318,11 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
     })
   }, [
     data.partialOfferRequestId,
-    data.payHere.payNowEnabled,
-    data.payHere.scriptUrl,
-    data.payHere.unavailableReason,
+    data.payment.payNowEnabled,
+    data.payment.unavailableReason,
     data.state.offerId,
     data.state.quoteId,
     data.state.selectedPartialOffers,
-    onPayNowDismissed,
-    onPayNowProcessingStart,
     onSuccess,
     pollCheckoutCompletion,
     resetFeedback,
@@ -421,4 +363,8 @@ function wait(ms: number) {
 
 function toSafeActionMessage(message: string | null | undefined, fallback: string) {
   return toSafeUserErrorMessage(message, fallback)
+}
+
+function redirectToCheckout(url: string) {
+  window.location.assign(url)
 }

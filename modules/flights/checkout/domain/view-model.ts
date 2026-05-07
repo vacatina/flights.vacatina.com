@@ -114,18 +114,14 @@ export function buildCheckoutPageModel({
       offer,
       seatMaps,
     },
-    payHere: {
+    payment: {
+      provider: "stripe",
+      checkoutUi: "hosted",
       payNowEnabled: false,
-      unavailableReason: "PayHere availability is being checked.",
-      chargeCurrency: "LKR",
-      estimatedFareAmountLkr: null,
-      estimatedFareAmountLkrLabel: null,
-      fxSourceCurrency: quote.currency,
-      fxTargetCurrency: "LKR",
-      fxBaseRate: null,
-      fxBufferPercent: 3,
-      fxEffectiveRate: null,
-      scriptUrl: "https://www.payhere.lk/lib/payhere.js",
+      unavailableReason: "Stripe availability is being checked.",
+      chargeAmount: null,
+      chargeCurrency: quote.currency,
+      chargeAmountLabel: null,
     },
   }
 }

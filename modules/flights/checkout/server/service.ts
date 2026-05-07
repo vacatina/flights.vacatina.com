@@ -1,7 +1,7 @@
 export {
   fetchCheckoutPageData,
   getCheckoutSessionStatus,
-  processPayHereNotification,
+  processStripeWebhookEvent,
   startCheckoutPayment,
   submitCheckout,
 } from "@/modules/flights/checkout/server/service-core"

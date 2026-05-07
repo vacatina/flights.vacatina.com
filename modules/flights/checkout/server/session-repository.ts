@@ -33,14 +33,7 @@ export interface CheckoutSessionRecord {
   providerStatusMessage: string | null
   paymentCurrency: string | null
   paymentAmount: number | null
-  fxSourceCurrency: string | null
-  fxTargetCurrency: string | null
-  fxBaseRate: number | null
-  fxBufferPercent: number | null
-  fxEffectiveRate: number | null
   checkoutPayloadSnapshot: unknown
-  externalPaymentAuthorizationId: string | null
-  externalPaymentCaptureId: string | null
   duffelOrderId: string | null
   paymentInitiatedAt: Date | null
   paymentConfirmedAt: Date | null
@@ -74,11 +67,6 @@ interface CreateCheckoutSessionInput {
   providerStatusMessage?: string | null
   paymentCurrency?: string | null
   paymentAmount?: number | null
-  fxSourceCurrency?: string | null
-  fxTargetCurrency?: string | null
-  fxBaseRate?: number | null
-  fxBufferPercent?: number | null
-  fxEffectiveRate?: number | null
   checkoutPayloadSnapshot?: unknown
   status: CheckoutSessionStatus
   paymentInitiatedAt?: Date | null
@@ -93,15 +81,8 @@ interface UpdateCheckoutSessionInput {
   providerOrderId?: string | null
   paymentCurrency?: string | null
   paymentAmount?: number | null
-  fxSourceCurrency?: string | null
-  fxTargetCurrency?: string | null
-  fxBaseRate?: number | null
-  fxBufferPercent?: number | null
-  fxEffectiveRate?: number | null
   checkoutPayloadSnapshot?: unknown
   paymentInitiatedAt?: Date | null
-  externalPaymentAuthorizationId?: string | null
-  externalPaymentCaptureId?: string | null
   duffelOrderId?: string | null
   providerPaymentId?: string | null
   providerStatusCode?: string | null
@@ -199,14 +180,7 @@ export const defaultCheckoutSessionRepository: CheckoutSessionRepository = {
         providerStatusMessage: input.providerStatusMessage ?? null,
         paymentCurrency: input.paymentCurrency ?? null,
         paymentAmount: input.paymentAmount ?? null,
-        fxSourceCurrency: input.fxSourceCurrency ?? null,
-        fxTargetCurrency: input.fxTargetCurrency ?? null,
-        fxBaseRate: input.fxBaseRate ?? null,
-        fxBufferPercent: input.fxBufferPercent ?? null,
-        fxEffectiveRate: input.fxEffectiveRate ?? null,
         checkoutPayloadSnapshot: input.checkoutPayloadSnapshot ?? null,
-        externalPaymentAuthorizationId: null,
-        externalPaymentCaptureId: null,
         duffelOrderId: null,
         paymentInitiatedAt: input.paymentInitiatedAt ?? null,
         paymentConfirmedAt: input.paymentConfirmedAt ?? null,
@@ -249,20 +223,6 @@ export const defaultCheckoutSessionRepository: CheckoutSessionRepository = {
           input.paymentAmount === undefined || input.paymentAmount === null
             ? null
             : toDbNumeric(input.paymentAmount),
-        fxSourceCurrency: input.fxSourceCurrency ?? null,
-        fxTargetCurrency: input.fxTargetCurrency ?? null,
-        fxBaseRate:
-          input.fxBaseRate === undefined || input.fxBaseRate === null
-            ? null
-            : toDbHighPrecisionNumeric(input.fxBaseRate),
-        fxBufferPercent:
-          input.fxBufferPercent === undefined || input.fxBufferPercent === null
-            ? null
-            : toDbHighPrecisionNumeric(input.fxBufferPercent),
-        fxEffectiveRate:
-          input.fxEffectiveRate === undefined || input.fxEffectiveRate === null
-            ? null
-            : toDbHighPrecisionNumeric(input.fxEffectiveRate),
         checkoutPayloadSnapshot: input.checkoutPayloadSnapshot ?? null,
         paymentInitiatedAt: input.paymentInitiatedAt ?? null,
         paymentConfirmedAt: input.paymentConfirmedAt ?? null,
@@ -332,14 +292,7 @@ function toSessionRecord(row: typeof checkoutSessions.$inferSelect): CheckoutSes
     providerStatusMessage: row.providerStatusMessage,
     paymentCurrency: row.paymentCurrency,
     paymentAmount: row.paymentAmount === null ? null : Number(row.paymentAmount),
-    fxSourceCurrency: row.fxSourceCurrency,
-    fxTargetCurrency: row.fxTargetCurrency,
-    fxBaseRate: row.fxBaseRate === null ? null : Number(row.fxBaseRate),
-    fxBufferPercent: row.fxBufferPercent === null ? null : Number(row.fxBufferPercent),
-    fxEffectiveRate: row.fxEffectiveRate === null ? null : Number(row.fxEffectiveRate),
     checkoutPayloadSnapshot: row.checkoutPayloadSnapshot ?? null,
-    externalPaymentAuthorizationId: row.externalPaymentAuthorizationId,
-    externalPaymentCaptureId: row.externalPaymentCaptureId,
     duffelOrderId: row.duffelOrderId,
     paymentInitiatedAt: row.paymentInitiatedAt,
     paymentConfirmedAt: row.paymentConfirmedAt,
@@ -357,10 +310,6 @@ function toDbNumeric(value: number) {
   return value.toFixed(4)
 }
 
-function toDbHighPrecisionNumeric(value: number) {
-  return value.toFixed(8)
-}
-
 function toDbPatch(patch: UpdateCheckoutSessionInput) {
   const output: Record<string, unknown> = {
     ...patch,
@@ -369,25 +318,6 @@ function toDbPatch(patch: UpdateCheckoutSessionInput) {
   if (patch.paymentAmount !== undefined) {
     output.paymentAmount =
       patch.paymentAmount === null ? null : toDbNumeric(patch.paymentAmount)
-  }
-
-  if (patch.fxBaseRate !== undefined) {
-    output.fxBaseRate =
-      patch.fxBaseRate === null ? null : toDbHighPrecisionNumeric(patch.fxBaseRate)
-  }
-
-  if (patch.fxBufferPercent !== undefined) {
-    output.fxBufferPercent =
-      patch.fxBufferPercent === null
-        ? null
-        : toDbHighPrecisionNumeric(patch.fxBufferPercent)
-  }
-
-  if (patch.fxEffectiveRate !== undefined) {
-    output.fxEffectiveRate =
-      patch.fxEffectiveRate === null
-        ? null
-        : toDbHighPrecisionNumeric(patch.fxEffectiveRate)
   }
 
   return output

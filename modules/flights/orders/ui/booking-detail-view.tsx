@@ -556,14 +556,6 @@ export function BookingDetailView({
             {detail.paymentCurrency ? (
               <p>Charge currency: {detail.paymentCurrency}</p>
             ) : null}
-            {detail.fxSourceCurrency &&
-            detail.fxTargetCurrency &&
-            detail.fxEffectiveRate ? (
-              <p>
-                FX: {detail.fxSourceCurrency} → {detail.fxTargetCurrency} @{" "}
-                {detail.fxEffectiveRate.toFixed(6)}
-              </p>
-            ) : null}
             {detail.paidAtLabel ? <p>Paid at: {detail.paidAtLabel}</p> : null}
             {detail.paymentRequiredByLabel ? (
               <p>Payment required by: {detail.paymentRequiredByLabel}</p>

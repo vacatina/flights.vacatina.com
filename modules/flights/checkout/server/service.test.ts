@@ -1,5 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest"
 import type { Offer, Order, SeatMap } from "@duffel/api/types"
+import type Stripe from "stripe"
+
 import type { CheckoutSubmitInput } from "@/modules/flights/checkout/domain"
 import type {
   CheckoutSessionRecord,
@@ -11,6 +13,11 @@ import type {
 } from "@/modules/flights/checkout/server/order-repository"
 import type { PaymentWebhookEventRepository } from "@/modules/flights/checkout/server/payment-webhook-event-repository"
 
+const stripeMocks = vi.hoisted(() => ({
+  createCheckoutSession: vi.fn(),
+  retrieveCheckoutSession: vi.fn(),
+}))
+
 const mockFns = vi.hoisted(() => ({
   validatePricedQuote: vi.fn(),
   markPricedQuoteConsumed: vi.fn(),
@@ -21,17 +28,27 @@ const mockFns = vi.hoisted(() => ({
   getAirlineLogosByAirlineId: vi.fn(),
   incrementCheckoutMetric: vi.fn(),
   buildCheckoutPageModel: vi.fn(),
-  getPayHereConfig: vi.fn(),
-  convertToLkr: vi.fn(),
-  createPayHereRequestHash: vi.fn(() => "HASH_1"),
-  verifyPayHereNotifySignature: vi.fn(() => true),
-  mapPayHereStatusCode: vi.fn(() => "success"),
+  getStripeConfig: vi.fn(),
   createBookingReference: vi.fn(() => "BK-TESTREF001"),
   enqueueNotification: vi.fn(),
   dispatchPendingNotifications: vi.fn(),
+  buildFlightOrderSnapshot: vi.fn(),
 }))
 
 vi.mock("server-only", () => ({}))
+
+vi.mock("@/lib/stripe", () => ({
+  getStripeClient: () => ({
+    checkout: {
+      sessions: {
+        create: stripeMocks.createCheckoutSession,
+        retrieve: stripeMocks.retrieveCheckoutSession,
+      },
+    },
+  }),
+  getStripeConfig: mockFns.getStripeConfig,
+  toStripeAmountMinorUnit: (amount: number) => Math.round(amount * 100),
+}))
 
 vi.mock("@/modules/flights/pricing/server", () => ({
   validatePricedQuote: mockFns.validatePricedQuote,
@@ -51,15 +68,6 @@ vi.mock("@/modules/flights/checkout/server/metrics", () => ({
   incrementCheckoutMetric: mockFns.incrementCheckoutMetric,
 }))
 
-vi.mock("@/modules/flights/payments/payhere", () => ({
-  getPayHereConfig: mockFns.getPayHereConfig,
-  convertToLkr: mockFns.convertToLkr,
-  createPayHereRequestHash: mockFns.createPayHereRequestHash,
-  verifyPayHereNotifySignature: mockFns.verifyPayHereNotifySignature,
-  mapPayHereStatusCode: mockFns.mapPayHereStatusCode,
-  toPayHereAmount: (value: number) => value.toFixed(2),
-}))
-
 vi.mock("@/modules/flights/orders/server/identity", () => ({
   createBookingReference: mockFns.createBookingReference,
   createEmailHash: (value: string) => `hash:${value.toLowerCase()}`,
@@ -68,6 +76,10 @@ vi.mock("@/modules/flights/orders/server/identity", () => ({
 vi.mock("@/modules/notifications/server", () => ({
   enqueueNotification: mockFns.enqueueNotification,
   dispatchPendingNotifications: mockFns.dispatchPendingNotifications,
+}))
+
+vi.mock("@/modules/flights/orders/domain", () => ({
+  buildFlightOrderSnapshot: mockFns.buildFlightOrderSnapshot,
 }))
 
 vi.mock("@/modules/flights/checkout/domain", async () => {
@@ -85,7 +97,7 @@ vi.mock("@/modules/flights/checkout/domain", async () => {
 import {
   fetchCheckoutPageData,
   getCheckoutSessionStatus,
-  processPayHereNotification,
+  processStripeWebhookEvent,
   startCheckoutPayment,
   submitCheckout,
 } from "@/modules/flights/checkout/server/service"
@@ -126,92 +138,60 @@ beforeEach(() => {
   })
   mockFns.getAirlineLogosByAirlineId.mockResolvedValue({})
   mockFns.incrementCheckoutMetric.mockImplementation(() => undefined)
-  mockFns.createBookingReference.mockReturnValue("BK-TESTREF001")
+  mockFns.getStripeConfig.mockReturnValue({
+    secretKey: "sk_test_123",
+    webhookSecret: "whsec_test_123",
+    appBaseUrl: "https://example.com",
+  })
   mockFns.enqueueNotification.mockResolvedValue(undefined)
   mockFns.dispatchPendingNotifications.mockResolvedValue({
     scannedCount: 1,
     sentCount: 1,
     failedCount: 0,
   })
-  mockFns.getPayHereConfig.mockReturnValue({
-    merchantId: "merchant_1",
-    merchantSecret: "secret",
-    sandbox: true,
-    scriptUrl: "https://www.payhere.lk/lib/payhere.js",
-    notifyUrl: "https://example.com/api/payments/payhere/notify",
-    returnUrl: "https://example.com/return",
-    cancelUrl: "https://example.com/cancel",
-    fxBufferPercent: 3,
-    markupRatePercent: 0,
-    markupFixedLkr: 0,
+  mockFns.buildFlightOrderSnapshot.mockReturnValue({
+    schemaVersion: 1,
+    routeLabel: "CMB - DXB",
+    currency: "USD",
+    sellAmount: 120,
+    sellAmountLabel: "USD 120.00",
+    billingSummary: {
+      fareAmountLabel: "USD 100.00",
+      taxesAmountLabel: "Included",
+      totalAmountLabel: "USD 120.00",
+    },
+    availableActions: [],
+    ticketDocuments: [],
+    bookedServices: [],
+    metadataEntries: [],
+    conditions: {
+      changes: "Changes unavailable",
+      refunds: "Refunds unavailable",
+    },
+    legs: [],
+    passengers: [],
   })
-  mockFns.convertToLkr.mockReturnValue({
-    sourceCurrency: "USD",
-    targetCurrency: "LKR",
-    sourceAmount: 100,
-    convertedAmount: 33_000,
-    baseRate: 320,
-    bufferPercent: 3,
-    effectiveRate: 329.6,
-  })
-  mockFns.buildCheckoutPageModel.mockReturnValue({
-    partialOfferRequestId: "prq_1",
-    state: {
-      offerId: "off_1",
-      selectedPartialOffers: ["off_partial_1"],
-      quoteId: "pqt_1",
-      step: "traveler",
-    },
-    quote: {
-      quoteId: "pqt_1",
-      currency: "USD",
-      fareNetAmount: 100,
-      fareSellAmount: 120,
-      fareSellAmountLabel: "USD 120.00",
-      expiresAtIso: "2026-04-13T11:00:00.000Z",
-      expiresAtLabel: "13/04/2026, 11:00",
-    },
-    tripSummary: {
-      journeyTypeLabel: "One way",
-      dateRangeLabel: "Date unavailable",
-      passengersLabel: "1 passenger",
-      cabinLabel: "Economy",
-      routeLabel: "CMB ⇄ DXB",
-      offerExpiresAtLabel: null,
-    },
-    selectedFlights: [],
-    paymentRequirements: {
-      requiresInstantPayment: false,
-      canHold: true,
-      paymentRequiredByIso: null,
-      paymentRequiredByLabel: null,
-      priceGuaranteeExpiresAtIso: null,
-      priceGuaranteeExpiresAtLabel: null,
-    },
-    identityDocumentsRequired: false,
-    supportedIdentityDocumentTypes: [],
-    passengerDefaults: [],
-    ancillary: {
-      offer: createOffer(),
-      seatMaps: [],
-    },
-    payHere: {
-      payNowEnabled: true,
-      unavailableReason: null,
-      chargeCurrency: "LKR",
-      estimatedFareAmountLkr: 33000,
-      estimatedFareAmountLkrLabel: "LKR 33000.00",
-      fxSourceCurrency: "USD",
-      fxTargetCurrency: "LKR",
-      fxBaseRate: 320,
-      fxBufferPercent: 3,
-      fxEffectiveRate: 329.6,
-      scriptUrl: "https://www.payhere.lk/lib/payhere.js",
-    },
-  })
+  mockFns.buildCheckoutPageModel.mockReturnValue(createCheckoutPageModel())
+
+  stripeMocks.createCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_1",
+      url: "https://checkout.stripe.com/c/pay/cs_test_1",
+      status: "open",
+      payment_status: "unpaid",
+    })
+  )
+  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_1",
+      url: "https://checkout.stripe.com/c/pay/cs_test_1",
+      status: "open",
+      payment_status: "unpaid",
+    })
+  )
 })
 
-test("fetchCheckoutPageData includes payHere preview", async () => {
+test("fetchCheckoutPageData builds Stripe payment preview from sell amount", async () => {
   const result = await fetchCheckoutPageData(
     {
       partialOfferRequestId: "prq_1",
@@ -239,119 +219,27 @@ test("fetchCheckoutPageData includes payHere preview", async () => {
     }
   )
 
-  expect(result.payHere.payNowEnabled).toBe(true)
-  expect(result.payHere.estimatedFareAmountLkr).toBe(33000)
-})
-
-test("fetchCheckoutPageData uses session fallback for status mode when quote is not active", async () => {
-  mockFns.validatePricedQuote.mockResolvedValue({
-    ok: false,
-    reason: "not_active",
-    quote: {
-      id: "pqt_1",
-      partialOfferRequestId: "prq_1",
-      offerId: "off_1",
-      selectedPartialOffers: ["off_partial_1"],
-      ownerUserId: null,
-      ownerGuestId: "gst_1",
-      ownerOrgId: null,
-      currency: "USD",
-      netAmount: 90,
-      sellAmount: 108,
-      appliedRuleId: null,
-      appliedRuleSpecificity: null,
-      status: "consumed",
-      expiresAt: new Date("2026-04-13T11:00:00.000Z"),
-      createdAt: NOW,
-      updatedAt: NOW,
-    },
-  })
-
-  const sessionRepo = createSessionRepository()
-  await sessionRepo.repo.create({
-    id: "chs_1",
-    idempotencyKey: "idempotency_fallback_1",
-    partialOfferRequestId: "prq_1",
-    quoteId: "pqt_1",
-    offerId: "off_1",
-    selectedPartialOffers: ["off_partial_1"],
-    ownerUserId: null,
-    ownerGuestId: "gst_1",
-    ownerOrgId: null,
-    paymentMode: "pay_now",
-    currency: "USD",
-    netAmount: 130,
-    sellAmount: 160,
-    paymentProvider: "payhere",
-    providerOrderId: "chs_1",
-    providerPaymentId: "pay_1",
-    providerStatusCode: "2",
-    providerStatusMessage: "success",
-    paymentCurrency: "LKR",
-    paymentAmount: 33000,
-    fxSourceCurrency: "USD",
-    fxTargetCurrency: "LKR",
-    fxBaseRate: 320,
-    fxBufferPercent: 3,
-    fxEffectiveRate: 329.6,
-    checkoutPayloadSnapshot: null,
-    status: "completed",
-    paymentInitiatedAt: NOW,
-    paymentConfirmedAt: NOW,
-    finalizedAt: NOW,
-    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
-  })
-
-  await fetchCheckoutPageData(
-    {
-      partialOfferRequestId: "prq_1",
-      state: {
-        offerId: "off_1",
-        selectedPartialOffers: ["off_partial_1"],
-        quoteId: "pqt_1",
-        step: "pay",
-        status: "success",
-        sessionId: "chs_1",
-      },
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => {
-        throw new Error("not used")
-      },
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  const modelInput = mockFns.buildCheckoutPageModel.mock.calls.at(-1)?.[0]
-  expect(modelInput.quote.netAmount).toBe(130)
-  expect(modelInput.quote.sellAmount).toBe(160)
-  expect(mockFns.convertToLkr).toHaveBeenCalledWith({
-    amount: 130,
-    sourceCurrency: "USD",
-    bufferPercent: 3,
+  expect(result.payment).toEqual({
+    provider: "stripe",
+    checkoutUi: "hosted",
+    payNowEnabled: true,
+    unavailableReason: null,
+    chargeAmount: 120,
+    chargeCurrency: "USD",
+    chargeAmountLabel: "USD 120.00",
   })
 })
 
-test("startCheckoutPayment creates processing session and payload", async () => {
+test("startCheckoutPayment creates a Stripe Checkout session using sellTotal", async () => {
   const sessionRepo = createSessionRepository()
+
   const result = await startCheckoutPayment(
     {
       actor: {
         type: "guest",
         guestId: "gst_1",
       },
-      payload: createSubmitInput({
-        paymentMode: "pay_now",
-      }),
+      payload: createSubmitInput({ paymentMode: "pay_now" }),
     },
     {
       now: () => NOW,
@@ -364,22 +252,50 @@ test("startCheckoutPayment creates processing session and payload", async () => 
     }
   )
 
-  expect(result.status).toBe("processing")
-  expect(result.payment.currency).toBe("LKR")
-  expect(sessionRepo.spies.create).toHaveBeenCalledTimes(1)
+  expect(result).toMatchObject({
+    status: "processing",
+    redirectUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
+    chargeAmount: 120,
+    chargeCurrency: "USD",
+    chargeAmountLabel: "USD 120.00",
+  })
+
+  expect(stripeMocks.createCheckoutSession).toHaveBeenCalledWith(
+    expect.objectContaining({
+      mode: "payment",
+      payment_method_types: ["card"],
+      currency: "usd",
+      customer_email: "guest@example.com",
+      client_reference_id: result.checkoutSessionId,
+      success_url:
+        `https://example.com/results/prq_1/checkout?offer=off_1&selected=off_partial_1&quote=pqt_1&step=pay&status=processing&session=${result.checkoutSessionId}`,
+      cancel_url:
+        `https://example.com/results/prq_1/checkout?offer=off_1&selected=off_partial_1&quote=pqt_1&step=pay&session=${result.checkoutSessionId}&cancelled=1`,
+      line_items: [
+        expect.objectContaining({
+          quantity: 1,
+          price_data: expect.objectContaining({
+            currency: "usd",
+            unit_amount: 12000,
+          }),
+        }),
+      ],
+    })
+  )
+
+  const createdRecord = sessionRepo.spies.create.mock.calls[0]?.[0]
+  expect(createdRecord).toMatchObject({
+    paymentProvider: "stripe",
+    paymentCurrency: "USD",
+    paymentAmount: 120,
+    paymentMode: "pay_now",
+    netAmount: 100,
+    sellAmount: 120,
+  })
 })
 
-test("startCheckoutPayment preserves multi-city selected partial offers in checkout session", async () => {
+test("startCheckoutPayment reuses an open Stripe Checkout session", async () => {
   const sessionRepo = createSessionRepository()
-  const selectedPartialOffers = [
-    "off_partial_1",
-    "off_partial_2",
-    "off_partial_3",
-  ]
-  const payload = createSubmitInput({
-    paymentMode: "pay_now",
-    selectedPartialOffers,
-  })
 
   await startCheckoutPayment(
     {
@@ -387,52 +303,7 @@ test("startCheckoutPayment preserves multi-city selected partial offers in check
         type: "guest",
         guestId: "gst_1",
       },
-      payload,
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer({
-        slices: [
-          createSlice({
-            id: "sli_1",
-            originIata: "CMB",
-            destinationIata: "DXB",
-          }),
-          createSlice({
-            id: "sli_2",
-            originIata: "DXB",
-            destinationIata: "LHR",
-          }),
-          createSlice({
-            id: "sli_3",
-            originIata: "LHR",
-            destinationIata: "SFO",
-          }),
-        ],
-      }),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  const createdSessionInput = sessionRepo.spies.create.mock.calls[0]?.[0]
-  expect(createdSessionInput?.selectedPartialOffers).toEqual(selectedPartialOffers)
-})
-
-test("submitCheckout succeeds for hold flow", async () => {
-  const sessionRepo = createSessionRepository()
-  const result = await submitCheckout(
-    {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-      payload: createSubmitInput({
-        paymentMode: "hold",
-      }),
+      payload: createSubmitInput({ paymentMode: "pay_now" }),
     },
     {
       now: () => NOW,
@@ -445,21 +316,266 @@ test("submitCheckout succeeds for hold flow", async () => {
     }
   )
 
-  expect(result.paymentMode).toBe("hold")
-  expect(result.duffelOrderId).toBe("ord_1")
+  stripeMocks.createCheckoutSession.mockClear()
+  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_1",
+      url: "https://checkout.stripe.com/c/pay/cs_existing",
+      status: "open",
+      payment_status: "unpaid",
+    })
+  )
 
-  const session = await sessionRepo.repo.findById(result.checkoutSessionId)
-  expect(session?.checkoutPayloadSnapshot).toMatchObject({
-    snapshotType: "checkout_terminal_summary",
-    paymentMode: "hold",
-  })
-  expect(session?.checkoutPayloadSnapshot).not.toHaveProperty("contact")
-  expect(session?.checkoutPayloadSnapshot).not.toHaveProperty("passengers")
+  const result = await startCheckoutPayment(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload: createSubmitInput({ paymentMode: "pay_now" }),
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => createDuffelOrder(),
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  expect(result.redirectUrl).toBe("https://checkout.stripe.com/c/pay/cs_existing")
+  expect(stripeMocks.retrieveCheckoutSession).toHaveBeenCalledWith("cs_test_1")
+  expect(stripeMocks.createCheckoutSession).not.toHaveBeenCalled()
 })
 
-test("processPayHereNotification finalizes checkout on success", async () => {
+test("startCheckoutPayment recreates an expired Stripe Checkout session", async () => {
+  const sessionRepo = createSessionRepository()
+
+  await startCheckoutPayment(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload: createSubmitInput({ paymentMode: "pay_now" }),
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => createDuffelOrder(),
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_1",
+      url: null,
+      status: "expired",
+      payment_status: "unpaid",
+    })
+  )
+  stripeMocks.createCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_2",
+      url: "https://checkout.stripe.com/c/pay/cs_test_2",
+      status: "open",
+      payment_status: "unpaid",
+    })
+  )
+
+  const result = await startCheckoutPayment(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload: createSubmitInput({ paymentMode: "pay_now" }),
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => createDuffelOrder(),
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  expect(result.redirectUrl).toBe("https://checkout.stripe.com/c/pay/cs_test_2")
+  expect(sessionRepo.spies.update).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      status: "processing",
+      providerOrderId: "cs_test_2",
+      providerStatusCode: "open",
+      providerStatusMessage: "unpaid",
+    })
+  )
+})
+
+test("startCheckoutPayment retries sessions failed by stripe expiration and refreshes contact snapshot", async () => {
+  const sessionRepo = createSessionRepository()
+  const originalPayload = {
+    ...createSubmitInput({ paymentMode: "pay_now" }),
+    passengers: [
+      {
+        id: "pas_1",
+        type: "adult" as const,
+        title: "mr" as const,
+        givenName: "Tony",
+        familyName: "Stark",
+        bornOn: "1980-07-24",
+        gender: "m" as const,
+        email: "traveler@example.com",
+        phoneNumber: "+94770000000",
+        identityDocument: null,
+      },
+    ],
+  }
+
+  const initialResult = await startCheckoutPayment(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload: originalPayload,
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => createDuffelOrder(),
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  await sessionRepo.repo.update(initialResult.checkoutSessionId, {
+    status: "failed",
+    errorCode: "stripe_checkout_expired",
+    errorMessage: "Stripe checkout session expired before payment was completed.",
+  })
+  sessionRepo.spies.update.mockClear()
+
+  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_1",
+      url: null,
+      status: "expired",
+      payment_status: "unpaid",
+    })
+  )
+  stripeMocks.createCheckoutSession.mockResolvedValue(
+    createStripeCheckoutSession({
+      id: "cs_test_3",
+      url: "https://checkout.stripe.com/c/pay/cs_test_3",
+      status: "open",
+      payment_status: "unpaid",
+    })
+  )
+
+  const result = await startCheckoutPayment(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload: {
+        ...originalPayload,
+        contact: {
+          email: "updated@example.com",
+          phoneNumber: "+94770000001",
+        },
+      },
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: async () => createDuffelOrder(),
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  expect(result.redirectUrl).toBe("https://checkout.stripe.com/c/pay/cs_test_3")
+  expect(sessionRepo.spies.update).toHaveBeenCalledWith(
+    initialResult.checkoutSessionId,
+    expect.objectContaining({
+      status: "processing",
+      errorCode: null,
+      errorMessage: null,
+      providerOrderId: "cs_test_3",
+      providerStatusCode: "open",
+      providerStatusMessage: "unpaid",
+      checkoutPayloadSnapshot: expect.objectContaining({
+        contact: {
+          email: "updated@example.com",
+          phoneNumber: "+94770000001",
+        },
+      }),
+    })
+  )
+
+  const refreshedSession = await sessionRepo.repo.findById(initialResult.checkoutSessionId)
+  expect(refreshedSession?.status).toBe("processing")
+  expect(refreshedSession?.errorCode).toBeNull()
+  expect(refreshedSession?.errorMessage).toBeNull()
+  expect(refreshedSession?.providerOrderId).toBe("cs_test_3")
+  expect(refreshedSession?.checkoutPayloadSnapshot).toMatchObject({
+    contact: {
+      email: "updated@example.com",
+      phoneNumber: "+94770000001",
+    },
+  })
+})
+
+test("submitCheckout keeps the hold flow unchanged", async () => {
+  const sessionRepo = createSessionRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
+
+  const result = await submitCheckout(
+    {
+      actor: {
+        type: "guest",
+        guestId: "gst_1",
+      },
+      payload: createSubmitInput({ paymentMode: "hold" }),
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: createOrderSpy,
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  expect(result.paymentMode).toBe("hold")
+  expect(createOrderSpy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "pay_later",
+    })
+  )
+  expect(stripeMocks.createCheckoutSession).not.toHaveBeenCalled()
+})
+
+test("processStripeWebhookEvent finalizes checkout on paid completion", async () => {
   const sessionRepo = createSessionRepository()
   const orderRepo = createOrderRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
 
   const createdSession = await sessionRepo.repo.create({
     id: "chs_1",
@@ -475,41 +591,14 @@ test("processPayHereNotification finalizes checkout on success", async () => {
     currency: "USD",
     netAmount: 100,
     sellAmount: 120,
-    paymentProvider: "payhere",
-    providerOrderId: "chs_1",
+    paymentProvider: "stripe",
+    providerOrderId: "cs_test_1",
     providerPaymentId: null,
     providerStatusCode: null,
     providerStatusMessage: null,
-    paymentCurrency: "LKR",
-    paymentAmount: 33000,
-    fxSourceCurrency: "USD",
-    fxTargetCurrency: "LKR",
-    fxBaseRate: 320,
-    fxBufferPercent: 3,
-    fxEffectiveRate: 329.6,
-    checkoutPayloadSnapshot: {
-      partialOfferRequestId: "prq_1",
-      offerId: "off_1",
-      quoteId: "pqt_1",
-      selectedPartialOffers: ["off_partial_1"],
-      contact: {
-        email: "guest@example.com",
-        phoneNumber: "+94771234567",
-      },
-      billing: {
-        address: "1 Main Street",
-        city: "Colombo",
-        country: "Sri Lanka",
-      },
-      passengers: createSubmitInput({ paymentMode: "pay_now" }).passengers,
-      metadata: [],
-      ancillarySelection: {
-        services: [],
-        metadata: null,
-      },
-      netTotal: 100,
-      sourceCurrency: "USD",
-    },
+    paymentCurrency: "USD",
+    paymentAmount: 120,
+    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
     status: "processing",
     paymentInitiatedAt: NOW,
     paymentConfirmedAt: null,
@@ -517,17 +606,244 @@ test("processPayHereNotification finalizes checkout on success", async () => {
     expiresAt: new Date("2026-04-13T11:00:00.000Z"),
   })
 
-  await processPayHereNotification(
+  await processStripeWebhookEvent(
     {
-      payload: {
-        merchant_id: "merchant_1",
-        order_id: createdSession.id,
-        payment_id: "pay_1",
-        payhere_amount: "33000.00",
-        payhere_currency: "LKR",
-        status_code: "2",
-        md5sig: "VALID",
+      event: createStripeEvent({
+        id: "evt_1",
+        type: "checkout.session.completed",
+        session: createStripeCheckoutSession({
+          id: "cs_test_1",
+          url: "https://checkout.stripe.com/c/pay/cs_test_1",
+          status: "complete",
+          payment_status: "paid",
+          client_reference_id: createdSession.id,
+          payment_intent: "pi_1",
+          amount_total: 12000,
+          currency: "usd",
+          metadata: {
+            checkout_session_id: createdSession.id,
+          },
+        }),
+      }),
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: createOrderSpy,
+      sessionRepository: sessionRepo.repo,
+      orderRepository: orderRepo.repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  const finalizedSession = await sessionRepo.repo.findById(createdSession.id)
+  expect(finalizedSession?.status).toBe("completed")
+  expect(finalizedSession?.providerPaymentId).toBe("pi_1")
+  expect(finalizedSession?.checkoutPayloadSnapshot).toMatchObject({
+    snapshotType: "checkout_terminal_summary",
+    paymentMode: "pay_now",
+  })
+  expect(createOrderSpy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "instant",
+      payments: [
+        {
+          type: "balance",
+          amount: "100.00",
+          currency: "USD",
+        },
+      ],
+    })
+  )
+  expect(mockFns.markPricedQuoteConsumed).toHaveBeenCalledWith("pqt_1")
+  expect(orderRepo.spies.create).toHaveBeenCalledTimes(1)
+})
+
+test("processStripeWebhookEvent ignores duplicate events", async () => {
+  const sessionRepo = createSessionRepository()
+  const orderRepo = createOrderRepository()
+  const webhookRepo = createPaymentWebhookEventRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
+
+  const createdSession = await sessionRepo.repo.create({
+    id: "chs_1",
+    idempotencyKey: "idempotency_1",
+    partialOfferRequestId: "prq_1",
+    quoteId: "pqt_1",
+    offerId: "off_1",
+    selectedPartialOffers: ["off_partial_1"],
+    ownerUserId: null,
+    ownerGuestId: "gst_1",
+    ownerOrgId: null,
+    paymentMode: "pay_now",
+    currency: "USD",
+    netAmount: 100,
+    sellAmount: 120,
+    paymentProvider: "stripe",
+    providerOrderId: "cs_test_1",
+    providerPaymentId: null,
+    providerStatusCode: null,
+    providerStatusMessage: null,
+    paymentCurrency: "USD",
+    paymentAmount: 120,
+    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
+    status: "processing",
+    paymentInitiatedAt: NOW,
+    paymentConfirmedAt: null,
+    finalizedAt: null,
+    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
+  })
+
+  const event = createStripeEvent({
+    id: "evt_duplicate_1",
+    type: "checkout.session.completed",
+    session: createStripeCheckoutSession({
+      id: "cs_test_1",
+      status: "complete",
+      payment_status: "paid",
+      client_reference_id: createdSession.id,
+      payment_intent: "pi_duplicate_1",
+      amount_total: 12000,
+      currency: "usd",
+      metadata: {
+        checkout_session_id: createdSession.id,
       },
+    }),
+  })
+
+  const deps = {
+    now: () => NOW,
+    getOfferById: async () => createOffer(),
+    getSeatMapsByOfferId: async () => [] as SeatMap[],
+    createOrder: createOrderSpy,
+    sessionRepository: sessionRepo.repo,
+    orderRepository: orderRepo.repo,
+    paymentWebhookEventRepository: webhookRepo,
+  }
+
+  await processStripeWebhookEvent({ event }, deps)
+  await processStripeWebhookEvent({ event }, deps)
+
+  expect(createOrderSpy).toHaveBeenCalledTimes(1)
+})
+
+test("processStripeWebhookEvent marks mismatched payments for reconciliation", async () => {
+  const sessionRepo = createSessionRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
+
+  const createdSession = await sessionRepo.repo.create({
+    id: "chs_1",
+    idempotencyKey: "idempotency_1",
+    partialOfferRequestId: "prq_1",
+    quoteId: "pqt_1",
+    offerId: "off_1",
+    selectedPartialOffers: ["off_partial_1"],
+    ownerUserId: null,
+    ownerGuestId: "gst_1",
+    ownerOrgId: null,
+    paymentMode: "pay_now",
+    currency: "USD",
+    netAmount: 100,
+    sellAmount: 120,
+    paymentProvider: "stripe",
+    providerOrderId: "cs_test_1",
+    providerPaymentId: null,
+    providerStatusCode: null,
+    providerStatusMessage: null,
+    paymentCurrency: "USD",
+    paymentAmount: 120,
+    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
+    status: "processing",
+    paymentInitiatedAt: NOW,
+    paymentConfirmedAt: null,
+    finalizedAt: null,
+    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
+  })
+
+  await processStripeWebhookEvent(
+    {
+      event: createStripeEvent({
+        id: "evt_mismatch_1",
+        type: "checkout.session.completed",
+        session: createStripeCheckoutSession({
+          id: "cs_test_1",
+          status: "complete",
+          payment_status: "paid",
+          client_reference_id: createdSession.id,
+          payment_intent: "pi_mismatch_1",
+          amount_total: 11900,
+          currency: "usd",
+          metadata: {
+            checkout_session_id: createdSession.id,
+          },
+        }),
+      }),
+    },
+    {
+      now: () => NOW,
+      getOfferById: async () => createOffer(),
+      getSeatMapsByOfferId: async () => [] as SeatMap[],
+      createOrder: createOrderSpy,
+      sessionRepository: sessionRepo.repo,
+      orderRepository: createOrderRepository().repo,
+      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
+    }
+  )
+
+  const reconciledSession = await sessionRepo.repo.findById(createdSession.id)
+  expect(reconciledSession?.status).toBe("reconciliation_required")
+  expect(reconciledSession?.errorCode).toBe("stripe_amount_mismatch")
+  expect(createOrderSpy).not.toHaveBeenCalled()
+})
+
+test("processStripeWebhookEvent marks expired Stripe sessions as failed", async () => {
+  const sessionRepo = createSessionRepository()
+
+  const createdSession = await sessionRepo.repo.create({
+    id: "chs_1",
+    idempotencyKey: "idempotency_1",
+    partialOfferRequestId: "prq_1",
+    quoteId: "pqt_1",
+    offerId: "off_1",
+    selectedPartialOffers: ["off_partial_1"],
+    ownerUserId: null,
+    ownerGuestId: "gst_1",
+    ownerOrgId: null,
+    paymentMode: "pay_now",
+    currency: "USD",
+    netAmount: 100,
+    sellAmount: 120,
+    paymentProvider: "stripe",
+    providerOrderId: "cs_test_1",
+    providerPaymentId: null,
+    providerStatusCode: null,
+    providerStatusMessage: null,
+    paymentCurrency: "USD",
+    paymentAmount: 120,
+    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
+    status: "processing",
+    paymentInitiatedAt: NOW,
+    paymentConfirmedAt: null,
+    finalizedAt: null,
+    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
+  })
+
+  await processStripeWebhookEvent(
+    {
+      event: createStripeEvent({
+        id: "evt_expired_1",
+        type: "checkout.session.expired",
+        session: createStripeCheckoutSession({
+          id: "cs_test_1",
+          status: "expired",
+          payment_status: "unpaid",
+          client_reference_id: createdSession.id,
+          metadata: {
+            checkout_session_id: createdSession.id,
+          },
+        }),
+      }),
     },
     {
       now: () => NOW,
@@ -535,19 +851,14 @@ test("processPayHereNotification finalizes checkout on success", async () => {
       getSeatMapsByOfferId: async () => [] as SeatMap[],
       createOrder: async () => createDuffelOrder(),
       sessionRepository: sessionRepo.repo,
-      orderRepository: orderRepo.repo,
+      orderRepository: createOrderRepository().repo,
       paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
     }
   )
 
-  const finalized = await sessionRepo.repo.findById(createdSession.id)
-  expect(finalized?.status).toBe("completed")
-  expect(finalized?.checkoutPayloadSnapshot).toMatchObject({
-    snapshotType: "checkout_terminal_summary",
-    paymentMode: "pay_now",
-  })
-  expect(finalized?.checkoutPayloadSnapshot).not.toHaveProperty("contact")
-  expect(finalized?.checkoutPayloadSnapshot).not.toHaveProperty("passengers")
+  const failedSession = await sessionRepo.repo.findById(createdSession.id)
+  expect(failedSession?.status).toBe("failed")
+  expect(failedSession?.errorCode).toBe("stripe_checkout_expired")
 })
 
 test("getCheckoutSessionStatus enforces actor ownership", async () => {
@@ -566,18 +877,13 @@ test("getCheckoutSessionStatus enforces actor ownership", async () => {
     currency: "USD",
     netAmount: 100,
     sellAmount: 120,
-    paymentProvider: "payhere",
-    providerOrderId: "chs_2",
+    paymentProvider: "stripe",
+    providerOrderId: "cs_test_2",
     providerPaymentId: null,
     providerStatusCode: null,
     providerStatusMessage: null,
-    paymentCurrency: "LKR",
-    paymentAmount: 33000,
-    fxSourceCurrency: "USD",
-    fxTargetCurrency: "LKR",
-    fxBaseRate: 320,
-    fxBufferPercent: 3,
-    fxEffectiveRate: 329.6,
+    paymentCurrency: "USD",
+    paymentAmount: 120,
     checkoutPayloadSnapshot: null,
     status: "processing",
     paymentInitiatedAt: NOW,
@@ -622,11 +928,6 @@ function createSubmitInput(input: {
       email: "guest@example.com",
       phoneNumber: "+94771234567",
     },
-    billing: {
-      address: "1 Main Street",
-      city: "Colombo",
-      country: "Sri Lanka",
-    },
     passengers: [
       {
         id: "pas_1",
@@ -643,6 +944,81 @@ function createSubmitInput(input: {
     ancillarySelection: {
       services: [],
       metadata: null,
+    },
+  }
+}
+
+function createStoredCheckoutSnapshot() {
+  return {
+    partialOfferRequestId: "prq_1",
+    offerId: "off_1",
+    quoteId: "pqt_1",
+    selectedPartialOffers: ["off_partial_1"],
+    contact: {
+      email: "guest@example.com",
+      phoneNumber: "+94771234567",
+    },
+    passengers: createSubmitInput({ paymentMode: "pay_now" }).passengers,
+    metadata: [],
+    ancillarySelection: {
+      services: [],
+      metadata: null,
+    },
+    netTotal: 100,
+    sourceCurrency: "USD",
+  }
+}
+
+function createCheckoutPageModel() {
+  return {
+    partialOfferRequestId: "prq_1",
+    state: {
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      quoteId: "pqt_1",
+      step: "traveler",
+    },
+    quote: {
+      quoteId: "pqt_1",
+      currency: "USD",
+      fareNetAmount: 100,
+      fareSellAmount: 120,
+      fareSellAmountLabel: "USD 120.00",
+      expiresAtIso: "2026-04-13T11:00:00.000Z",
+      expiresAtLabel: "13/04/2026, 11:00",
+    },
+    tripSummary: {
+      journeyTypeLabel: "One way",
+      dateRangeLabel: "Date unavailable",
+      passengersLabel: "1 passenger",
+      cabinLabel: "Economy",
+      routeLabel: "CMB ⇄ DXB",
+      offerExpiresAtLabel: null,
+    },
+    selectedFlights: [],
+    paymentRequirements: {
+      requiresInstantPayment: false,
+      canHold: true,
+      paymentRequiredByIso: null,
+      paymentRequiredByLabel: null,
+      priceGuaranteeExpiresAtIso: null,
+      priceGuaranteeExpiresAtLabel: null,
+    },
+    identityDocumentsRequired: false,
+    supportedIdentityDocumentTypes: [],
+    passengerDefaults: [],
+    ancillary: {
+      offer: createOffer(),
+      seatMaps: [],
+    },
+    payment: {
+      provider: "stripe" as const,
+      checkoutUi: "hosted" as const,
+      payNowEnabled: false,
+      unavailableReason: null,
+      chargeAmount: null,
+      chargeCurrency: "USD",
+      chargeAmountLabel: null,
     },
   }
 }
@@ -700,47 +1076,12 @@ function createOffer(overrides: Record<string, unknown> = {}) {
   } as unknown as Offer
 }
 
-function createSlice(input: {
-  id: string
-  originIata: string
-  destinationIata: string
-}) {
-  return {
-    id: input.id,
-    origin: {
-      iata_code: input.originIata,
-    },
-    destination: {
-      iata_code: input.destinationIata,
-    },
-    duration: "PT4H58M",
-    segments: [
-      {
-        id: `${input.id}_seg_1`,
-        origin: {
-          iata_code: input.originIata,
-        },
-        destination: {
-          iata_code: input.destinationIata,
-        },
-        departing_at: "2026-04-13T10:00:00.000Z",
-        arriving_at: "2026-04-13T14:58:00.000Z",
-        passengers: [
-          {
-            passenger_id: "pas_1",
-            cabin_class: "economy",
-          },
-        ],
-      },
-    ],
-  }
-}
-
 function createDuffelOrder() {
   return {
     id: "ord_1",
     total_amount: "120.00",
     total_currency: "USD",
+    booking_reference: "DUFFELREF",
     payment_status: {
       awaiting_payment: false,
       payment_required_by: null,
@@ -748,6 +1089,39 @@ function createDuffelOrder() {
       paid_at: "2026-04-13T10:15:00.000Z",
     },
   } as unknown as Order
+}
+
+function createStripeCheckoutSession(
+  overrides: Partial<Stripe.Checkout.Session>
+): Stripe.Checkout.Session {
+  return {
+    id: "cs_test_default",
+    object: "checkout.session",
+    url: "https://checkout.stripe.com/c/pay/cs_test_default",
+    status: "open",
+    payment_status: "unpaid",
+    client_reference_id: null,
+    payment_intent: null,
+    amount_total: 12000,
+    currency: "usd",
+    metadata: {},
+    ...overrides,
+  } as Stripe.Checkout.Session
+}
+
+function createStripeEvent(input: {
+  id: string
+  type: Stripe.Event.Type
+  session: Stripe.Checkout.Session
+}): Stripe.Event {
+  return {
+    id: input.id,
+    object: "event",
+    type: input.type,
+    data: {
+      object: input.session,
+    },
+  } as Stripe.Event
 }
 
 function createSessionRepository() {
@@ -782,14 +1156,7 @@ function createSessionRepository() {
         providerStatusMessage: record.providerStatusMessage ?? null,
         paymentCurrency: record.paymentCurrency ?? null,
         paymentAmount: record.paymentAmount ?? null,
-        fxSourceCurrency: record.fxSourceCurrency ?? null,
-        fxTargetCurrency: record.fxTargetCurrency ?? null,
-        fxBaseRate: record.fxBaseRate ?? null,
-        fxBufferPercent: record.fxBufferPercent ?? null,
-        fxEffectiveRate: record.fxEffectiveRate ?? null,
         checkoutPayloadSnapshot: record.checkoutPayloadSnapshot ?? null,
-        externalPaymentAuthorizationId: null,
-        externalPaymentCaptureId: null,
         duffelOrderId: null,
         paymentInitiatedAt: record.paymentInitiatedAt ?? null,
         paymentConfirmedAt: record.paymentConfirmedAt ?? null,

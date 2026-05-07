@@ -2,21 +2,24 @@ import "server-only"
 
 import { format } from "date-fns"
 import type { CreateOrder, Offer, Order, SeatMap } from "@duffel/api/types"
+import type Stripe from "stripe"
 import { z } from "zod"
 
 import type { ActorContext } from "@/modules/auth/types"
 import { toNumeric } from "@/lib/shared/number"
+import { getStripeClient, getStripeConfig, toStripeAmountMinorUnit } from "@/lib/stripe"
 import {
   buildCheckoutPageModel,
   computeAncillaryPricing,
   mapPassengersToCreateOrderPassengers,
   normalizeAncillarySelection,
   normalizeMetadataPairs,
+  toCheckoutUrlSearchParams,
   validateIdentityDocumentRequirements,
   type CheckoutPageData,
+  type CheckoutPaymentStartResult,
   type CheckoutSessionStatusResult,
   type CheckoutSubmitInput,
-  type CheckoutPaymentStartResult,
   type CheckoutUrlState,
 } from "@/modules/flights/checkout/domain"
 import { getCheckoutServerConfig } from "@/modules/flights/checkout/server/config"
@@ -47,21 +50,11 @@ import {
   roundToCurrency,
   statusToMessage,
   toAmountString,
-  toPayHereEventKey,
   toPayNowUnavailableReason,
   toQuoteOwner,
   toQuoteValidationErrorMessage,
+  toStripeEventKey,
 } from "@/modules/flights/checkout/server/service-helpers"
-import {
-  convertToLkr,
-  getPayHereConfig,
-  mapPayHereStatusCode,
-  toPayHereAmount,
-  verifyPayHereNotifySignature,
-  createPayHereRequestHash,
-  type PayHereNotifyPayload,
-  type PayHereStartPaymentPayload,
-} from "@/modules/flights/payments/payhere"
 import { buildFlightOrderSnapshot } from "@/modules/flights/orders/domain"
 import {
   createBookingReference,
@@ -77,8 +70,10 @@ import {
   markPricedQuoteConsumed,
   validatePricedQuote,
 } from "@/modules/flights/pricing/server"
+import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
 import { enqueueNotification, dispatchPendingNotifications } from "@/modules/notifications/server"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
+import { isStripeCheckoutSession } from "@/modules/flights/checkout/server/stripe-event"
 
 interface FetchCheckoutPageDataInput {
   partialOfferRequestId: string
@@ -96,8 +91,8 @@ interface SubmitCheckoutInput {
   payload: CheckoutSubmitInput
 }
 
-interface ProcessPayHereNotificationInput {
-  payload: PayHereNotifyPayload
+interface ProcessStripeWebhookEventInput {
+  event: Stripe.Event
 }
 
 interface CheckoutSubmissionSuccess {
@@ -141,11 +136,6 @@ const checkoutPayloadSnapshotSchema = z.object({
   contact: z.object({
     email: z.email(),
     phoneNumber: z.string().min(1),
-  }),
-  billing: z.object({
-    address: z.string().min(1),
-    city: z.string().min(1),
-    country: z.string().min(1),
   }),
   passengers: z.array(
     z.object({
@@ -324,19 +314,19 @@ export async function fetchCheckoutPageData(
     airlineLogosByAirlineId: logos,
   })
 
-  const payHerePreview = buildPayHerePreview({
-    fareNetAmount: quoteForView.netAmount,
+  const paymentPreview = buildStripePaymentPreview({
+    fareSellAmount: quoteForView.sellAmount,
     sourceCurrency: quoteForView.currency,
   })
 
-  model.payHere = payHerePreview
+  model.payment = paymentPreview
 
   logFlightFlow("fetchCheckoutPageData", "completed", {
     partialOfferRequestId: input.partialOfferRequestId,
     offerId: effectiveOfferId,
     seatMapCount: seatMaps.length,
     passengerCount: model.passengerDefaults.length,
-    payNowEnabled: model.payHere.payNowEnabled,
+    payNowEnabled: model.payment.payNowEnabled,
   })
 
   return model
@@ -382,11 +372,7 @@ export async function startCheckoutPayment(
   deps: CheckoutServiceDeps = defaultDeps
 ): Promise<CheckoutPaymentStartResult> {
   if (input.payload.paymentMode !== "pay_now") {
-    throw new Error("Invalid payment mode for PayHere payment start.")
-  }
-
-  if (!input.payload.billing) {
-    throw new Error("Billing details are required for pay now.")
+    throw new Error("Invalid payment mode for Stripe payment start.")
   }
 
   const now = deps.now()
@@ -397,14 +383,14 @@ export async function startCheckoutPayment(
     now,
   })
 
-  const payHerePreview = buildPayHerePreview({
-    fareNetAmount: prepared.netTotal,
+  const paymentPreview = buildStripePaymentPreview({
+    fareSellAmount: prepared.sellTotal,
     sourceCurrency: prepared.quote.currency,
   })
 
-  if (!payHerePreview.payNowEnabled) {
+  if (!paymentPreview.payNowEnabled) {
     throw new Error(
-      payHerePreview.unavailableReason ??
+      paymentPreview.unavailableReason ??
         "Pay now is unavailable for this fare. Please choose hold."
     )
   }
@@ -421,10 +407,12 @@ export async function startCheckoutPayment(
     metadata: prepared.metadata,
     netTotal: prepared.netTotal,
     sellTotal: prepared.sellTotal,
-    billing: input.payload.billing,
   })
 
   const existingSession = await deps.sessionRepository.findByIdempotencyKey(idempotencyKey)
+  const isRetryableExpiredSession =
+    existingSession?.status === "failed" &&
+    existingSession.errorCode === "stripe_checkout_expired"
 
   if (existingSession) {
     if (existingSession.status === "completed") {
@@ -435,27 +423,72 @@ export async function startCheckoutPayment(
       throw new Error("Payment already received. Waiting for booking confirmation.")
     }
 
-    if (existingSession.status === "processing") {
+    if (existingSession.status === "processing" || isRetryableExpiredSession) {
       if (!existingSession.providerOrderId || existingSession.paymentAmount === null) {
         throw new Error("Checkout payment state is incomplete. Please retry checkout.")
       }
 
-      const paymentPayload = buildPayHereStartPayload({
+      const stripe = getStripeClient()
+      const existingProviderSession = await stripe.checkout.sessions.retrieve(
+        existingSession.providerOrderId
+      )
+
+      if (existingProviderSession.status === "open" && existingProviderSession.url) {
+        return {
+          checkoutSessionId: existingSession.id,
+          redirectUrl: existingProviderSession.url,
+          chargeAmount: existingSession.paymentAmount,
+          chargeCurrency: existingSession.paymentCurrency ?? existingSession.currency,
+          chargeAmountLabel: formatCurrencyAmount(
+            existingSession.paymentAmount,
+            existingSession.paymentCurrency ?? existingSession.currency
+          ),
+          status: "processing",
+        }
+      }
+
+      if (existingProviderSession.status === "complete") {
+        throw new Error("Payment already received. Waiting for booking confirmation.")
+      }
+
+      if (existingProviderSession.status !== "expired") {
+        throw new Error("Checkout payment state is incomplete. Please retry checkout.")
+      }
+
+      const refreshedProviderSession = await createStripeCheckoutSession({
         checkoutSessionId: existingSession.id,
         partialOfferRequestId: input.payload.partialOfferRequestId,
         offerId: input.payload.offerId,
         quoteId: input.payload.quoteId,
+        selectedPartialOffers: input.payload.selectedPartialOffers,
+        chargeAmount: existingSession.paymentAmount,
+        chargeCurrency: existingSession.paymentCurrency ?? existingSession.currency,
         contact: input.payload.contact,
-        billing: input.payload.billing,
-        amountLkr: existingSession.paymentAmount,
+      })
+
+      await deps.sessionRepository.update(existingSession.id, {
+        status: "processing",
+        providerOrderId: refreshedProviderSession.id,
+        providerStatusCode: refreshedProviderSession.status ?? "open",
+        providerStatusMessage: refreshedProviderSession.payment_status ?? "unpaid",
+        paymentInitiatedAt: now,
+        checkoutPayloadSnapshot: replaceCheckoutSnapshotContact(
+          existingSession.checkoutPayloadSnapshot,
+          input.payload.contact
+        ),
+        errorCode: null,
+        errorMessage: null,
       })
 
       return {
         checkoutSessionId: existingSession.id,
-        payment: paymentPayload,
+        redirectUrl: refreshedProviderSession.url ?? "",
         chargeAmount: existingSession.paymentAmount,
-        chargeCurrency: "LKR",
-        chargeAmountLabel: formatCurrencyAmount(existingSession.paymentAmount, "LKR"),
+        chargeCurrency: existingSession.paymentCurrency ?? existingSession.currency,
+        chargeAmountLabel: formatCurrencyAmount(
+          existingSession.paymentAmount,
+          existingSession.paymentCurrency ?? existingSession.currency
+        ),
         status: "processing",
       }
     }
@@ -466,14 +499,15 @@ export async function startCheckoutPayment(
   }
 
   const checkoutSessionId = createCheckoutSessionId()
-  const paymentPayload = buildPayHereStartPayload({
+  const stripeCheckoutSession = await createStripeCheckoutSession({
     checkoutSessionId,
     partialOfferRequestId: input.payload.partialOfferRequestId,
     offerId: input.payload.offerId,
     quoteId: input.payload.quoteId,
+    selectedPartialOffers: input.payload.selectedPartialOffers,
     contact: input.payload.contact,
-    billing: input.payload.billing,
-    amountLkr: payHerePreview.estimatedFareAmountLkr ?? 0,
+    chargeAmount: paymentPreview.chargeAmount ?? 0,
+    chargeCurrency: paymentPreview.chargeCurrency,
   })
 
   await deps.sessionRepository.create({
@@ -490,25 +524,19 @@ export async function startCheckoutPayment(
     currency: prepared.quote.currency,
     netAmount: prepared.netTotal,
     sellAmount: prepared.sellTotal,
-    paymentProvider: "payhere",
-    providerOrderId: checkoutSessionId,
+    paymentProvider: "stripe",
+    providerOrderId: stripeCheckoutSession.id,
     providerPaymentId: null,
-    providerStatusCode: null,
-    providerStatusMessage: null,
-    paymentCurrency: "LKR",
-    paymentAmount: payHerePreview.estimatedFareAmountLkr ?? null,
-    fxSourceCurrency: payHerePreview.fxSourceCurrency,
-    fxTargetCurrency: payHerePreview.fxTargetCurrency,
-    fxBaseRate: payHerePreview.fxBaseRate,
-    fxBufferPercent: payHerePreview.fxBufferPercent,
-    fxEffectiveRate: payHerePreview.fxEffectiveRate,
+    providerStatusCode: stripeCheckoutSession.status ?? "open",
+    providerStatusMessage: stripeCheckoutSession.payment_status ?? "unpaid",
+    paymentCurrency: paymentPreview.chargeCurrency,
+    paymentAmount: paymentPreview.chargeAmount ?? null,
     checkoutPayloadSnapshot: {
       partialOfferRequestId: input.payload.partialOfferRequestId,
       offerId: input.payload.offerId,
       quoteId: input.payload.quoteId,
       selectedPartialOffers: input.payload.selectedPartialOffers,
       contact: input.payload.contact,
-      billing: input.payload.billing,
       passengers: input.payload.passengers,
       metadata: input.payload.metadata,
       ancillarySelection: prepared.ancillarySelection,
@@ -526,24 +554,27 @@ export async function startCheckoutPayment(
     checkoutSessionId,
     paymentMode: "pay_now",
   })
-  incrementCheckoutMetric("payhere_start_total", {
+  incrementCheckoutMetric("stripe_start_total", {
     checkoutSessionId,
   })
 
-  logFlightFlow("checkout.payhere", "payment_started", {
+  logFlightFlow("checkout.stripe", "payment_started", {
     checkoutSessionId,
     partialOfferRequestId: input.payload.partialOfferRequestId,
     offerId: input.payload.offerId,
-    chargeAmount: payHerePreview.estimatedFareAmountLkr,
-    chargeCurrency: "LKR",
+    providerOrderId: stripeCheckoutSession.id,
+    chargeAmount: paymentPreview.chargeAmount,
+    chargeCurrency: paymentPreview.chargeCurrency,
   })
 
   return {
     checkoutSessionId,
-    payment: paymentPayload,
-    chargeAmount: payHerePreview.estimatedFareAmountLkr ?? 0,
-    chargeCurrency: "LKR",
-    chargeAmountLabel: payHerePreview.estimatedFareAmountLkrLabel ?? formatCurrencyAmount(0, "LKR"),
+    redirectUrl: stripeCheckoutSession.url ?? "",
+    chargeAmount: paymentPreview.chargeAmount ?? 0,
+    chargeCurrency: paymentPreview.chargeCurrency,
+    chargeAmountLabel:
+      paymentPreview.chargeAmountLabel ??
+      formatCurrencyAmount(0, paymentPreview.chargeCurrency),
     status: "processing",
   }
 }
@@ -553,7 +584,7 @@ export async function submitCheckout(
   deps: CheckoutServiceDeps = defaultDeps
 ): Promise<CheckoutSubmissionSuccess> {
   if (input.payload.paymentMode !== "hold") {
-    throw new Error("Pay now uses PayHere async flow. Please retry with pay now.")
+    throw new Error("Pay now uses Stripe checkout flow. Please retry with pay now.")
   }
 
   const now = deps.now()
@@ -584,7 +615,6 @@ export async function submitCheckout(
     metadata: prepared.metadata,
     netTotal: prepared.netTotal,
     sellTotal: prepared.sellTotal,
-    billing: input.payload.billing,
   })
 
   const existingSession = await deps.sessionRepository.findByIdempotencyKey(idempotencyKey)
@@ -637,11 +667,6 @@ export async function submitCheckout(
     providerStatusMessage: null,
     paymentCurrency: null,
     paymentAmount: null,
-    fxSourceCurrency: null,
-    fxTargetCurrency: null,
-    fxBaseRate: null,
-    fxBufferPercent: null,
-    fxEffectiveRate: null,
     checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
       partialOfferRequestId: input.payload.partialOfferRequestId,
       offerId: input.payload.offerId,
@@ -832,121 +857,116 @@ export async function getCheckoutSessionStatus(
   }
 }
 
-export async function processPayHereNotification(
-  input: ProcessPayHereNotificationInput,
+export async function processStripeWebhookEvent(
+  input: ProcessStripeWebhookEventInput,
   deps: CheckoutServiceDeps = defaultDeps
 ) {
-  incrementCheckoutMetric("payhere_notify_total")
+  incrementCheckoutMetric("stripe_webhook_total")
 
-  const payload = input.payload
-  const config = getPayHereConfig()
-  const eventKey = toPayHereEventKey({
-    orderId: payload.order_id,
-    paymentId: payload.payment_id,
-    statusCode: payload.status_code,
-    amount: payload.payhere_amount,
-    currency: payload.payhere_currency,
-  })
-
-  if (payload.merchant_id !== config.merchantId) {
-    incrementCheckoutMetric("payhere_notify_invalid_sig_total", {
-      reason: "merchant_id_mismatch",
-    })
-    throw new Error("Invalid PayHere merchant ID.")
+  if (!isStripeCheckoutSession(input.event.data.object)) {
+    return
   }
 
-  if (
-    !verifyPayHereNotifySignature({
-      merchantSecret: config.merchantSecret,
-      payload,
-    })
-  ) {
-    incrementCheckoutMetric("payhere_notify_invalid_sig_total", {
-      reason: "signature_mismatch",
-    })
-    throw new Error("Invalid PayHere signature.")
-  }
+  const stripeSession = input.event.data.object
+  const eventKey = toStripeEventKey(input.event.id)
 
   const alreadyProcessed = await deps.paymentWebhookEventRepository.isProcessed({
-    provider: "payhere",
+    provider: "stripe",
     eventKey,
   })
 
   if (alreadyProcessed) {
-    logFlightFlow("checkout.payhere", "notify_ignored_duplicate_event", {
-      providerOrderId: payload.order_id,
-      paymentId: payload.payment_id,
+    logFlightFlow("checkout.stripe", "webhook_ignored_duplicate_event", {
+      providerOrderId: stripeSession.id,
+      eventType: input.event.type,
     })
     return
   }
 
-  const session = await deps.sessionRepository.findById(payload.order_id)
-
-  if (!session) {
-    await deps.paymentWebhookEventRepository.record({
-      id: createWebhookEventId(),
-      provider: "payhere",
-      eventKey,
-      providerOrderId: payload.order_id,
-      providerPaymentId: payload.payment_id,
-      payload,
-    })
-    throw new Error("Checkout session not found for PayHere order.")
-  }
+  const session = await resolveCheckoutSessionFromStripeSession(stripeSession, deps)
 
   await deps.paymentWebhookEventRepository.record({
     id: createWebhookEventId(),
-    provider: "payhere",
+    provider: "stripe",
     eventKey,
-    providerOrderId: payload.order_id,
-    providerPaymentId: payload.payment_id,
-    payload,
+    providerOrderId: stripeSession.id,
+    providerPaymentId:
+      typeof stripeSession.payment_intent === "string" ? stripeSession.payment_intent : null,
+    payload: input.event,
   })
 
-  if (session.status === "completed") {
-    logFlightFlow("checkout.payhere", "notify_ignored_completed_session", {
+  if (!session) {
+    throw new Error("Checkout session not found for Stripe session.")
+  }
+
+  if (input.event.type === "checkout.session.expired") {
+    if (session.status === "completed" || session.providerOrderId !== stripeSession.id) {
+      return
+    }
+
+    await deps.sessionRepository.update(session.id, {
+      status: "failed",
+      providerStatusCode: stripeSession.status ?? "expired",
+      providerStatusMessage: stripeSession.payment_status ?? "unpaid",
+      errorCode: "stripe_checkout_expired",
+      errorMessage: "Stripe checkout session expired before payment was completed.",
+      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+        partialOfferRequestId: session.partialOfferRequestId,
+        offerId: session.offerId,
+        quoteId: session.quoteId,
+        selectedPartialOffers: session.selectedPartialOffers,
+        paymentMode: session.paymentMode,
+        sourceCurrency: session.currency,
+        netTotal: session.netAmount,
+        sellTotal: session.sellAmount,
+      }),
+    })
+    incrementCheckoutMetric("checkout_payment_failed_total", {
       checkoutSessionId: session.id,
-      paymentId: payload.payment_id,
+      statusCode: stripeSession.status ?? "expired",
     })
     return
   }
 
-  const mappedStatus = mapPayHereStatusCode(payload.status_code)
-  const now = deps.now()
+  if (input.event.type !== "checkout.session.completed") {
+    return
+  }
 
-  if (mappedStatus !== "success") {
-    await deps.sessionRepository.update(session.id, {
-      status: mappedStatus === "pending" ? "processing" : "failed",
-      providerPaymentId: payload.payment_id,
-      providerStatusCode: payload.status_code,
-      providerStatusMessage: payload.status_message ?? mappedStatus,
-      checkoutPayloadSnapshot:
-        mappedStatus === "pending"
-          ? session.checkoutPayloadSnapshot
-          : createTerminalCheckoutSnapshot({
-              partialOfferRequestId: session.partialOfferRequestId,
-              offerId: session.offerId,
-              quoteId: session.quoteId,
-              selectedPartialOffers: session.selectedPartialOffers,
-              paymentMode: session.paymentMode,
-              sourceCurrency: session.currency,
-              netTotal: session.netAmount,
-              sellTotal: session.sellAmount,
-            }),
-      errorCode: mappedStatus === "pending" ? null : "payhere_payment_failed",
-      errorMessage:
-        mappedStatus === "pending"
-          ? null
-          : payload.status_message ?? "Payment was not successful.",
+  if (session.status === "completed") {
+    logFlightFlow("checkout.stripe", "webhook_ignored_completed_session", {
+      checkoutSessionId: session.id,
+      providerOrderId: stripeSession.id,
     })
+    return
+  }
 
-    if (mappedStatus !== "pending") {
-      incrementCheckoutMetric("checkout_payment_failed_total", {
-        checkoutSessionId: session.id,
-        statusCode: payload.status_code,
-      })
-    }
+  const now = deps.now()
+  const paymentIntentId =
+    typeof stripeSession.payment_intent === "string" ? stripeSession.payment_intent : null
 
+  if (stripeSession.payment_status !== "paid") {
+    await deps.sessionRepository.update(session.id, {
+      status: "failed",
+      providerPaymentId: paymentIntentId,
+      providerStatusCode: stripeSession.status ?? "complete",
+      providerStatusMessage: stripeSession.payment_status ?? "unpaid",
+      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+        partialOfferRequestId: session.partialOfferRequestId,
+        offerId: session.offerId,
+        quoteId: session.quoteId,
+        selectedPartialOffers: session.selectedPartialOffers,
+        paymentMode: session.paymentMode,
+        sourceCurrency: session.currency,
+        netTotal: session.netAmount,
+        sellTotal: session.sellAmount,
+      }),
+      errorCode: "stripe_payment_unpaid",
+      errorMessage: "Payment was not completed successfully.",
+    })
+    incrementCheckoutMetric("checkout_payment_failed_total", {
+      checkoutSessionId: session.id,
+      statusCode: stripeSession.payment_status ?? "unpaid",
+    })
     return
   }
 
@@ -954,15 +974,18 @@ export async function processPayHereNotification(
     !isPaymentAmountMatch({
       expectedAmount: session.paymentAmount,
       expectedCurrency: session.paymentCurrency,
-      actualAmount: payload.payhere_amount,
-      actualCurrency: payload.payhere_currency,
+      actualAmount: fromStripeAmountMinorUnit(
+        stripeSession.amount_total ?? 0,
+        stripeSession.currency ?? session.paymentCurrency ?? session.currency
+      ),
+      actualCurrency: stripeSession.currency ?? session.paymentCurrency ?? session.currency,
     })
   ) {
     await deps.sessionRepository.update(session.id, {
       status: "reconciliation_required",
-      providerPaymentId: payload.payment_id,
-      providerStatusCode: payload.status_code,
-      providerStatusMessage: payload.status_message ?? "amount_mismatch",
+      providerPaymentId: paymentIntentId,
+      providerStatusCode: stripeSession.status ?? "complete",
+      providerStatusMessage: stripeSession.payment_status ?? "paid",
       paymentConfirmedAt: now,
       checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
         partialOfferRequestId: session.partialOfferRequestId,
@@ -974,7 +997,7 @@ export async function processPayHereNotification(
         netTotal: session.netAmount,
         sellTotal: session.sellAmount,
       }),
-      errorCode: "payhere_amount_mismatch",
+      errorCode: "stripe_amount_mismatch",
       errorMessage:
         "Payment amount/currency mismatch detected. Support will reconcile this payment.",
     })
@@ -988,158 +1011,26 @@ export async function processPayHereNotification(
 
   await deps.sessionRepository.update(session.id, {
     status: "payment_authorized",
-    providerPaymentId: payload.payment_id,
-    providerStatusCode: payload.status_code,
-    providerStatusMessage: payload.status_message ?? "success",
+    providerPaymentId: paymentIntentId,
+    providerStatusCode: stripeSession.status ?? "complete",
+    providerStatusMessage: stripeSession.payment_status ?? "paid",
     paymentConfirmedAt: now,
     errorCode: null,
     errorMessage: null,
   })
 
   try {
-    const snapshotParsed = checkoutPayloadSnapshotSchema.safeParse(
-      session.checkoutPayloadSnapshot
-    )
-
-    if (!snapshotParsed.success) {
-      throw new Error("Stored checkout snapshot is invalid.")
-    }
-
-    const snapshot = snapshotParsed.data
-    const offer = await deps.getOfferById(snapshot.offerId)
-    const ancillarySelection = normalizeAncillarySelection(snapshot.ancillarySelection)
-
-    validateIdentityDocumentRequirements({
-      offer,
-      passengers: snapshot.passengers,
-    })
-
-    const passengers = mapPassengersToCreateOrderPassengers({
-      offer,
-      passengers: snapshot.passengers,
-      contact: snapshot.contact,
-    })
-
-    const metadata = normalizeMetadataPairs(snapshot.metadata)
-    metadata.checkout_quote_id = snapshot.quoteId
-    metadata.checkout_session_origin = "vacatina_checkout_v1"
-    metadata.checkout_payment_provider = "payhere"
-
-    const orderPayload: CreateOrder = {
-      selected_offers: [offer.id],
-      passengers,
-      type: "instant",
-      metadata,
-      payments: [
-        {
-          type: getCheckoutServerConfig().settlementPaymentType,
-          amount: toAmountString(snapshot.netTotal, snapshot.sourceCurrency),
-          currency: snapshot.sourceCurrency,
-        },
-      ],
-    }
-
-    if (ancillarySelection.services.length > 0) {
-      orderPayload.services = ancillarySelection.services
-    }
-
-    const duffelOrder = await deps.createOrder(orderPayload)
-    incrementCheckoutMetric("order_created", {
-      checkoutSessionId: session.id,
-      duffelOrderId: duffelOrder.id,
-    })
-
-    const flightOrder = await createFlightOrderWithReference(
-      {
-        id: createFlightOrderId(),
-        checkoutSessionId: session.id,
-        duffelOrderId: duffelOrder.id,
-        partialOfferRequestId: snapshot.partialOfferRequestId,
-        offerId: snapshot.offerId,
-        selectedPartialOffers: snapshot.selectedPartialOffers,
-        ownerUserId: session.ownerUserId,
-        ownerGuestId: session.ownerGuestId,
-        ownerOrgId: session.ownerOrgId,
-        contactEmail: snapshot.contact.email,
-        contactEmailHash: createEmailHash(snapshot.contact.email),
-        paymentMode: "pay_now",
-        settlementType: getCheckoutServerConfig().settlementPaymentType,
-        currency: snapshot.sourceCurrency,
-        netAmount: snapshot.netTotal,
-        sellAmount: session.sellAmount,
-        duffelTotalAmount: toNumeric(duffelOrder.total_amount),
-        duffelTotalCurrency: duffelOrder.total_currency,
-        paymentAwaiting: duffelOrder.payment_status.awaiting_payment,
-        paymentRequiredBy: parseOptionalDate(duffelOrder.payment_status.payment_required_by),
-        priceGuaranteeExpiresAt: parseOptionalDate(
-          duffelOrder.payment_status.price_guarantee_expires_at
-        ),
-        paidAt: parseOptionalDate(duffelOrder.payment_status.paid_at),
-        orderSnapshot: buildFlightOrderSnapshot({
-          offer,
-          order: duffelOrder,
-          paymentMode: "pay_now",
-          currency: snapshot.sourceCurrency,
-          sellAmount: session.sellAmount,
-          contact: snapshot.contact,
-          travelers: snapshot.passengers.map((passenger) => ({
-            id: passenger.id,
-            type: passenger.type,
-            title: passenger.title,
-            givenName: passenger.givenName,
-            familyName: passenger.familyName,
-            bornOn: passenger.bornOn,
-            gender: passenger.gender,
-            email: passenger.email,
-            phoneNumber: passenger.phoneNumber,
-          })),
-          now,
-        }),
-      },
-      deps.orderRepository
-    )
-
-    await markPricedQuoteConsumed(snapshot.quoteId)
-    incrementCheckoutMetric("quote_consumed", {
-      checkoutSessionId: session.id,
-      quoteId: snapshot.quoteId,
-    })
-
-    await deps.sessionRepository.update(session.id, {
-      status: "completed",
-      duffelOrderId: duffelOrder.id,
-      finalizedAt: now,
-      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
-        partialOfferRequestId: snapshot.partialOfferRequestId,
-        offerId: snapshot.offerId,
-        quoteId: snapshot.quoteId,
-        selectedPartialOffers: snapshot.selectedPartialOffers,
-        paymentMode: session.paymentMode,
-        sourceCurrency: snapshot.sourceCurrency,
-        netTotal: snapshot.netTotal,
-        sellTotal: session.sellAmount,
-        ancillaryServicesCount: ancillarySelection.services.length,
-        metadataKeys: Object.keys(metadata),
-      }),
-      errorCode: null,
-      errorMessage: null,
-    })
-
-    incrementCheckoutMetric("checkout_payment_success_total", {
-      checkoutSessionId: session.id,
-      duffelOrderId: duffelOrder.id,
-    })
-
-    await tryDispatchOrderNotification({
-      eventType: "booking_confirmed",
-      flightOrder,
-      checkoutSessionId: session.id,
-      statusLabel: "Confirmed",
+    await finalizeAuthorizedCheckoutSession({
+      session,
+      deps,
+      now,
+      paymentProvider: "stripe",
+      providerPaymentId: paymentIntentId,
     })
   } catch (error) {
-    logFlightFlowError("checkout.payhere", "finalize_failed", error, {
+    logFlightFlowError("checkout.stripe", "finalize_failed", error, {
       checkoutSessionId: session.id,
-      providerPaymentId: payload.payment_id,
+      providerPaymentId: paymentIntentId,
     })
 
     await deps.sessionRepository.update(session.id, {
@@ -1154,7 +1045,7 @@ export async function processPayHereNotification(
         netTotal: session.netAmount,
         sellTotal: session.sellAmount,
       }),
-      errorCode: "payhere_finalize_failed",
+      errorCode: "stripe_finalize_failed",
       errorMessage:
         "Payment received but booking confirmation is pending manual reconciliation.",
     })
@@ -1164,6 +1055,155 @@ export async function processPayHereNotification(
     })
     await queueReconciliationNotificationForSession(session)
   }
+}
+
+async function finalizeAuthorizedCheckoutSession(input: {
+  session: NonNullable<Awaited<ReturnType<CheckoutSessionRepository["findById"]>>>
+  deps: CheckoutServiceDeps
+  now: Date
+  paymentProvider: "stripe"
+  providerPaymentId: string | null
+}) {
+  const snapshotParsed = checkoutPayloadSnapshotSchema.safeParse(
+    input.session.checkoutPayloadSnapshot
+  )
+
+  if (!snapshotParsed.success) {
+    throw new Error("Stored checkout snapshot is invalid.")
+  }
+
+  const snapshot = snapshotParsed.data
+  const offer = await input.deps.getOfferById(snapshot.offerId)
+  const ancillarySelection = normalizeAncillarySelection(snapshot.ancillarySelection)
+
+  validateIdentityDocumentRequirements({
+    offer,
+    passengers: snapshot.passengers,
+  })
+
+  const passengers = mapPassengersToCreateOrderPassengers({
+    offer,
+    passengers: snapshot.passengers,
+    contact: snapshot.contact,
+  })
+
+  const metadata = normalizeMetadataPairs(snapshot.metadata)
+  metadata.checkout_quote_id = snapshot.quoteId
+  metadata.checkout_session_origin = "vacatina_checkout_v1"
+  metadata.checkout_payment_provider = input.paymentProvider
+
+  const orderPayload: CreateOrder = {
+    selected_offers: [offer.id],
+    passengers,
+    type: "instant",
+    metadata,
+    payments: [
+      {
+        type: getCheckoutServerConfig().settlementPaymentType,
+        amount: toAmountString(snapshot.netTotal, snapshot.sourceCurrency),
+        currency: snapshot.sourceCurrency,
+      },
+    ],
+  }
+
+  if (ancillarySelection.services.length > 0) {
+    orderPayload.services = ancillarySelection.services
+  }
+
+  const duffelOrder = await input.deps.createOrder(orderPayload)
+  incrementCheckoutMetric("order_created", {
+    checkoutSessionId: input.session.id,
+    duffelOrderId: duffelOrder.id,
+  })
+
+  const flightOrder = await createFlightOrderWithReference(
+    {
+      id: createFlightOrderId(),
+      checkoutSessionId: input.session.id,
+      duffelOrderId: duffelOrder.id,
+      partialOfferRequestId: snapshot.partialOfferRequestId,
+      offerId: snapshot.offerId,
+      selectedPartialOffers: snapshot.selectedPartialOffers,
+      ownerUserId: input.session.ownerUserId,
+      ownerGuestId: input.session.ownerGuestId,
+      ownerOrgId: input.session.ownerOrgId,
+      contactEmail: snapshot.contact.email,
+      contactEmailHash: createEmailHash(snapshot.contact.email),
+      paymentMode: "pay_now",
+      settlementType: getCheckoutServerConfig().settlementPaymentType,
+      currency: snapshot.sourceCurrency,
+      netAmount: snapshot.netTotal,
+      sellAmount: input.session.sellAmount,
+      duffelTotalAmount: toNumeric(duffelOrder.total_amount),
+      duffelTotalCurrency: duffelOrder.total_currency,
+      paymentAwaiting: duffelOrder.payment_status.awaiting_payment,
+      paymentRequiredBy: parseOptionalDate(duffelOrder.payment_status.payment_required_by),
+      priceGuaranteeExpiresAt: parseOptionalDate(
+        duffelOrder.payment_status.price_guarantee_expires_at
+      ),
+      paidAt: parseOptionalDate(duffelOrder.payment_status.paid_at),
+      orderSnapshot: buildFlightOrderSnapshot({
+        offer,
+        order: duffelOrder,
+        paymentMode: "pay_now",
+        currency: snapshot.sourceCurrency,
+        sellAmount: input.session.sellAmount,
+        contact: snapshot.contact,
+        travelers: snapshot.passengers.map((passenger) => ({
+          id: passenger.id,
+          type: passenger.type,
+          title: passenger.title,
+          givenName: passenger.givenName,
+          familyName: passenger.familyName,
+          bornOn: passenger.bornOn,
+          gender: passenger.gender,
+          email: passenger.email,
+          phoneNumber: passenger.phoneNumber,
+        })),
+        now: input.now,
+      }),
+    },
+    input.deps.orderRepository
+  )
+
+  await markPricedQuoteConsumed(snapshot.quoteId)
+  incrementCheckoutMetric("quote_consumed", {
+    checkoutSessionId: input.session.id,
+    quoteId: snapshot.quoteId,
+  })
+
+  await input.deps.sessionRepository.update(input.session.id, {
+    status: "completed",
+    duffelOrderId: duffelOrder.id,
+    providerPaymentId: input.providerPaymentId,
+    finalizedAt: input.now,
+    checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+      partialOfferRequestId: snapshot.partialOfferRequestId,
+      offerId: snapshot.offerId,
+      quoteId: snapshot.quoteId,
+      selectedPartialOffers: snapshot.selectedPartialOffers,
+      paymentMode: input.session.paymentMode,
+      sourceCurrency: snapshot.sourceCurrency,
+      netTotal: snapshot.netTotal,
+      sellTotal: input.session.sellAmount,
+      ancillaryServicesCount: ancillarySelection.services.length,
+      metadataKeys: Object.keys(metadata),
+    }),
+    errorCode: null,
+    errorMessage: null,
+  })
+
+  incrementCheckoutMetric("checkout_payment_success_total", {
+    checkoutSessionId: input.session.id,
+    duffelOrderId: duffelOrder.id,
+  })
+
+  await tryDispatchOrderNotification({
+    eventType: "booking_confirmed",
+    flightOrder,
+    checkoutSessionId: input.session.id,
+    statusLabel: "Confirmed",
+  })
 }
 
 async function prepareCheckoutForSubmission(input: {
@@ -1366,111 +1406,183 @@ function readSnapshotRouteLabel(snapshot: Record<string, unknown>) {
     : "Route unavailable"
 }
 
-function buildPayHerePreview(input: {
-  fareNetAmount: number
+function buildStripePaymentPreview(input: {
+  fareSellAmount: number
   sourceCurrency: string
-}): CheckoutPageData["payHere"] {
+}): CheckoutPageData["payment"] {
   try {
-    const payHereConfig = getPayHereConfig()
-    const converted = convertToLkr({
-      amount: input.fareNetAmount,
-      sourceCurrency: input.sourceCurrency,
-      bufferPercent: payHereConfig.fxBufferPercent,
-    })
-    const calculatedChargeAmount = roundToCurrency(
-      converted.convertedAmount * (1 + payHereConfig.markupRatePercent / 100) +
-        payHereConfig.markupFixedLkr,
-      "LKR"
-    )
-    const chargeAmount = payHereConfig.testFixedAmountLkr ?? calculatedChargeAmount
+    const sourceCurrency = input.sourceCurrency.trim().toUpperCase()
+
+    if (!sourceCurrency) {
+      throw new Error("Stripe pay_now is unavailable for an unknown currency.")
+    }
+
+    if (!Number.isFinite(input.fareSellAmount) || input.fareSellAmount <= 0) {
+      throw new Error(
+        `Stripe pay_now is unavailable for ${sourceCurrency}. Invalid charge amount.`
+      )
+    }
+
+    const chargeAmount = roundToCurrency(input.fareSellAmount, sourceCurrency)
 
     return {
+      provider: "stripe",
+      checkoutUi: "hosted",
       payNowEnabled: true,
       unavailableReason: null,
-      chargeCurrency: "LKR",
-      estimatedFareAmountLkr: chargeAmount,
-      estimatedFareAmountLkrLabel: formatCurrencyAmount(chargeAmount, "LKR"),
-      fxSourceCurrency: converted.sourceCurrency,
-      fxTargetCurrency: converted.targetCurrency,
-      fxBaseRate: converted.baseRate,
-      fxBufferPercent: converted.bufferPercent,
-      fxEffectiveRate: converted.effectiveRate,
-      scriptUrl: payHereConfig.scriptUrl,
+      chargeAmount,
+      chargeCurrency: sourceCurrency,
+      chargeAmountLabel: formatCurrencyAmount(chargeAmount, sourceCurrency),
     }
   } catch (error) {
     return {
+      provider: "stripe",
+      checkoutUi: "hosted",
       payNowEnabled: false,
       unavailableReason: toPayNowUnavailableReason(error),
-      chargeCurrency: "LKR",
-      estimatedFareAmountLkr: null,
-      estimatedFareAmountLkrLabel: null,
-      fxSourceCurrency: input.sourceCurrency,
-      fxTargetCurrency: "LKR",
-      fxBaseRate: null,
-      fxBufferPercent: 3,
-      fxEffectiveRate: null,
-      scriptUrl: "https://www.payhere.lk/lib/payhere.js",
+      chargeAmount: null,
+      chargeCurrency: input.sourceCurrency.trim().toUpperCase() || "USD",
+      chargeAmountLabel: null,
     }
   }
 }
 
-function buildPayHereStartPayload(input: {
+async function createStripeCheckoutSession(input: {
   checkoutSessionId: string
   partialOfferRequestId: string
   offerId: string
   quoteId: string
+  selectedPartialOffers: string[]
   contact: CheckoutSubmitInput["contact"]
-  billing: NonNullable<CheckoutSubmitInput["billing"]>
-  amountLkr: number
-}): PayHereStartPaymentPayload {
-  const config = getPayHereConfig()
-  const amount = toPayHereAmount(input.amountLkr)
-  const hash = createPayHereRequestHash({
-    merchantId: config.merchantId,
-    merchantSecret: config.merchantSecret,
-    orderId: input.checkoutSessionId,
-    amount,
-    currency: "LKR",
+  chargeAmount: number
+  chargeCurrency: string
+}) {
+  const stripe = getStripeClient()
+  const urls = buildStripeCheckoutUrls({
+    partialOfferRequestId: input.partialOfferRequestId,
+    checkoutSessionId: input.checkoutSessionId,
+    offerId: input.offerId,
+    quoteId: input.quoteId,
+    selectedPartialOffers: input.selectedPartialOffers,
   })
 
-  const [firstName, ...rest] = deriveNameFromEmail(input.contact.email)
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    success_url: urls.successUrl,
+    cancel_url: urls.cancelUrl,
+    currency: input.chargeCurrency.toLowerCase(),
+    client_reference_id: input.checkoutSessionId,
+    customer_email: input.contact.email,
+    metadata: {
+      checkout_session_id: input.checkoutSessionId,
+      partial_offer_request_id: input.partialOfferRequestId,
+      quote_id: input.quoteId,
+      offer_id: input.offerId,
+    },
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: input.chargeCurrency.toLowerCase(),
+          unit_amount: toStripeAmountMinorUnit(input.chargeAmount, input.chargeCurrency),
+          product_data: {
+            name: `Flight booking ${input.partialOfferRequestId}`,
+          },
+        },
+      },
+    ],
+  })
+
+  if (!session.url) {
+    throw new Error("Stripe Checkout session did not include a redirect URL.")
+  }
+
+  return session
+}
+
+function buildStripeCheckoutUrls(input: {
+  partialOfferRequestId: string
+  checkoutSessionId: string
+  offerId: string
+  quoteId: string
+  selectedPartialOffers: string[]
+}) {
+  const { appBaseUrl } = getStripeConfig()
+  const successParams = toCheckoutUrlSearchParams({
+    offerId: input.offerId,
+    selectedPartialOffers: input.selectedPartialOffers,
+    quoteId: input.quoteId,
+    step: "pay",
+    status: "processing",
+    sessionId: input.checkoutSessionId,
+  })
+  const cancelParams = toCheckoutUrlSearchParams({
+    offerId: input.offerId,
+    selectedPartialOffers: input.selectedPartialOffers,
+    quoteId: input.quoteId,
+    step: "pay",
+    sessionId: input.checkoutSessionId,
+    cancelled: true,
+  })
 
   return {
-    sandbox: config.sandbox,
-    merchant_id: config.merchantId,
-    return_url: config.returnUrl,
-    cancel_url: config.cancelUrl,
-    notify_url: config.notifyUrl,
-    order_id: input.checkoutSessionId,
-    items: `Flight booking ${input.partialOfferRequestId}`,
-    amount,
-    currency: "LKR",
-    first_name: firstName,
-    last_name: rest.join(" ") || "Customer",
-    email: input.contact.email,
-    phone: input.contact.phoneNumber,
-    address: input.billing.address,
-    city: input.billing.city,
-    country: input.billing.country,
-    custom_1: input.quoteId,
-    custom_2: input.offerId,
-    hash,
+    successUrl: `${appBaseUrl}/results/${input.partialOfferRequestId}/checkout?${successParams.toString()}`,
+    cancelUrl: `${appBaseUrl}/results/${input.partialOfferRequestId}/checkout?${cancelParams.toString()}`,
   }
 }
 
-function deriveNameFromEmail(email: string) {
-  const localPart = email.split("@")[0] ?? "customer"
-  const words = localPart
-    .split(/[._-]+/)
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+async function resolveCheckoutSessionFromStripeSession(
+  stripeSession: Stripe.Checkout.Session,
+  deps: CheckoutServiceDeps
+) {
+  const clientReferenceId =
+    typeof stripeSession.client_reference_id === "string"
+      ? stripeSession.client_reference_id.trim()
+      : ""
 
-  if (words.length === 0) {
-    return ["Customer"]
+  if (clientReferenceId) {
+    const session = await deps.sessionRepository.findById(clientReferenceId)
+
+    if (session) {
+      return session
+    }
   }
 
-  return words
+  const metadataCheckoutSessionId = stripeSession.metadata?.checkout_session_id?.trim()
+
+  if (metadataCheckoutSessionId) {
+    const session = await deps.sessionRepository.findById(metadataCheckoutSessionId)
+
+    if (session) {
+      return session
+    }
+  }
+
+  return deps.sessionRepository.findByProviderOrderId(stripeSession.id)
+}
+
+function fromStripeAmountMinorUnit(amount: number, currency: string) {
+  const normalizedCurrency = currency.trim().toUpperCase()
+  const digits = currencyMinorUnit(normalizedCurrency)
+  const divisor = 10 ** digits
+  return (amount / divisor).toFixed(digits)
+}
+
+function replaceCheckoutSnapshotContact(
+  snapshot: unknown,
+  contact: CheckoutSubmitInput["contact"]
+) {
+  const parsed = checkoutPayloadSnapshotSchema.safeParse(snapshot)
+
+  if (!parsed.success) {
+    return snapshot
+  }
+
+  return {
+    ...parsed.data,
+    contact,
+  }
 }
 
 function toCheckoutQuoteViewSource(quote: {

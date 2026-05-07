@@ -38,29 +38,14 @@ AUTH_GUEST_SESSION_COOKIE_NAME=guest_session
 AUTH_GUEST_SESSION_TTL_MS=2592000000
 ```
 
-## PayHere checkout
+## Stripe checkout
 
-Set these variables to enable PayHere pay-now checkout:
+Set these variables to enable Stripe Checkout pay-now flow:
 
 ```bash
-PAYHERE_MERCHANT_ID=
-PAYHERE_MERCHANT_SECRET=
-PAYHERE_APP_BASE_URL=https://your-domain.com
-PAYHERE_SANDBOX=true
-PAYHERE_NOTIFY_URL=
-PAYHERE_RETURN_URL=
-PAYHERE_CANCEL_URL=
-PAYHERE_SCRIPT_URL=https://www.payhere.lk/lib/payhere.js
-PAYHERE_FX_BUFFER_PERCENT=3
-PAYHERE_MARKUP_RATE_PERCENT=0
-PAYHERE_MARKUP_FIXED_LKR=0
-PAYHERE_TEST_FIXED_AMOUNT_LKR=
-
-
-# If empty, code auto-builds notify URL as: PAYHERE_APP_BASE_URL + /api/payments/payhere/notify
-PAYHERE_NOTIFY_URL=
-PAYHERE_RETURN_URL=https://your-domain.com/results
-PAYHERE_CANCEL_URL=https://your-domain.com/results
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_APP_BASE_URL=https://your-domain.com
 
 # Runtime tuning
 PRICING_QUOTE_TTL_MS=600000
@@ -75,8 +60,19 @@ DUFFEL_RESULTS_PAGE_SIZE=20
 # Feature/debug flags
 FLIGHTS_DEBUG=false
 NEXT_PUBLIC_FLIGHTS_DEBUG=false
-
 ```
+
+Stripe Checkout returns customers to the existing checkout flow:
+
+```text
+Success: /results/[partialOfferRequestId]/checkout?...&step=pay&status=processing&session=<checkout_session_id>
+Cancel:  /results/[partialOfferRequestId]/checkout?...&step=pay&session=<checkout_session_id>&cancelled=1
+Webhook: /api/webhooks/payments/stripe
+```
+
+The webhook is authoritative for booking finalization. Browser redirect alone does not confirm payment.
+
+Stripe v1 is intentionally limited to immediate card/wallet flows through hosted Checkout. Delayed methods are out of scope.
 
 Multi-city search is enabled by default and supports 2 to 6 legs.
 For labeling: 2-leg mirrored journeys render `Outbound`/`Inbound`; 3+ legs render `Leg 1..N`.

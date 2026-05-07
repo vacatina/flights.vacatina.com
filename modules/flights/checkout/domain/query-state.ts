@@ -14,6 +14,7 @@ const checkoutQuerySchema = z.object({
   step: z.string().optional(),
   status: z.string().optional(),
   session: z.string().optional(),
+  cancelled: z.string().optional(),
 })
 const checkoutStepSchema = z.enum(["traveler", "extras", "pay"])
 const checkoutPaymentStatusSchema = z.enum([
@@ -35,6 +36,7 @@ export function parseCheckoutUrlState(
     step: firstValue(searchParams.step),
     status: firstValue(searchParams.status),
     session: firstValue(searchParams.session),
+    cancelled: firstValue(searchParams.cancelled),
   })
 
   if (!parsed.success) {
@@ -52,6 +54,7 @@ export function parseCheckoutUrlState(
     step: parseStep(parsed.data.step),
     status: parseStatus(parsed.data.status),
     sessionId: parseSession(parsed.data.session),
+    cancelled: parseCancelled(parsed.data.cancelled),
   }
 
   if (state.selectedPartialOffers.length === 0) {
@@ -77,6 +80,10 @@ export function toCheckoutUrlSearchParams(state: CheckoutUrlState) {
 
   if (state.sessionId) {
     params.set("session", state.sessionId)
+  }
+
+  if (state.cancelled) {
+    params.set("cancelled", "1")
   }
 
   return params
@@ -128,4 +135,12 @@ function parseSession(value: string | undefined): string | undefined {
 
   const normalized = value.trim()
   return normalized.length > 0 ? normalized : undefined
+}
+
+function parseCancelled(value: string | undefined) {
+  if (!value) {
+    return undefined
+  }
+
+  return value.trim() === "1" ? true : undefined
 }

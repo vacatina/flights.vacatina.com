@@ -16,11 +16,6 @@ const validPayload = {
     email: "test@example.com",
     phoneNumber: "+94771234567",
   },
-  billing: {
-    address: "1 Main Street",
-    city: "Colombo",
-    country: "Sri Lanka",
-  },
   passengers: [
     {
       id: "pas_1",
@@ -81,28 +76,10 @@ test("executeStartCheckoutPaymentAction returns success for pay_now payload", as
       async startCheckoutPayment() {
         return {
           checkoutSessionId: "chs_1",
-          payment: {
-            sandbox: true,
-            merchant_id: "merchant",
-            return_url: "https://example.com",
-            cancel_url: "https://example.com",
-            notify_url: "https://example.com/notify",
-            order_id: "chs_1",
-            items: "Flight booking prq_1",
-            amount: "1000.00",
-            currency: "LKR",
-            first_name: "Tony",
-            last_name: "Stark",
-            email: "test@example.com",
-            phone: "+94771234567",
-            address: "1 Main Street",
-            city: "Colombo",
-            country: "Sri Lanka",
-            hash: "HASH",
-          },
+          redirectUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
           chargeAmount: 1000,
-          chargeCurrency: "LKR",
-          chargeAmountLabel: "LKR 1000.00",
+          chargeCurrency: "USD",
+          chargeAmountLabel: "USD 1000.00",
           status: "processing",
         }
       },
@@ -110,7 +87,7 @@ test("executeStartCheckoutPaymentAction returns success for pay_now payload", as
   )
 
   expect(result.ok).toBe(true)
-  expect(result.ok && result.data.chargeCurrency).toBe("LKR")
+  expect(result.ok && result.data.redirectUrl).toContain("stripe.com")
 })
 
 test("executeGetCheckoutSessionStatusAction returns success for valid input", async () => {
@@ -132,7 +109,7 @@ test("executeGetCheckoutSessionStatusAction returns success for valid input", as
           message: "processing",
           duffelOrderId: null,
           bookingReference: null,
-          totalChargeAmountLabel: "LKR 1000.00",
+          totalChargeAmountLabel: "USD 1000.00",
         }
       },
     }

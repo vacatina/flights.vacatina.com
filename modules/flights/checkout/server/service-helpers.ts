@@ -52,10 +52,7 @@ export function statusToMessage(input: {
 }
 
 export function toPayNowUnavailableReason(error: unknown) {
-  if (
-    error instanceof Error &&
-    error.message.startsWith("PayHere pay_now is unavailable for")
-  ) {
+  if (error instanceof Error && error.message.startsWith("Stripe pay_now is unavailable for")) {
     return error.message
   }
 
@@ -85,14 +82,8 @@ export function isPaymentAmountMatch(input: {
   return Math.abs(expectedAmount - actualAmount) < 0.01
 }
 
-export function toPayHereEventKey(input: {
-  orderId: string
-  paymentId: string
-  statusCode: string
-  amount: string
-  currency: string
-}) {
-  return `${input.orderId}:${input.paymentId}:${input.statusCode}:${input.amount}:${input.currency}`
+export function toStripeEventKey(eventId: string) {
+  return eventId.trim()
 }
 
 export function createWebhookEventId() {
@@ -155,11 +146,6 @@ export function buildCheckoutIdempotencyKey(input: {
   metadata: Record<string, string>
   netTotal: number
   sellTotal: number
-  billing: {
-    address: string
-    city: string
-    country: string
-  } | null
 }) {
   const payload = JSON.stringify({
     partialOfferRequestId: input.partialOfferRequestId,
@@ -173,7 +159,6 @@ export function buildCheckoutIdempotencyKey(input: {
     metadata: input.metadata,
     netTotal: input.netTotal,
     sellTotal: input.sellTotal,
-    billing: input.billing,
   })
 
   return createHash("sha256").update(payload).digest("hex")
