@@ -184,7 +184,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   const totalPreview = data.quote.fareSellAmount + ancillaryPreviewTotal
   const currentStatus = data.state.status
   const currentSessionId = data.state.sessionId
-  const statusModeActive = Boolean(currentStatus && currentSessionId)
+  const resolvedCurrentSessionStatus =
+    payNowResolution && payNowResolution.sessionId === currentSessionId
+      ? mapResolutionStatusToQueryStatus(payNowResolution.status)
+      : null
+  const effectiveStatus = resolvedCurrentSessionStatus ?? currentStatus
+  const statusModeActive = Boolean(effectiveStatus && currentSessionId)
   const fallbackMissingSessionMessage =
     data.state.status && !data.state.sessionId
       ? "Payment status link is incomplete. Please retry payment from the pay step."
@@ -262,20 +267,52 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       return
     }
 
+    if (
+      payNowResolution &&
+      payNowResolution.sessionId === data.state.sessionId
+    ) {
+      const canonicalStatus = mapResolutionStatusToQueryStatus(payNowResolution.status)
+
+      if (payNowResolution.status === "success" && payNowResolution.bookingReference) {
+        navigateToBookingDetail(payNowResolution.bookingReference)
+        return
+      }
+
+      if (canonicalStatus === "processing") {
+        if (data.state.status !== "processing") {
+          router.replace(
+            buildCheckoutHref({
+              step: "pay",
+              status: canonicalStatus,
+              sessionId: data.state.sessionId,
+            })
+          )
+        }
+
+        if (activePollingSessionId !== data.state.sessionId) {
+          void resumePayNowProcessing(data.state.sessionId)
+        }
+        return
+      }
+
+      if (canonicalStatus !== data.state.status) {
+        router.replace(
+          buildCheckoutHref({
+            step: "pay",
+            status: canonicalStatus,
+            sessionId: data.state.sessionId,
+          })
+        )
+      }
+      return
+    }
+
     if (data.state.status === "processing") {
       if (activePollingSessionId === data.state.sessionId) {
         return
       }
 
       void resumePayNowProcessing(data.state.sessionId)
-      return
-    }
-
-    if (
-      payNowResolution &&
-      payNowResolution.sessionId === data.state.sessionId &&
-      mapResolutionStatusToQueryStatus(payNowResolution.status) === data.state.status
-    ) {
       return
     }
 
@@ -317,7 +354,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   ])
 
   useEffect(() => {
-    if (currentStatus !== "success") {
+    if (effectiveStatus !== "success") {
       return
     }
 
@@ -328,8 +365,8 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     })
   }, [
     currentSessionId,
-    currentStatus,
     data.partialOfferRequestId,
+    effectiveStatus,
     payNowResolution?.duffelOrderId,
   ])
 
@@ -490,9 +527,9 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </Card>
           ) : null}
 
-          {statusModeActive && currentStatus ? (
+          {statusModeActive && effectiveStatus ? (
             <CheckoutPaymentStatusView
-              status={currentStatus}
+              status={effectiveStatus}
               sessionId={currentSessionId}
               resolution={payNowResolution}
               errorMessage={submitError}
