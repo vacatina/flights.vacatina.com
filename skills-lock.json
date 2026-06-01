@@ -76,6 +76,12 @@
       "sourceType": "github",
       "computedHash": "e3aeb1f9e8a68d24df0c1c2e3c8ab97ede09a7251a2c76988318d02254346979"
     },
+    "product-name": {
+      "source": "phuryn/pm-skills",
+      "sourceType": "github",
+      "skillPath": "pm-marketing-growth/skills/product-name/SKILL.md",
+      "computedHash": "37cca037c08948af87728d31b676c2192029fa8ca0a4dd62584ad0839dee55a7"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
