@@ -15,6 +15,9 @@ describe("CheckoutPayStep", () => {
         submitError={null}
         paymentProcessingMessage={null}
         isSubmitting={false}
+        paymentReady
+        quoteExpired={false}
+        reviewHref="/results/prq_1/review"
         clerkEnabled={false}
         signInHref="/sign-in"
         onBack={() => undefined}
@@ -24,6 +27,33 @@ describe("CheckoutPayStep", () => {
     )
 
     expect(screen.getByText("US$135.00")).toBeTruthy()
+  })
+
+  test("shows refresh guidance when the quote is expired", () => {
+    render(
+      <CheckoutPayStep
+        data={createCheckoutData()}
+        paymentMode="pay_now"
+        ancillaryPreviewTotal={0}
+        totalPreview={123}
+        submitError={null}
+        paymentProcessingMessage={null}
+        isSubmitting={false}
+        paymentReady={false}
+        quoteExpired
+        reviewHref="/results/prq_1/review"
+        clerkEnabled={false}
+        signInHref="/sign-in"
+        onBack={() => undefined}
+        onCreatePayPalOrder={async () => "PAYPAL-ORDER-1"}
+        onCapturePayPalOrder={async () => undefined}
+      />
+    )
+
+    expect(screen.getByText("This fare has expired.")).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Refresh pricing" }).getAttribute("href")).toBe(
+      "/results/prq_1/review"
+    )
   })
 })
 

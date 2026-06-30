@@ -6,7 +6,7 @@ import {
   PayPalScriptProvider,
 } from "@paypal/react-paypal-js"
 import { Show } from "@clerk/nextjs"
-import { ArrowRightIcon } from "lucide-react"
+import { ArrowRightIcon, ShieldCheckIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,6 +23,9 @@ interface CheckoutPayStepProps {
   submitError: string | null
   paymentProcessingMessage: string | null
   isSubmitting: boolean
+  paymentReady: boolean
+  quoteExpired: boolean
+  reviewHref: string
   clerkEnabled: boolean
   signInHref: string
   onBack: () => void
@@ -39,6 +42,9 @@ export function CheckoutPayStep({
   submitError,
   paymentProcessingMessage,
   isSubmitting,
+  paymentReady,
+  quoteExpired,
+  reviewHref,
   clerkEnabled,
   signInHref,
   onBack,
@@ -52,9 +58,9 @@ export function CheckoutPayStep({
     <div className="space-y-7">
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold tracking-tight md:text-xl">
-          {paymentMode === "hold" ? "Confirm and pay later" : "Payment"}
+          {paymentMode === "hold" ? "Confirm and pay later" : "Review and pay"}
         </h2>
-        <Card className="rounded-2xl">
+        <Card className="rounded-lg border-[#d7d8ce]">
           <CardContent className="space-y-3 p-4 md:p-5">
             <div className="flex items-center justify-between text-sm">
               <span>Fare</span>
@@ -75,7 +81,7 @@ export function CheckoutPayStep({
             </div>
             <p className="text-sm text-muted-foreground">
               {paymentMode === "pay_now"
-                ? "PayPal charges the exact displayed booking total for this itinerary."
+                ? "Confirm the trip total before opening PayPal. Payment is captured only after approval."
                 : "Final amount is revalidated on confirm before order creation."}
             </p>
           </CardContent>
@@ -99,32 +105,60 @@ export function CheckoutPayStep({
       </section>
 
       {paymentMode === "pay_now" && data.payment.payNowEnabled ? (
-        paypalClientId ? (
-          <PayPalScriptProvider
-            options={{
-              clientId: paypalClientId,
-              currency: data.payment.chargeCurrency,
-              intent: "capture",
-            }}
-          >
-            <PayPalButtons
-              style={{
-                layout: "vertical",
-                shape: "rect",
-                label: "paypal",
+        quoteExpired ? (
+          <div className="space-y-3 rounded-lg border border-destructive/30 bg-white p-4">
+            <div className="space-y-3 rounded-md bg-destructive/5 px-3 py-3 text-sm">
+              <p className="font-medium text-destructive">This fare has expired.</p>
+              <p className="text-muted-foreground">
+                Refresh pricing before starting PayPal so the airline total is current.
+              </p>
+              <Button size="sm" variant="outline" render={<Link href={reviewHref} />}>
+                Refresh pricing
+              </Button>
+            </div>
+          </div>
+        ) : paypalClientId ? (
+          <div className="space-y-3 rounded-lg border border-[#d7d8ce] bg-white p-4">
+            <div className="flex items-start gap-2 text-sm text-[#66706b]">
+              <ShieldCheckIcon className="mt-0.5 size-4 text-emerald-700" />
+              <div>
+                <p className="font-medium text-[#17201d]">Payment secured by PayPal</p>
+                <p>
+                  Traveler details must be complete before payment can start.
+                </p>
+              </div>
+            </div>
+            {!paymentReady ? (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Complete the highlighted traveler details before continuing to PayPal.
+              </p>
+            ) : null}
+            <PayPalScriptProvider
+              options={{
+                clientId: paypalClientId,
+                currency: data.payment.chargeCurrency,
+                intent: "capture",
               }}
-              disabled={isSubmitting}
-              forceReRender={[totalPreview, data.payment.chargeCurrency]}
-              createOrder={async () => onCreatePayPalOrder()}
-              onApprove={async (approvalData) => {
-                if (!approvalData.orderID) {
-                  throw new Error("PayPal approval did not include an order ID.")
-                }
+            >
+              <PayPalButtons
+                style={{
+                  layout: "vertical",
+                  shape: "rect",
+                  label: "paypal",
+                }}
+                disabled={quoteExpired || !paymentReady || isSubmitting}
+                forceReRender={[totalPreview, data.payment.chargeCurrency, paymentReady]}
+                createOrder={async () => onCreatePayPalOrder()}
+                onApprove={async (approvalData) => {
+                  if (!approvalData.orderID) {
+                    throw new Error("PayPal approval did not include an order ID.")
+                  }
 
-                await onCapturePayPalOrder(approvalData.orderID)
-              }}
-            />
-          </PayPalScriptProvider>
+                  await onCapturePayPalOrder(approvalData.orderID)
+                }}
+              />
+            </PayPalScriptProvider>
+          </div>
         ) : (
           <p className="text-sm text-destructive">
             PayPal checkout is not configured. Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID.

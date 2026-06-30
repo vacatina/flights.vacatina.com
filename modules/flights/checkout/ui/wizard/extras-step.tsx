@@ -1,12 +1,10 @@
 "use client"
 
 import { BriefcaseIcon } from "lucide-react"
-import type { UseFieldArrayReturn, UseFormReturn } from "react-hook-form"
+import type { UseFormReturn } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import {
   extractServicesFromAncillariesPayload,
@@ -18,7 +16,6 @@ import { DuffelAncillariesPanel } from "@/modules/flights/checkout/ui/duffel-anc
 interface CheckoutExtrasStepProps {
   data: CheckoutPageData
   form: UseFormReturn<CheckoutFormValues>
-  metadataFieldArray: UseFieldArrayReturn<CheckoutFormValues, "metadata", "id">
   paymentMode: CheckoutFormValues["paymentMode"] | undefined
   onBack: () => void
   onContinue: () => void
@@ -30,7 +27,6 @@ interface CheckoutExtrasStepProps {
 export function CheckoutExtrasStep({
   data,
   form,
-  metadataFieldArray,
   paymentMode,
   onBack,
   onContinue,
@@ -41,15 +37,23 @@ export function CheckoutExtrasStep({
   return (
     <div className="space-y-7">
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Add extras</h2>
-        <Card className="rounded-2xl">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase text-[#6c746f]">Extras</p>
+          <h2 className="text-2xl font-semibold tracking-tight md:text-xl">
+            Add seats and baggage
+          </h2>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Select optional services for this itinerary. Extras are reviewed again before payment.
+          </p>
+        </div>
+        <Card className="rounded-lg border-[#d7d8ce]">
           <CardContent className="space-y-4 p-4 md:p-5">
             <div className="flex items-start gap-3">
               <BriefcaseIcon className="mt-0.5 size-5" />
               <div className="space-y-1">
-                <p className="font-medium">Extra baggage and seat selection</p>
+                <p className="font-medium">Available extras</p>
                 <p className="text-sm text-muted-foreground">
-                  Choose ancillaries with Duffel Components
+                  Choose seat and baggage options supported by the airline.
                 </p>
               </div>
             </div>
@@ -70,32 +74,11 @@ export function CheckoutExtrasStep({
             />
             {paymentMode === "hold" ? (
               <p className="text-sm text-muted-foreground">
-                Extras are disabled for hold mode.
+                Extras are disabled for hold mode and can be handled after the airline order is created.
               </p>
             ) : null}
           </CardContent>
         </Card>
-      </section>
-
-      <Separator />
-
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold tracking-tight md:text-xl">Add metadata</h2>
-        <div className="space-y-3">
-          {metadataFieldArray.fields.map((field, index) => (
-            <div key={field.id} className="grid gap-3 md:grid-cols-2">
-              <Input placeholder="Key" {...form.register(`metadata.${index}.key`)} />
-              <Input placeholder="Value" {...form.register(`metadata.${index}.value`)} />
-            </div>
-          ))}
-          <button
-            type="button"
-            className="text-sm font-medium text-primary"
-            onClick={() => metadataFieldArray.append({ key: "", value: "" })}
-          >
-            Add another key/value pair
-          </button>
-        </div>
       </section>
 
       <div className="flex items-center justify-between gap-3">
