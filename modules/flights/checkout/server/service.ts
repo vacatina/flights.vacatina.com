@@ -1,7 +1,8 @@
 export {
+  captureCheckoutPayPalOrder,
+  createCheckoutPayPalOrder,
   fetchCheckoutPageData,
   getCheckoutSessionStatus,
-  processStripeWebhookEvent,
-  startCheckoutPayment,
+  processPayPalWebhookEvent,
   submitCheckout,
 } from "@/modules/flights/checkout/server/service-core"

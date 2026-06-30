@@ -5,8 +5,9 @@ import type { CheckoutPageData } from "@/modules/flights/checkout/domain"
 import { CheckoutPageClient } from "@/modules/flights/checkout/ui/checkout-page-client"
 
 const mocks = vi.hoisted(() => ({
+  capturePayPalOrderActionMock: vi.fn(),
+  createPayPalOrderActionMock: vi.fn(),
   getCheckoutSessionStatusActionMock: vi.fn(),
-  startCheckoutPaymentActionMock: vi.fn(),
   submitCheckoutActionMock: vi.fn(),
 }))
 
@@ -28,8 +29,9 @@ vi.mock("next/navigation", () => ({
 }))
 
 vi.mock("@/modules/flights/checkout/server/actions", () => ({
+  capturePayPalOrderAction: mocks.capturePayPalOrderActionMock,
+  createPayPalOrderAction: mocks.createPayPalOrderActionMock,
   getCheckoutSessionStatusAction: mocks.getCheckoutSessionStatusActionMock,
-  startCheckoutPaymentAction: mocks.startCheckoutPaymentActionMock,
   submitCheckoutAction: mocks.submitCheckoutActionMock,
 }))
 
@@ -170,8 +172,8 @@ function createCheckoutData(
       seatMaps: [],
     },
     payment: {
-      provider: "stripe",
-      checkoutUi: "hosted",
+      provider: "paypal",
+      checkoutUi: "buttons",
       payNowEnabled: true,
       unavailableReason: null,
       chargeAmount: 123,

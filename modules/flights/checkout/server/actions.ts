@@ -33,12 +33,21 @@ interface SubmitCheckoutActionDeps {
   }>
 }
 
-interface StartCheckoutPaymentActionDeps {
+interface CreatePayPalOrderActionDeps {
   getActorContext?: () => Promise<ActorContext>
-  startCheckoutPayment?: (input: {
+  createCheckoutPayPalOrder?: (input: {
     actor: ActorContext
     payload: CheckoutSubmitInput
   }) => Promise<CheckoutPaymentStartResult>
+}
+
+interface CapturePayPalOrderActionDeps {
+  getActorContext?: () => Promise<ActorContext>
+  captureCheckoutPayPalOrder?: (input: {
+    actor: ActorContext
+    checkoutSessionId: string
+    paypalOrderId: string
+  }) => Promise<CheckoutSessionStatusResult>
 }
 
 interface CheckoutSessionStatusActionDeps {
@@ -61,6 +70,11 @@ type SubmitCheckoutSuccess = {
 
 const checkoutSessionStatusSchema = z.object({
   checkoutSessionId: z.string().trim().min(1),
+})
+
+const paypalCaptureSchema = z.object({
+  checkoutSessionId: z.string().trim().min(1),
+  paypalOrderId: z.string().trim().min(1),
 })
 
 export async function submitCheckoutAction(
@@ -112,7 +126,7 @@ export async function executeSubmitCheckoutAction(
   if (payload.paymentMode !== "hold") {
     return actionFailure(
       "VALIDATION_ERROR",
-      "Pay now checkout must be started through the payment initialization action."
+      "Pay now checkout must be started through PayPal."
     )
   }
 
@@ -136,15 +150,15 @@ export async function executeSubmitCheckoutAction(
   }
 }
 
-export async function startCheckoutPaymentAction(
+export async function createPayPalOrderAction(
   input: unknown
 ): Promise<ActionResult<CheckoutPaymentStartResult>> {
-  return executeStartCheckoutPaymentAction(input)
+  return executeCreatePayPalOrderAction(input)
 }
 
-export async function executeStartCheckoutPaymentAction(
+export async function executeCreatePayPalOrderAction(
   input: unknown,
-  deps: StartCheckoutPaymentActionDeps = {}
+  deps: CreatePayPalOrderActionDeps = {}
 ): Promise<ActionResult<CheckoutPaymentStartResult>> {
   let actor: ActorContext
 
@@ -154,7 +168,7 @@ export async function executeStartCheckoutPaymentAction(
       resolveActor: deps.getActorContext,
     })
   } catch (error) {
-    logFlightFlowError("startCheckoutPaymentAction", "actor_resolution_failed", error, {
+    logFlightFlowError("createPayPalOrderAction", "actor_resolution_failed", error, {
       inputType: typeof input,
     })
     return actionFailure(
@@ -183,21 +197,78 @@ export async function executeStartCheckoutPaymentAction(
   }
 
   try {
-    const startCheckoutPayment =
-      deps.startCheckoutPayment ?? (await getCheckoutPaymentStarter())
-    const result = await startCheckoutPayment({
+    const createCheckoutPayPalOrder =
+      deps.createCheckoutPayPalOrder ?? (await getPayPalOrderCreator())
+    const result = await createCheckoutPayPalOrder({
       actor,
       payload,
     })
     return actionSuccess(result)
   } catch (error) {
-    logFlightFlowError("startCheckoutPaymentAction", "failed", error, {
+    logFlightFlowError("createPayPalOrderAction", "failed", error, {
       partialOfferRequestId: payload.partialOfferRequestId,
       offerId: payload.offerId,
     })
     return actionFailure(
       "UPSTREAM_ERROR",
-      "Could not start payment right now. Please try again."
+      "Could not create PayPal order right now. Please try again."
+    )
+  }
+}
+
+export async function capturePayPalOrderAction(
+  input: unknown
+): Promise<ActionResult<CheckoutSessionStatusResult>> {
+  return executeCapturePayPalOrderAction(input)
+}
+
+export async function executeCapturePayPalOrderAction(
+  input: unknown,
+  deps: CapturePayPalOrderActionDeps = {}
+): Promise<ActionResult<CheckoutSessionStatusResult>> {
+  let actor: ActorContext
+
+  try {
+    actor = await resolveActionActorContext({
+      scope: "checkout.actions",
+      resolveActor: deps.getActorContext,
+    })
+  } catch (error) {
+    logFlightFlowError("capturePayPalOrderAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
+  }
+
+  const parsed = paypalCaptureSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return actionFailure(
+      "VALIDATION_ERROR",
+      parsed.error.issues[0]?.message ?? "Invalid PayPal capture request"
+    )
+  }
+
+  try {
+    const captureCheckoutPayPalOrder =
+      deps.captureCheckoutPayPalOrder ?? (await getPayPalOrderCapturer())
+    const result = await captureCheckoutPayPalOrder({
+      actor,
+      checkoutSessionId: parsed.data.checkoutSessionId,
+      paypalOrderId: parsed.data.paypalOrderId,
+    })
+    return actionSuccess(result)
+  } catch (error) {
+    logFlightFlowError("capturePayPalOrderAction", "failed", error, {
+      checkoutSessionId: parsed.data.checkoutSessionId,
+      paypalOrderId: parsed.data.paypalOrderId,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not capture PayPal payment right now. Please try again."
     )
   }
 }
@@ -262,9 +333,14 @@ async function getCheckoutSubmitter() {
   return submitCheckout
 }
 
-async function getCheckoutPaymentStarter() {
-  const { startCheckoutPayment } = await import("@/modules/flights/checkout/server/service")
-  return startCheckoutPayment
+async function getPayPalOrderCreator() {
+  const { createCheckoutPayPalOrder } = await import("@/modules/flights/checkout/server/service")
+  return createCheckoutPayPalOrder
+}
+
+async function getPayPalOrderCapturer() {
+  const { captureCheckoutPayPalOrder } = await import("@/modules/flights/checkout/server/service")
+  return captureCheckoutPayPalOrder
 }
 
 async function getCheckoutSessionStatusResolver() {

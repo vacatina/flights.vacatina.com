@@ -52,7 +52,7 @@ export function statusToMessage(input: {
 }
 
 export function toPayNowUnavailableReason(error: unknown) {
-  if (error instanceof Error && error.message.startsWith("Stripe pay_now is unavailable for")) {
+  if (error instanceof Error && error.message.startsWith("PayPal pay_now is unavailable for")) {
     return error.message
   }
 
@@ -82,7 +82,7 @@ export function isPaymentAmountMatch(input: {
   return Math.abs(expectedAmount - actualAmount) < 0.01
 }
 
-export function toStripeEventKey(eventId: string) {
+export function toPaymentEventKey(eventId: string) {
   return eventId.trim()
 }
 

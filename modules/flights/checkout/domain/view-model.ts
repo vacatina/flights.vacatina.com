@@ -115,10 +115,10 @@ export function buildCheckoutPageModel({
       seatMaps,
     },
     payment: {
-      provider: "stripe",
-      checkoutUi: "hosted",
+      provider: "paypal",
+      checkoutUi: "buttons",
       payNowEnabled: false,
-      unavailableReason: "Stripe availability is being checked.",
+      unavailableReason: "PayPal availability is being checked.",
       chargeAmount: null,
       chargeCurrency: quote.currency,
       chargeAmountLabel: null,

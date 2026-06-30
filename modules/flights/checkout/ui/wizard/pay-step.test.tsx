@@ -18,6 +18,8 @@ describe("CheckoutPayStep", () => {
         clerkEnabled={false}
         signInHref="/sign-in"
         onBack={() => undefined}
+        onCreatePayPalOrder={async () => "PAYPAL-ORDER-1"}
+        onCapturePayPalOrder={async () => undefined}
       />
     )
 
@@ -68,8 +70,8 @@ function createCheckoutData(): CheckoutPageData {
       seatMaps: [],
     },
     payment: {
-      provider: "stripe",
-      checkoutUi: "hosted",
+      provider: "paypal",
+      checkoutUi: "buttons",
       payNowEnabled: true,
       unavailableReason: null,
       chargeAmount: 120,

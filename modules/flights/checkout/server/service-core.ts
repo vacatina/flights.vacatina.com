@@ -2,19 +2,25 @@ import "server-only"
 
 import { format } from "date-fns"
 import type { CreateOrder, Offer, Order, SeatMap } from "@duffel/api/types"
-import type Stripe from "stripe"
 import { z } from "zod"
 
 import type { ActorContext } from "@/modules/auth/types"
 import { toNumeric } from "@/lib/shared/number"
-import { getStripeClient, getStripeConfig, toStripeAmountMinorUnit } from "@/lib/stripe"
+import {
+  capturePayPalOrder,
+  createPayPalOrder as createPayPalProviderOrder,
+  getPayPalCaptureFromOrder,
+  getPayPalCheckoutSessionIdFromResource,
+  getPayPalOrder,
+  type PayPalCapture,
+  type PayPalWebhookEvent,
+} from "@/lib/paypal"
 import {
   buildCheckoutPageModel,
   computeAncillaryPricing,
   mapPassengersToCreateOrderPassengers,
   normalizeAncillarySelection,
   normalizeMetadataPairs,
-  toCheckoutUrlSearchParams,
   validateIdentityDocumentRequirements,
   type CheckoutPageData,
   type CheckoutPaymentStartResult,
@@ -53,7 +59,7 @@ import {
   toPayNowUnavailableReason,
   toQuoteOwner,
   toQuoteValidationErrorMessage,
-  toStripeEventKey,
+  toPaymentEventKey,
 } from "@/modules/flights/checkout/server/service-helpers"
 import { buildFlightOrderSnapshot } from "@/modules/flights/orders/domain"
 import {
@@ -70,10 +76,8 @@ import {
   markPricedQuoteConsumed,
   validatePricedQuote,
 } from "@/modules/flights/pricing/server"
-import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
 import { enqueueNotification, dispatchPendingNotifications } from "@/modules/notifications/server"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
-import { isStripeCheckoutSession } from "@/modules/flights/checkout/server/stripe-event"
 
 interface FetchCheckoutPageDataInput {
   partialOfferRequestId: string
@@ -91,8 +95,14 @@ interface SubmitCheckoutInput {
   payload: CheckoutSubmitInput
 }
 
-interface ProcessStripeWebhookEventInput {
-  event: Stripe.Event
+interface CapturePayPalOrderInput {
+  actor: ActorContext
+  checkoutSessionId: string
+  paypalOrderId: string
+}
+
+interface ProcessPayPalWebhookEventInput {
+  event: PayPalWebhookEvent
 }
 
 interface CheckoutSubmissionSuccess {
@@ -314,7 +324,7 @@ export async function fetchCheckoutPageData(
     airlineLogosByAirlineId: logos,
   })
 
-  const paymentPreview = buildStripePaymentPreview({
+  const paymentPreview = buildPayPalPaymentPreview({
     fareSellAmount: quoteForView.sellAmount,
     sourceCurrency: quoteForView.currency,
   })
@@ -367,12 +377,12 @@ async function resolveQuoteFromSessionForStatusMode(input: {
   }
 }
 
-export async function startCheckoutPayment(
+export async function createCheckoutPayPalOrder(
   input: StartCheckoutPaymentInput,
   deps: CheckoutServiceDeps = defaultDeps
 ): Promise<CheckoutPaymentStartResult> {
   if (input.payload.paymentMode !== "pay_now") {
-    throw new Error("Invalid payment mode for Stripe payment start.")
+    throw new Error("Invalid payment mode for PayPal order creation.")
   }
 
   const now = deps.now()
@@ -383,7 +393,7 @@ export async function startCheckoutPayment(
     now,
   })
 
-  const paymentPreview = buildStripePaymentPreview({
+  const paymentPreview = buildPayPalPaymentPreview({
     fareSellAmount: prepared.sellTotal,
     sourceCurrency: prepared.quote.currency,
   })
@@ -410,9 +420,6 @@ export async function startCheckoutPayment(
   })
 
   const existingSession = await deps.sessionRepository.findByIdempotencyKey(idempotencyKey)
-  const isRetryableExpiredSession =
-    existingSession?.status === "failed" &&
-    existingSession.errorCode === "stripe_checkout_expired"
 
   if (existingSession) {
     if (existingSession.status === "completed") {
@@ -423,55 +430,21 @@ export async function startCheckoutPayment(
       throw new Error("Payment already received. Waiting for booking confirmation.")
     }
 
-    if (existingSession.status === "processing" || isRetryableExpiredSession) {
+    if (existingSession.status === "processing") {
       if (!existingSession.providerOrderId || existingSession.paymentAmount === null) {
         throw new Error("Checkout payment state is incomplete. Please retry checkout.")
       }
 
-      const stripe = getStripeClient()
-      const existingProviderSession = await stripe.checkout.sessions.retrieve(
-        existingSession.providerOrderId
-      )
+      const existingProviderOrder = await getPayPalOrder(existingSession.providerOrderId)
 
-      if (existingProviderSession.status === "open" && existingProviderSession.url) {
-        return {
-          checkoutSessionId: existingSession.id,
-          redirectUrl: existingProviderSession.url,
-          chargeAmount: existingSession.paymentAmount,
-          chargeCurrency: existingSession.paymentCurrency ?? existingSession.currency,
-          chargeAmountLabel: formatCurrencyAmount(
-            existingSession.paymentAmount,
-            existingSession.paymentCurrency ?? existingSession.currency
-          ),
-          status: "processing",
-        }
-      }
-
-      if (existingProviderSession.status === "complete") {
+      if (existingProviderOrder.status === "COMPLETED") {
         throw new Error("Payment already received. Waiting for booking confirmation.")
       }
 
-      if (existingProviderSession.status !== "expired") {
-        throw new Error("Checkout payment state is incomplete. Please retry checkout.")
-      }
-
-      const refreshedProviderSession = await createStripeCheckoutSession({
-        checkoutSessionId: existingSession.id,
-        partialOfferRequestId: input.payload.partialOfferRequestId,
-        offerId: input.payload.offerId,
-        quoteId: input.payload.quoteId,
-        selectedPartialOffers: input.payload.selectedPartialOffers,
-        chargeAmount: existingSession.paymentAmount,
-        chargeCurrency: existingSession.paymentCurrency ?? existingSession.currency,
-        contact: input.payload.contact,
-      })
-
       await deps.sessionRepository.update(existingSession.id, {
         status: "processing",
-        providerOrderId: refreshedProviderSession.id,
-        providerStatusCode: refreshedProviderSession.status ?? "open",
-        providerStatusMessage: refreshedProviderSession.payment_status ?? "unpaid",
-        paymentInitiatedAt: now,
+        providerStatusCode: existingProviderOrder.status ?? "CREATED",
+        providerStatusMessage: existingProviderOrder.status ?? "CREATED",
         checkoutPayloadSnapshot: replaceCheckoutSnapshotContact(
           existingSession.checkoutPayloadSnapshot,
           input.payload.contact
@@ -482,7 +455,7 @@ export async function startCheckoutPayment(
 
       return {
         checkoutSessionId: existingSession.id,
-        redirectUrl: refreshedProviderSession.url ?? "",
+        paypalOrderId: existingSession.providerOrderId,
         chargeAmount: existingSession.paymentAmount,
         chargeCurrency: existingSession.paymentCurrency ?? existingSession.currency,
         chargeAmountLabel: formatCurrencyAmount(
@@ -499,15 +472,14 @@ export async function startCheckoutPayment(
   }
 
   const checkoutSessionId = createCheckoutSessionId()
-  const stripeCheckoutSession = await createStripeCheckoutSession({
+  const paypalOrder = await createPayPalProviderOrder({
     checkoutSessionId,
     partialOfferRequestId: input.payload.partialOfferRequestId,
     offerId: input.payload.offerId,
     quoteId: input.payload.quoteId,
-    selectedPartialOffers: input.payload.selectedPartialOffers,
-    contact: input.payload.contact,
-    chargeAmount: paymentPreview.chargeAmount ?? 0,
-    chargeCurrency: paymentPreview.chargeCurrency,
+    amount: paymentPreview.chargeAmount ?? 0,
+    currency: paymentPreview.chargeCurrency,
+    contactEmail: input.payload.contact.email,
   })
 
   await deps.sessionRepository.create({
@@ -524,11 +496,11 @@ export async function startCheckoutPayment(
     currency: prepared.quote.currency,
     netAmount: prepared.netTotal,
     sellAmount: prepared.sellTotal,
-    paymentProvider: "stripe",
-    providerOrderId: stripeCheckoutSession.id,
+    paymentProvider: "paypal",
+    providerOrderId: paypalOrder.id,
     providerPaymentId: null,
-    providerStatusCode: stripeCheckoutSession.status ?? "open",
-    providerStatusMessage: stripeCheckoutSession.payment_status ?? "unpaid",
+    providerStatusCode: paypalOrder.status ?? "CREATED",
+    providerStatusMessage: paypalOrder.status ?? "CREATED",
     paymentCurrency: paymentPreview.chargeCurrency,
     paymentAmount: paymentPreview.chargeAmount ?? null,
     checkoutPayloadSnapshot: {
@@ -554,22 +526,22 @@ export async function startCheckoutPayment(
     checkoutSessionId,
     paymentMode: "pay_now",
   })
-  incrementCheckoutMetric("stripe_start_total", {
+  incrementCheckoutMetric("paypal_order_create_total", {
     checkoutSessionId,
   })
 
-  logFlightFlow("checkout.stripe", "payment_started", {
+  logFlightFlow("checkout.paypal", "order_created", {
     checkoutSessionId,
     partialOfferRequestId: input.payload.partialOfferRequestId,
     offerId: input.payload.offerId,
-    providerOrderId: stripeCheckoutSession.id,
+    providerOrderId: paypalOrder.id,
     chargeAmount: paymentPreview.chargeAmount,
     chargeCurrency: paymentPreview.chargeCurrency,
   })
 
   return {
     checkoutSessionId,
-    redirectUrl: stripeCheckoutSession.url ?? "",
+    paypalOrderId: paypalOrder.id,
     chargeAmount: paymentPreview.chargeAmount ?? 0,
     chargeCurrency: paymentPreview.chargeCurrency,
     chargeAmountLabel:
@@ -579,12 +551,58 @@ export async function startCheckoutPayment(
   }
 }
 
+export async function captureCheckoutPayPalOrder(
+  input: CapturePayPalOrderInput,
+  deps: CheckoutServiceDeps = defaultDeps
+): Promise<CheckoutSessionStatusResult> {
+  const session = await deps.sessionRepository.findById(input.checkoutSessionId)
+
+  if (!session) {
+    throw new Error("Checkout session not found.")
+  }
+
+  if (!doesSessionOwnerMatch(session, input.actor)) {
+    throw new Error("Checkout session ownership mismatch.")
+  }
+
+  if (session.providerOrderId !== input.paypalOrderId) {
+    throw new Error("PayPal order does not match checkout session.")
+  }
+
+  if (session.status === "completed") {
+    return getCheckoutSessionStatus(
+      { actor: input.actor, checkoutSessionId: input.checkoutSessionId },
+      deps
+    )
+  }
+
+  incrementCheckoutMetric("paypal_capture_total", {
+    checkoutSessionId: session.id,
+  })
+
+  const capturedOrder = await capturePayPalOrder(input.paypalOrderId)
+  const capture = getPayPalCaptureFromOrder(capturedOrder)
+  await processVerifiedPayPalCapture({
+    session,
+    capture,
+    orderStatus: capturedOrder.status ?? null,
+    deps,
+    now: deps.now(),
+    source: "capture_action",
+  })
+
+  return getCheckoutSessionStatus(
+    { actor: input.actor, checkoutSessionId: input.checkoutSessionId },
+    deps
+  )
+}
+
 export async function submitCheckout(
   input: SubmitCheckoutInput,
   deps: CheckoutServiceDeps = defaultDeps
 ): Promise<CheckoutSubmissionSuccess> {
   if (input.payload.paymentMode !== "hold") {
-    throw new Error("Pay now uses Stripe checkout flow. Please retry with pay now.")
+    throw new Error("Pay now uses PayPal checkout flow. Please retry with pay now.")
   }
 
   const now = deps.now()
@@ -857,59 +875,86 @@ export async function getCheckoutSessionStatus(
   }
 }
 
-export async function processStripeWebhookEvent(
-  input: ProcessStripeWebhookEventInput,
+export async function processPayPalWebhookEvent(
+  input: ProcessPayPalWebhookEventInput,
   deps: CheckoutServiceDeps = defaultDeps
 ) {
-  incrementCheckoutMetric("stripe_webhook_total")
-
-  if (!isStripeCheckoutSession(input.event.data.object)) {
-    return
-  }
-
-  const stripeSession = input.event.data.object
-  const eventKey = toStripeEventKey(input.event.id)
+  incrementCheckoutMetric("paypal_webhook_total")
+  const eventId = typeof input.event.id === "string" ? input.event.id : ""
+  const eventType = typeof input.event.event_type === "string" ? input.event.event_type : ""
+  const eventKey = toPaymentEventKey(eventId || `${eventType}:${Date.now()}`)
 
   const alreadyProcessed = await deps.paymentWebhookEventRepository.isProcessed({
-    provider: "stripe",
+    provider: "paypal",
     eventKey,
   })
 
   if (alreadyProcessed) {
-    logFlightFlow("checkout.stripe", "webhook_ignored_duplicate_event", {
-      providerOrderId: stripeSession.id,
-      eventType: input.event.type,
+    logFlightFlow("checkout.paypal", "webhook_ignored_duplicate_event", {
+      eventId,
+      eventType,
     })
     return
   }
 
-  const session = await resolveCheckoutSessionFromStripeSession(stripeSession, deps)
+  const session = await resolveCheckoutSessionFromPayPalResource(input.event.resource, deps)
 
   await deps.paymentWebhookEventRepository.record({
     id: createWebhookEventId(),
-    provider: "stripe",
+    provider: "paypal",
     eventKey,
-    providerOrderId: stripeSession.id,
-    providerPaymentId:
-      typeof stripeSession.payment_intent === "string" ? stripeSession.payment_intent : null,
+    providerOrderId: session?.providerOrderId ?? readPayPalResourceOrderId(input.event.resource) ?? "unknown",
+    providerPaymentId: readPayPalResourceId(input.event.resource),
     payload: input.event,
   })
 
   if (!session) {
-    throw new Error("Checkout session not found for Stripe session.")
+    throw new Error("Checkout session not found for PayPal webhook event.")
   }
 
-  if (input.event.type === "checkout.session.expired") {
-    if (session.status === "completed" || session.providerOrderId !== stripeSession.id) {
-      return
-    }
+  if (session.status === "completed" && eventType === "PAYMENT.CAPTURE.COMPLETED") {
+    logFlightFlow("checkout.paypal", "webhook_ignored_completed_session", {
+      checkoutSessionId: session.id,
+      eventId,
+      eventType,
+    })
+    return
+  }
 
+  if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+    await processVerifiedPayPalCapture({
+      session,
+      capture: toPayPalCapture(input.event.resource),
+      orderStatus: "COMPLETED",
+      deps,
+      now: deps.now(),
+      source: "webhook",
+    })
+    return
+  }
+
+  if (
+    eventType === "PAYMENT.CAPTURE.DENIED" ||
+    eventType === "PAYMENT.CAPTURE.DECLINED" ||
+    eventType === "CHECKOUT.ORDER.VOIDED"
+  ) {
+    await markPayPalPaymentFailed({
+      session,
+      deps,
+      statusCode: readPayPalResourceStatus(input.event.resource) ?? eventType,
+      providerPaymentId: readPayPalResourceId(input.event.resource),
+      errorCode: "paypal_payment_failed",
+      errorMessage: "PayPal payment was not completed successfully.",
+    })
+    return
+  }
+
+  if (eventType === "PAYMENT.CAPTURE.REFUNDED") {
     await deps.sessionRepository.update(session.id, {
-      status: "failed",
-      providerStatusCode: stripeSession.status ?? "expired",
-      providerStatusMessage: stripeSession.payment_status ?? "unpaid",
-      errorCode: "stripe_checkout_expired",
-      errorMessage: "Stripe checkout session expired before payment was completed.",
+      status: "reconciliation_required",
+      providerPaymentId: readPayPalResourceId(input.event.resource),
+      providerStatusCode: readPayPalResourceStatus(input.event.resource) ?? eventType,
+      providerStatusMessage: eventType,
       checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
         partialOfferRequestId: session.partialOfferRequestId,
         offerId: session.offerId,
@@ -920,148 +965,164 @@ export async function processStripeWebhookEvent(
         netTotal: session.netAmount,
         sellTotal: session.sellAmount,
       }),
+      errorCode: "paypal_capture_refunded",
+      errorMessage: "PayPal capture was refunded. Support will reconcile this booking.",
     })
-    incrementCheckoutMetric("checkout_payment_failed_total", {
+    incrementCheckoutMetric("checkout_reconciliation_required_total", {
       checkoutSessionId: session.id,
-      statusCode: stripeSession.status ?? "expired",
+      reason: "capture_refunded",
     })
-    return
+    await queueReconciliationNotificationForSession(session)
   }
+}
 
-  if (input.event.type !== "checkout.session.completed") {
-    return
-  }
-
-  if (session.status === "completed") {
-    logFlightFlow("checkout.stripe", "webhook_ignored_completed_session", {
-      checkoutSessionId: session.id,
-      providerOrderId: stripeSession.id,
-    })
-    return
-  }
-
-  const now = deps.now()
-  const paymentIntentId =
-    typeof stripeSession.payment_intent === "string" ? stripeSession.payment_intent : null
-
-  if (stripeSession.payment_status !== "paid") {
-    await deps.sessionRepository.update(session.id, {
-      status: "failed",
-      providerPaymentId: paymentIntentId,
-      providerStatusCode: stripeSession.status ?? "complete",
-      providerStatusMessage: stripeSession.payment_status ?? "unpaid",
-      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
-        partialOfferRequestId: session.partialOfferRequestId,
-        offerId: session.offerId,
-        quoteId: session.quoteId,
-        selectedPartialOffers: session.selectedPartialOffers,
-        paymentMode: session.paymentMode,
-        sourceCurrency: session.currency,
-        netTotal: session.netAmount,
-        sellTotal: session.sellAmount,
-      }),
-      errorCode: "stripe_payment_unpaid",
-      errorMessage: "Payment was not completed successfully.",
-    })
-    incrementCheckoutMetric("checkout_payment_failed_total", {
-      checkoutSessionId: session.id,
-      statusCode: stripeSession.payment_status ?? "unpaid",
+async function processVerifiedPayPalCapture(input: {
+  session: NonNullable<Awaited<ReturnType<CheckoutSessionRepository["findById"]>>>
+  capture: PayPalCapture | null
+  orderStatus: string | null
+  deps: CheckoutServiceDeps
+  now: Date
+  source: "capture_action" | "webhook"
+}) {
+  if (!input.capture || input.capture.status !== "COMPLETED") {
+    await markPayPalPaymentFailed({
+      session: input.session,
+      deps: input.deps,
+      statusCode: input.capture?.status ?? input.orderStatus ?? "UNKNOWN",
+      providerPaymentId: input.capture?.id ?? null,
+      errorCode: "paypal_capture_not_completed",
+      errorMessage: "PayPal payment was not completed successfully.",
     })
     return
   }
 
   if (
     !isPaymentAmountMatch({
-      expectedAmount: session.paymentAmount,
-      expectedCurrency: session.paymentCurrency,
-      actualAmount: fromStripeAmountMinorUnit(
-        stripeSession.amount_total ?? 0,
-        stripeSession.currency ?? session.paymentCurrency ?? session.currency
-      ),
-      actualCurrency: stripeSession.currency ?? session.paymentCurrency ?? session.currency,
+      expectedAmount: input.session.paymentAmount,
+      expectedCurrency: input.session.paymentCurrency,
+      actualAmount: input.capture.amount?.value ?? "",
+      actualCurrency:
+        input.capture.amount?.currency_code ??
+        input.session.paymentCurrency ??
+        input.session.currency,
     })
   ) {
-    await deps.sessionRepository.update(session.id, {
+    await input.deps.sessionRepository.update(input.session.id, {
       status: "reconciliation_required",
-      providerPaymentId: paymentIntentId,
-      providerStatusCode: stripeSession.status ?? "complete",
-      providerStatusMessage: stripeSession.payment_status ?? "paid",
-      paymentConfirmedAt: now,
+      providerPaymentId: input.capture.id,
+      providerStatusCode: input.capture.status,
+      providerStatusMessage: input.orderStatus ?? input.capture.status,
+      paymentConfirmedAt: input.now,
       checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
-        partialOfferRequestId: session.partialOfferRequestId,
-        offerId: session.offerId,
-        quoteId: session.quoteId,
-        selectedPartialOffers: session.selectedPartialOffers,
-        paymentMode: session.paymentMode,
-        sourceCurrency: session.currency,
-        netTotal: session.netAmount,
-        sellTotal: session.sellAmount,
+        partialOfferRequestId: input.session.partialOfferRequestId,
+        offerId: input.session.offerId,
+        quoteId: input.session.quoteId,
+        selectedPartialOffers: input.session.selectedPartialOffers,
+        paymentMode: input.session.paymentMode,
+        sourceCurrency: input.session.currency,
+        netTotal: input.session.netAmount,
+        sellTotal: input.session.sellAmount,
       }),
-      errorCode: "stripe_amount_mismatch",
+      errorCode: "paypal_amount_mismatch",
       errorMessage:
         "Payment amount/currency mismatch detected. Support will reconcile this payment.",
     })
     incrementCheckoutMetric("checkout_reconciliation_required_total", {
-      checkoutSessionId: session.id,
+      checkoutSessionId: input.session.id,
       reason: "amount_mismatch",
+      source: input.source,
     })
-    await queueReconciliationNotificationForSession(session)
+    await queueReconciliationNotificationForSession(input.session)
     return
   }
 
-  await deps.sessionRepository.update(session.id, {
+  await input.deps.sessionRepository.update(input.session.id, {
     status: "payment_authorized",
-    providerPaymentId: paymentIntentId,
-    providerStatusCode: stripeSession.status ?? "complete",
-    providerStatusMessage: stripeSession.payment_status ?? "paid",
-    paymentConfirmedAt: now,
+    providerPaymentId: input.capture.id,
+    providerStatusCode: input.capture.status,
+    providerStatusMessage: input.orderStatus ?? input.capture.status,
+    paymentConfirmedAt: input.now,
     errorCode: null,
     errorMessage: null,
   })
 
   try {
     await finalizeAuthorizedCheckoutSession({
-      session,
-      deps,
-      now,
-      paymentProvider: "stripe",
-      providerPaymentId: paymentIntentId,
+      session: input.session,
+      deps: input.deps,
+      now: input.now,
+      paymentProvider: "paypal",
+      providerPaymentId: input.capture.id,
     })
   } catch (error) {
-    logFlightFlowError("checkout.stripe", "finalize_failed", error, {
-      checkoutSessionId: session.id,
-      providerPaymentId: paymentIntentId,
+    logFlightFlowError("checkout.paypal", "finalize_failed", error, {
+      checkoutSessionId: input.session.id,
+      providerPaymentId: input.capture.id,
+      source: input.source,
     })
 
-    await deps.sessionRepository.update(session.id, {
+    await input.deps.sessionRepository.update(input.session.id, {
       status: "reconciliation_required",
       checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
-        partialOfferRequestId: session.partialOfferRequestId,
-        offerId: session.offerId,
-        quoteId: session.quoteId,
-        selectedPartialOffers: session.selectedPartialOffers,
-        paymentMode: session.paymentMode,
-        sourceCurrency: session.currency,
-        netTotal: session.netAmount,
-        sellTotal: session.sellAmount,
+        partialOfferRequestId: input.session.partialOfferRequestId,
+        offerId: input.session.offerId,
+        quoteId: input.session.quoteId,
+        selectedPartialOffers: input.session.selectedPartialOffers,
+        paymentMode: input.session.paymentMode,
+        sourceCurrency: input.session.currency,
+        netTotal: input.session.netAmount,
+        sellTotal: input.session.sellAmount,
       }),
-      errorCode: "stripe_finalize_failed",
+      errorCode: "paypal_finalize_failed",
       errorMessage:
         "Payment received but booking confirmation is pending manual reconciliation.",
     })
     incrementCheckoutMetric("checkout_reconciliation_required_total", {
-      checkoutSessionId: session.id,
+      checkoutSessionId: input.session.id,
       reason: "finalize_failed",
+      source: input.source,
     })
-    await queueReconciliationNotificationForSession(session)
+    await queueReconciliationNotificationForSession(input.session)
   }
+}
+
+async function markPayPalPaymentFailed(input: {
+  session: NonNullable<Awaited<ReturnType<CheckoutSessionRepository["findById"]>>>
+  deps: CheckoutServiceDeps
+  statusCode: string
+  providerPaymentId: string | null
+  errorCode: string
+  errorMessage: string
+}) {
+  await input.deps.sessionRepository.update(input.session.id, {
+    status: "failed",
+    providerPaymentId: input.providerPaymentId,
+    providerStatusCode: input.statusCode,
+    providerStatusMessage: input.statusCode,
+    checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+      partialOfferRequestId: input.session.partialOfferRequestId,
+      offerId: input.session.offerId,
+      quoteId: input.session.quoteId,
+      selectedPartialOffers: input.session.selectedPartialOffers,
+      paymentMode: input.session.paymentMode,
+      sourceCurrency: input.session.currency,
+      netTotal: input.session.netAmount,
+      sellTotal: input.session.sellAmount,
+    }),
+    errorCode: input.errorCode,
+    errorMessage: input.errorMessage,
+  })
+  incrementCheckoutMetric("checkout_payment_failed_total", {
+    checkoutSessionId: input.session.id,
+    statusCode: input.statusCode,
+  })
 }
 
 async function finalizeAuthorizedCheckoutSession(input: {
   session: NonNullable<Awaited<ReturnType<CheckoutSessionRepository["findById"]>>>
   deps: CheckoutServiceDeps
   now: Date
-  paymentProvider: "stripe"
+  paymentProvider: "paypal"
   providerPaymentId: string | null
 }) {
   const snapshotParsed = checkoutPayloadSnapshotSchema.safeParse(
@@ -1406,7 +1467,7 @@ function readSnapshotRouteLabel(snapshot: Record<string, unknown>) {
     : "Route unavailable"
 }
 
-function buildStripePaymentPreview(input: {
+function buildPayPalPaymentPreview(input: {
   fareSellAmount: number
   sourceCurrency: string
 }): CheckoutPageData["payment"] {
@@ -1414,20 +1475,20 @@ function buildStripePaymentPreview(input: {
     const sourceCurrency = input.sourceCurrency.trim().toUpperCase()
 
     if (!sourceCurrency) {
-      throw new Error("Stripe pay_now is unavailable for an unknown currency.")
+      throw new Error("PayPal pay_now is unavailable for an unknown currency.")
     }
 
     if (!Number.isFinite(input.fareSellAmount) || input.fareSellAmount <= 0) {
       throw new Error(
-        `Stripe pay_now is unavailable for ${sourceCurrency}. Invalid charge amount.`
+        `PayPal pay_now is unavailable for ${sourceCurrency}. Invalid charge amount.`
       )
     }
 
     const chargeAmount = roundToCurrency(input.fareSellAmount, sourceCurrency)
 
     return {
-      provider: "stripe",
-      checkoutUi: "hosted",
+      provider: "paypal",
+      checkoutUi: "buttons",
       payNowEnabled: true,
       unavailableReason: null,
       chargeAmount,
@@ -1436,8 +1497,8 @@ function buildStripePaymentPreview(input: {
     }
   } catch (error) {
     return {
-      provider: "stripe",
-      checkoutUi: "hosted",
+      provider: "paypal",
+      checkoutUi: "buttons",
       payNowEnabled: false,
       unavailableReason: toPayNowUnavailableReason(error),
       chargeAmount: null,
@@ -1447,126 +1508,76 @@ function buildStripePaymentPreview(input: {
   }
 }
 
-async function createStripeCheckoutSession(input: {
-  checkoutSessionId: string
-  partialOfferRequestId: string
-  offerId: string
-  quoteId: string
-  selectedPartialOffers: string[]
-  contact: CheckoutSubmitInput["contact"]
-  chargeAmount: number
-  chargeCurrency: string
-}) {
-  const stripe = getStripeClient()
-  const urls = buildStripeCheckoutUrls({
-    partialOfferRequestId: input.partialOfferRequestId,
-    checkoutSessionId: input.checkoutSessionId,
-    offerId: input.offerId,
-    quoteId: input.quoteId,
-    selectedPartialOffers: input.selectedPartialOffers,
-  })
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    success_url: urls.successUrl,
-    cancel_url: urls.cancelUrl,
-    currency: input.chargeCurrency.toLowerCase(),
-    client_reference_id: input.checkoutSessionId,
-    customer_email: input.contact.email,
-    metadata: {
-      checkout_session_id: input.checkoutSessionId,
-      partial_offer_request_id: input.partialOfferRequestId,
-      quote_id: input.quoteId,
-      offer_id: input.offerId,
-    },
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: input.chargeCurrency.toLowerCase(),
-          unit_amount: toStripeAmountMinorUnit(input.chargeAmount, input.chargeCurrency),
-          product_data: {
-            name: `Flight booking ${input.partialOfferRequestId}`,
-          },
-        },
-      },
-    ],
-  })
-
-  if (!session.url) {
-    throw new Error("Stripe Checkout session did not include a redirect URL.")
-  }
-
-  return session
-}
-
-function buildStripeCheckoutUrls(input: {
-  partialOfferRequestId: string
-  checkoutSessionId: string
-  offerId: string
-  quoteId: string
-  selectedPartialOffers: string[]
-}) {
-  const { appBaseUrl } = getStripeConfig()
-  const successParams = toCheckoutUrlSearchParams({
-    offerId: input.offerId,
-    selectedPartialOffers: input.selectedPartialOffers,
-    quoteId: input.quoteId,
-    step: "pay",
-    status: "processing",
-    sessionId: input.checkoutSessionId,
-  })
-  const cancelParams = toCheckoutUrlSearchParams({
-    offerId: input.offerId,
-    selectedPartialOffers: input.selectedPartialOffers,
-    quoteId: input.quoteId,
-    step: "pay",
-    sessionId: input.checkoutSessionId,
-    cancelled: true,
-  })
-
-  return {
-    successUrl: `${appBaseUrl}/results/${input.partialOfferRequestId}/checkout?${successParams.toString()}`,
-    cancelUrl: `${appBaseUrl}/results/${input.partialOfferRequestId}/checkout?${cancelParams.toString()}`,
-  }
-}
-
-async function resolveCheckoutSessionFromStripeSession(
-  stripeSession: Stripe.Checkout.Session,
+async function resolveCheckoutSessionFromPayPalResource(
+  resource: unknown,
   deps: CheckoutServiceDeps
 ) {
-  const clientReferenceId =
-    typeof stripeSession.client_reference_id === "string"
-      ? stripeSession.client_reference_id.trim()
-      : ""
+  const checkoutSessionId = getPayPalCheckoutSessionIdFromResource(resource)
 
-  if (clientReferenceId) {
-    const session = await deps.sessionRepository.findById(clientReferenceId)
+  if (checkoutSessionId) {
+    const session = await deps.sessionRepository.findById(checkoutSessionId)
 
     if (session) {
       return session
     }
   }
 
-  const metadataCheckoutSessionId = stripeSession.metadata?.checkout_session_id?.trim()
+  const orderId = readPayPalResourceOrderId(resource)
 
-  if (metadataCheckoutSessionId) {
-    const session = await deps.sessionRepository.findById(metadataCheckoutSessionId)
-
-    if (session) {
-      return session
-    }
+  if (orderId) {
+    return deps.sessionRepository.findByProviderOrderId(orderId)
   }
 
-  return deps.sessionRepository.findByProviderOrderId(stripeSession.id)
+  return null
 }
 
-function fromStripeAmountMinorUnit(amount: number, currency: string) {
-  const normalizedCurrency = currency.trim().toUpperCase()
-  const digits = currencyMinorUnit(normalizedCurrency)
-  const divisor = 10 ** digits
-  return (amount / divisor).toFixed(digits)
+function toPayPalCapture(resource: unknown): PayPalCapture | null {
+  if (!resource || typeof resource !== "object") {
+    return null
+  }
+
+  const value = resource as PayPalCapture
+
+  if (!value.id) {
+    return null
+  }
+
+  return value
+}
+
+function readPayPalResourceId(resource: unknown) {
+  if (!resource || typeof resource !== "object") {
+    return null
+  }
+
+  const id = (resource as { id?: unknown }).id
+  return typeof id === "string" && id.trim() ? id.trim() : null
+}
+
+function readPayPalResourceStatus(resource: unknown) {
+  if (!resource || typeof resource !== "object") {
+    return null
+  }
+
+  const status = (resource as { status?: unknown }).status
+  return typeof status === "string" && status.trim() ? status.trim() : null
+}
+
+function readPayPalResourceOrderId(resource: unknown) {
+  if (!resource || typeof resource !== "object") {
+    return null
+  }
+
+  const value = resource as {
+    supplementary_data?: {
+      related_ids?: {
+        order_id?: unknown
+      }
+    }
+  }
+  const orderId = value.supplementary_data?.related_ids?.order_id
+
+  return typeof orderId === "string" && orderId.trim() ? orderId.trim() : null
 }
 
 function replaceCheckoutSnapshotContact(

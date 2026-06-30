@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vitest"
 
 import {
   createTerminalCheckoutSnapshot,
-  toStripeEventKey,
+  toPaymentEventKey,
 } from "@/modules/flights/checkout/server/service-helpers"
 
 vi.mock("server-only", () => ({}))
@@ -43,8 +43,8 @@ describe("createTerminalCheckoutSnapshot", () => {
   })
 })
 
-describe("toStripeEventKey", () => {
+describe("toPaymentEventKey", () => {
   test("normalizes the event id for idempotency", () => {
-    expect(toStripeEventKey(" evt_123 ")).toBe("evt_123")
+    expect(toPaymentEventKey(" evt_123 ")).toBe("evt_123")
   })
 })

@@ -138,7 +138,7 @@ export function CheckoutTravelerStep({
           >
             <p className="text-lg font-semibold md:text-base">Pay now</p>
             <p className="text-sm text-muted-foreground">
-              Pay with Stripe ({data.payment.chargeCurrency})
+              Pay with PayPal ({data.payment.chargeCurrency})
             </p>
           </button>
           <button
@@ -169,7 +169,7 @@ export function CheckoutTravelerStep({
         ) : null}
         {paymentMode === "pay_now" && data.payment.payNowEnabled ? (
           <p className="text-sm text-muted-foreground">
-            You will be redirected to Stripe Checkout to complete payment securely.
+            You will complete payment securely with PayPal on the pay step.
           </p>
         ) : null}
       </section>

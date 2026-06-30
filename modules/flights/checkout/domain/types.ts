@@ -151,8 +151,8 @@ export interface CheckoutPageData {
     seatMaps: SeatMap[]
   }
   payment: {
-    provider: "stripe"
-    checkoutUi: "hosted"
+    provider: "paypal"
+    checkoutUi: "buttons"
     payNowEnabled: boolean
     unavailableReason: string | null
     chargeAmount: number | null
@@ -190,7 +190,7 @@ export interface CheckoutSubmissionResult {
 
 export interface CheckoutPaymentStartResult {
   checkoutSessionId: string
-  redirectUrl: string
+  paypalOrderId: string
   chargeAmount: number
   chargeCurrency: string
   chargeAmountLabel: string

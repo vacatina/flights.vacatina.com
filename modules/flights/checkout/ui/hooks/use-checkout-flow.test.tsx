@@ -7,62 +7,63 @@ import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-
 
 const mocks = vi.hoisted(() => ({
   getCheckoutSessionStatusActionMock: vi.fn(),
-  startCheckoutPaymentActionMock: vi.fn(),
+  createPayPalOrderActionMock: vi.fn(),
+  capturePayPalOrderActionMock: vi.fn(),
   submitCheckoutActionMock: vi.fn(),
 }))
 
 vi.mock("@/modules/flights/checkout/server/actions", () => ({
+  capturePayPalOrderAction: mocks.capturePayPalOrderActionMock,
+  createPayPalOrderAction: mocks.createPayPalOrderActionMock,
   getCheckoutSessionStatusAction: mocks.getCheckoutSessionStatusActionMock,
-  startCheckoutPaymentAction: mocks.startCheckoutPaymentActionMock,
   submitCheckoutAction: mocks.submitCheckoutActionMock,
 }))
 
 describe("useCheckoutFlow", () => {
-  const assignSpy = vi.fn()
-  const originalLocation = window.location
-
   beforeEach(() => {
     vi.clearAllMocks()
-    assignSpy.mockReset()
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        ...originalLocation,
-        assign: (url: string | URL) => {
-          assignSpy(String(url))
-        },
-      },
-    })
   })
 
   afterEach(() => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: originalLocation,
-    })
     cleanup()
   })
 
-  test("pay_now redirects to Stripe Checkout", async () => {
-    mocks.startCheckoutPaymentActionMock.mockResolvedValue({
+  test("pay_now creates and captures a PayPal order", async () => {
+    mocks.createPayPalOrderActionMock.mockResolvedValue({
       ok: true,
       data: {
         checkoutSessionId: "chs_1",
-        redirectUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
+        paypalOrderId: "PAYPAL-ORDER-1",
         chargeAmount: 123,
         chargeCurrency: "USD",
         chargeAmountLabel: "USD 123.00",
         status: "processing",
       },
     })
+    mocks.capturePayPalOrderActionMock.mockResolvedValue({
+      ok: true,
+      data: {
+        checkoutSessionId: "chs_1",
+        status: "completed",
+        message: null,
+        duffelOrderId: "ord_1",
+        bookingReference: "BK-TESTREF001",
+        totalChargeAmountLabel: "USD 123.00",
+      },
+    })
 
     render(<CheckoutFlowHarness />)
-    fireEvent.click(screen.getByRole("button", { name: "Submit pay now" }))
+    fireEvent.click(screen.getByRole("button", { name: "PayPal create/capture" }))
 
     await waitFor(() => {
-      expect(assignSpy).toHaveBeenCalledWith(
-        "https://checkout.stripe.com/c/pay/cs_test_1"
-      )
+      expect(mocks.createPayPalOrderActionMock).toHaveBeenCalled()
+      expect(mocks.capturePayPalOrderActionMock).toHaveBeenCalledWith({
+        checkoutSessionId: "chs_1",
+        paypalOrderId: "PAYPAL-ORDER-1",
+      })
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId("submit-success").textContent).toContain("ord_1")
     })
   })
 
@@ -104,10 +105,13 @@ function CheckoutFlowHarness() {
       <button
         type="button"
         onClick={() => {
-          flow.onSubmit(createPayNowValues())
+          void (async () => {
+            const orderId = await flow.createPayPalOrder(createPayNowValues())
+            await flow.capturePayPalOrder(orderId)
+          })()
         }}
       >
-        Submit pay now
+        PayPal create/capture
       </button>
       <button
         type="button"
@@ -198,8 +202,8 @@ function createCheckoutData(): CheckoutPageData {
       seatMaps: [],
     },
     payment: {
-      provider: "stripe",
-      checkoutUi: "hosted",
+      provider: "paypal",
+      checkoutUi: "buttons",
       payNowEnabled: true,
       unavailableReason: null,
       chargeAmount: 123,

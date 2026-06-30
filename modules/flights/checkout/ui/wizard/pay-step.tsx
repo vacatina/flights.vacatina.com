@@ -1,6 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import {
+  PayPalButtons,
+  PayPalScriptProvider,
+} from "@paypal/react-paypal-js"
 import { Show } from "@clerk/nextjs"
 import { ArrowRightIcon } from "lucide-react"
 
@@ -22,6 +26,8 @@ interface CheckoutPayStepProps {
   clerkEnabled: boolean
   signInHref: string
   onBack: () => void
+  onCreatePayPalOrder: () => Promise<string>
+  onCapturePayPalOrder: (paypalOrderId: string) => Promise<void>
   isBackNavigating?: boolean
 }
 
@@ -36,8 +42,12 @@ export function CheckoutPayStep({
   clerkEnabled,
   signInHref,
   onBack,
+  onCreatePayPalOrder,
+  onCapturePayPalOrder,
   isBackNavigating = false,
 }: CheckoutPayStepProps) {
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID?.trim()
+
   return (
     <div className="space-y-7">
       <section className="space-y-4">
@@ -65,7 +75,7 @@ export function CheckoutPayStep({
             </div>
             <p className="text-sm text-muted-foreground">
               {paymentMode === "pay_now"
-                ? "Stripe Checkout charges the exact displayed booking total for this itinerary."
+                ? "PayPal charges the exact displayed booking total for this itinerary."
                 : "Final amount is revalidated on confirm before order creation."}
             </p>
           </CardContent>
@@ -88,6 +98,40 @@ export function CheckoutPayStep({
         ) : null}
       </section>
 
+      {paymentMode === "pay_now" && data.payment.payNowEnabled ? (
+        paypalClientId ? (
+          <PayPalScriptProvider
+            options={{
+              clientId: paypalClientId,
+              currency: data.payment.chargeCurrency,
+              intent: "capture",
+            }}
+          >
+            <PayPalButtons
+              style={{
+                layout: "vertical",
+                shape: "rect",
+                label: "paypal",
+              }}
+              disabled={isSubmitting}
+              forceReRender={[totalPreview, data.payment.chargeCurrency]}
+              createOrder={async () => onCreatePayPalOrder()}
+              onApprove={async (approvalData) => {
+                if (!approvalData.orderID) {
+                  throw new Error("PayPal approval did not include an order ID.")
+                }
+
+                await onCapturePayPalOrder(approvalData.orderID)
+              }}
+            />
+          </PayPalScriptProvider>
+        ) : (
+          <p className="text-sm text-destructive">
+            PayPal checkout is not configured. Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID.
+          </p>
+        )
+      ) : null}
+
       <div className="flex items-center justify-between gap-3">
         <Button
           type="button"
@@ -101,17 +145,15 @@ export function CheckoutPayStep({
           ) : null}
           Back
         </Button>
-        <Button type="submit" className="h-12 rounded-xl px-6 text-sm md:text-base" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <Spinner data-icon="inline-start" size="sm" />
-          ) : null}
-          {isSubmitting
-            ? "Confirming..."
-            : paymentMode === "hold"
-              ? "Confirm and hold"
-              : "Pay with Stripe"}
-          <ArrowRightIcon data-icon="inline-end" />
-        </Button>
+        {paymentMode === "hold" ? (
+          <Button type="submit" className="h-12 rounded-xl px-6 text-sm md:text-base" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <Spinner data-icon="inline-start" size="sm" />
+            ) : null}
+            {isSubmitting ? "Confirming..." : "Confirm and hold"}
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        ) : null}
       </div>
     </div>
   )

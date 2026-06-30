@@ -151,6 +151,8 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   })
   const {
     activePollingSessionId,
+    capturePayPalOrder,
+    createPayPalOrder,
     isSubmitting,
     onSubmit,
     paymentProcessingMessage,
@@ -447,7 +449,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   const payStepError = checkoutFlow.submitError ?? fallbackMissingSessionMessage
   const payStepBanner = data.state.cancelled
-    ? "Stripe checkout was cancelled before payment confirmation."
+    ? "PayPal checkout was cancelled before payment confirmation."
     : null
 
   return (
@@ -588,6 +590,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                     clerkEnabled={clerkEnabled}
                     signInHref={signInHref}
                     onBack={backFromPay}
+                    onCreatePayPalOrder={() => createPayPalOrder(form.getValues())}
+                    onCapturePayPalOrder={async (paypalOrderId) => {
+                      await capturePayPalOrder(paypalOrderId)
+                    }}
                     isBackNavigating={
                       isStepNavigating && stepNavigationIntent === "pay_back"
                     }
