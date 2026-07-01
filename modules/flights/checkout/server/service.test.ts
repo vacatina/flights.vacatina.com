@@ -183,6 +183,7 @@ test("fetchCheckoutPageData builds PayPal payment preview from sell amount", asy
   expect(result.payment).toEqual({
     provider: "paypal",
     checkoutUi: "buttons",
+    paypalEnvironment: "sandbox",
     payNowEnabled: true,
     unavailableReason: null,
     chargeAmount: 120,
@@ -548,6 +549,7 @@ function createCheckoutPageModel() {
     payment: {
       provider: "paypal" as const,
       checkoutUi: "buttons" as const,
+      paypalEnvironment: "sandbox" as const,
       payNowEnabled: false,
       unavailableReason: null,
       chargeAmount: null,

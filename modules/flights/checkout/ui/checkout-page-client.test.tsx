@@ -174,6 +174,7 @@ function createCheckoutData(
     payment: {
       provider: "paypal",
       checkoutUi: "buttons",
+      paypalEnvironment: "sandbox",
       payNowEnabled: true,
       unavailableReason: null,
       chargeAmount: 123,

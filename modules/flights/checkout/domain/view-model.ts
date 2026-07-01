@@ -117,6 +117,7 @@ export function buildCheckoutPageModel({
     payment: {
       provider: "paypal",
       checkoutUi: "buttons",
+      paypalEnvironment: toPayPalClientEnvironment(),
       payNowEnabled: false,
       unavailableReason: "PayPal availability is being checked.",
       chargeAmount: null,
@@ -150,6 +151,12 @@ function createTripSummary(
     routeLabel: buildJourneyRouteSummary(journeySlices),
     offerExpiresAtLabel: toOfferExpiresAtLabel(offer),
   }
+}
+
+function toPayPalClientEnvironment(): CheckoutPageData["payment"]["paypalEnvironment"] {
+  return process.env.PAYPAL_ENV?.trim().toLowerCase() === "live"
+    ? "production"
+    : "sandbox"
 }
 
 function createPaymentRequirements(offer: Offer): CheckoutPaymentRequirementsViewModel {

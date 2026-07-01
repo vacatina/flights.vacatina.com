@@ -506,6 +506,23 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     onSubmit(values)
   }
 
+  function onPayPalCancel() {
+    setSubmitError("PayPal checkout was cancelled before payment confirmation.")
+    logFlightFlow("CheckoutPageClient", "paypal_checkout_cancelled", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      quoteId: data.state.quoteId,
+    })
+  }
+
+  function onPayPalError(error: unknown) {
+    setSubmitError("PayPal could not process this payment. Try PayPal login or refresh pricing.")
+    logFlightFlow("CheckoutPageClient", "paypal_checkout_error", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      quoteId: data.state.quoteId,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    })
+  }
+
   function onRetryPayStep() {
     setPayNowResolution(null)
     setSubmitError(null)
@@ -687,6 +704,8 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                         clerkEnabled={clerkEnabled}
                         signInHref={signInHref}
                         onBack={backFromPay}
+                        onPayPalCancel={onPayPalCancel}
+                        onPayPalError={onPayPalError}
                         paymentReady={reviewReady}
                         quoteExpired={quoteExpired}
                         reviewHref={reviewHref}

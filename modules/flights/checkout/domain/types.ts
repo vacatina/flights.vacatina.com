@@ -153,6 +153,7 @@ export interface CheckoutPageData {
   payment: {
     provider: "paypal"
     checkoutUi: "buttons"
+    paypalEnvironment: "sandbox" | "production"
     payNowEnabled: boolean
     unavailableReason: string | null
     chargeAmount: number | null

@@ -1489,6 +1489,7 @@ function buildPayPalPaymentPreview(input: {
     return {
       provider: "paypal",
       checkoutUi: "buttons",
+      paypalEnvironment: toPayPalClientEnvironment(),
       payNowEnabled: true,
       unavailableReason: null,
       chargeAmount,
@@ -1499,6 +1500,7 @@ function buildPayPalPaymentPreview(input: {
     return {
       provider: "paypal",
       checkoutUi: "buttons",
+      paypalEnvironment: toPayPalClientEnvironment(),
       payNowEnabled: false,
       unavailableReason: toPayNowUnavailableReason(error),
       chargeAmount: null,
@@ -1506,6 +1508,12 @@ function buildPayPalPaymentPreview(input: {
       chargeAmountLabel: null,
     }
   }
+}
+
+function toPayPalClientEnvironment(): CheckoutPageData["payment"]["paypalEnvironment"] {
+  return process.env.PAYPAL_ENV?.trim().toLowerCase() === "live"
+    ? "production"
+    : "sandbox"
 }
 
 async function resolveCheckoutSessionFromPayPalResource(
