@@ -157,6 +157,20 @@ test("FareOptionsPageClient keeps one-way final-leg review navigation", () => {
   expect(pushMock).toHaveBeenCalledWith("/results/prq_1/review?selected=off_1")
 })
 
+test("FareOptionsPageClient blocks selection when search session is expired", () => {
+  render(
+    <FareOptionsPageClient
+      data={createFareOptionsData({
+        offerExpiresAtIso: "2000-04-04T10:00:00.000Z",
+        offerExpiresAtLabel: "04/04/2000, 10:00",
+      })}
+    />
+  )
+
+  expect(screen.getByText("Session expired")).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Select" }).hasAttribute("disabled")).toBe(true)
+})
+
 function createFareOptionsData(
   overrides?: Partial<FareOptionsPageData>
 ): FareOptionsPageData {
@@ -174,6 +188,8 @@ function createFareOptionsData(
       passengersLabel: "1 passenger",
       cabinLabel: "Economy",
     },
+    offerExpiresAtIso: "2099-04-04T10:00:00.000Z",
+    offerExpiresAtLabel: "04/04/2099, 10:00",
     offers: [
       {
         id: "off_1",

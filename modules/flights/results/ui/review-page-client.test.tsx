@@ -117,6 +117,35 @@ test("ReviewPageClient navigates to checkout when summary is complete", async ()
   })
 })
 
+test("ReviewPageClient blocks checkout when search session is expired", () => {
+  render(
+    <ReviewPageClient
+      data={createReviewData({
+        offerExpiresAtIso: "2000-04-04T10:00:00.000Z",
+        offerExpiresAtLabel: "04/04/2000, 10:00",
+        state: {
+          selected: ["off_partial_1", "off_partial_2"],
+          fare: ["fare_out_eco", "fare_in_classic"],
+        },
+        summary: {
+          soldByLabel: "Sold by Qatar Airways",
+          conditions: ["No data on changes"],
+          co2Label: "From 581kg CO2",
+          totalAmountLabel: "US$915.60",
+          checkoutEnabled: true,
+          helperText: "Selected fare options for all flights",
+          finalOfferId: "off_1",
+        },
+      })}
+    />
+  )
+
+  expect(screen.getByText("Session expired")).toBeTruthy()
+  expect(screen.getByRole("button", { name: /Go to checkout/ }).hasAttribute("disabled")).toBe(
+    true
+  )
+})
+
 test("ReviewPageClient auto-scrolls to next leg after fare selection", async () => {
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
   const scrollIntoViewMock = vi.fn()
@@ -188,6 +217,8 @@ function createReviewData(overrides?: Partial<ReviewPageData>): ReviewPageData {
     partialOfferRequestId: "prq_1",
     breadcrumbs: ["CMB to DXB", "DXB to CMB"],
     totalLegs: 2,
+    offerExpiresAtIso: "2099-04-04T10:00:00.000Z",
+    offerExpiresAtLabel: "04/04/2099, 10:00",
     state: {
       selected: ["off_partial_1", "off_partial_2"],
       fare: [],

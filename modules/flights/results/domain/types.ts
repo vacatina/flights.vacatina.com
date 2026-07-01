@@ -77,6 +77,8 @@ export interface FareOptionsPageData {
   editSearchHref: string
   breadcrumbs: string[]
   searchSummary: ResultsSearchSummary
+  offerExpiresAtIso: string | null
+  offerExpiresAtLabel: string | null
   offers: OfferCardViewModel[]
   airlines: string[]
   after: string | null

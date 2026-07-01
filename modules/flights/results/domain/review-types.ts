@@ -61,6 +61,8 @@ export interface ReviewPageData {
   partialOfferRequestId: string
   breadcrumbs: string[]
   totalLegs: number
+  offerExpiresAtIso: string | null
+  offerExpiresAtLabel: string | null
   state: ReviewUrlState
   legs: ReviewLegSectionViewModel[]
   summary: ReviewSummaryViewModel

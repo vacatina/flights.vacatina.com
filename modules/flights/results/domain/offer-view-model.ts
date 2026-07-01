@@ -175,6 +175,30 @@ export function createLegBreadcrumbs(offerRequest: OfferRequest) {
   )
 }
 
+export function getEarliestOfferExpiry(
+  offers: Array<Pick<Offer, "id"> & { expires_at?: string | null }>
+) {
+  let earliest: Date | null = null
+
+  for (const offer of offers) {
+    const expiresAt = parseDateTime(offer.expires_at)
+
+    if (!expiresAt) {
+      continue
+    }
+
+    if (!earliest || expiresAt.getTime() < earliest.getTime()) {
+      earliest = expiresAt
+    }
+  }
+
+  return earliest
+}
+
+export function formatOfferExpiryLabel(expiresAt: Date) {
+  return format(expiresAt, "dd/MM/yyyy, HH:mm")
+}
+
 function cabinClassToLabel(cabinClass: CabinClass) {
   return cabinClass
     .split("_")
