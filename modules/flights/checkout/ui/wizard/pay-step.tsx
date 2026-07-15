@@ -3,6 +3,7 @@
 import Link from "next/link"
 import {
   INSTANCE_LOADING_STATE,
+  PayPalGuestPaymentButton,
   PayPalOneTimePaymentButton,
   PayPalProvider,
   useEligibleMethods,
@@ -209,7 +210,7 @@ function PayPalV6Checkout({
     <PayPalProvider
       clientId={clientId}
       environment={data.payment.paypalEnvironment}
-      components={["paypal-payments"]}
+      components={["paypal-payments", "paypal-guest-payments"]}
       pageType="checkout"
       debug={data.payment.paypalEnvironment === "sandbox"}
     >
@@ -246,6 +247,7 @@ function PayPalV6PaymentControls({
   const sdkError = paypal.error ?? eligibility.error
   const loading = paypal.loadingStatus === INSTANCE_LOADING_STATE.PENDING || eligibility.isLoading
   const paypalEligible = eligibility.eligiblePaymentMethods?.isEligible("paypal") ?? false
+  const cardEligible = eligibility.eligiblePaymentMethods?.isEligible("card") ?? false
 
   useEffect(() => {
     logFlightFlow("CheckoutPayStep", "paypal_v6_sdk_status", {
@@ -273,11 +275,13 @@ function PayPalV6PaymentControls({
     logFlightFlow("CheckoutPayStep", "paypal_v6_eligibility_loaded", {
       partialOfferRequestId: data.partialOfferRequestId,
       paypalEligible,
+      cardEligible,
       currency: data.payment.chargeCurrency,
       amount,
     })
   }, [
     amount,
+    cardEligible,
     data.partialOfferRequestId,
     data.payment.chargeCurrency,
     eligibility.eligiblePaymentMethods,
@@ -304,10 +308,29 @@ function PayPalV6PaymentControls({
     paypalEligible,
   ])
 
+  useEffect(() => {
+    if (eligibility.isLoading || !eligibility.eligiblePaymentMethods || cardEligible) {
+      return
+    }
+
+    logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_ineligible", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      currency: data.payment.chargeCurrency,
+      amount,
+    })
+  }, [
+    amount,
+    cardEligible,
+    data.partialOfferRequestId,
+    data.payment.chargeCurrency,
+    eligibility.eligiblePaymentMethods,
+    eligibility.isLoading,
+  ])
+
   if (loading) {
     return (
       <p className="rounded-md border border-[#d7d8ce] bg-[#f7f8f4] px-3 py-2 text-sm text-[#66706b]">
-        Loading PayPal
+        Loading payment options
       </p>
     )
   }
@@ -320,59 +343,134 @@ function PayPalV6PaymentControls({
     )
   }
 
-  if (!paypalEligible) {
+  if (!paypalEligible && !cardEligible) {
     return (
       <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-        PayPal is unavailable for this booking.
+        PayPal and cards are unavailable for this booking.
       </p>
     )
   }
 
   return (
-    <div className="space-y-2">
-      <PayPalOneTimePaymentButton
-        type="pay"
-        disabled={disabled}
-        createOrder={async () => {
-          logFlightFlow("CheckoutPayStep", "paypal_v6_payment_session_started", {
-            partialOfferRequestId: data.partialOfferRequestId,
-          })
-          const orderId = await onCreatePayPalOrder()
-          logFlightFlow("CheckoutPayStep", "paypal_v6_order_created", {
-            partialOfferRequestId: data.partialOfferRequestId,
-            paypalOrderId: orderId,
-          })
-          return { orderId }
-        }}
-        onApprove={async (approvalData) => {
-          logFlightFlow("CheckoutPayStep", "paypal_v6_approval_received", {
-            partialOfferRequestId: data.partialOfferRequestId,
-            paypalOrderId: approvalData.orderId,
-          })
-          await onCapturePayPalOrder(approvalData.orderId)
-          logFlightFlow("CheckoutPayStep", "paypal_v6_capture_succeeded", {
-            partialOfferRequestId: data.partialOfferRequestId,
-            paypalOrderId: approvalData.orderId,
-          })
-        }}
-        onCancel={() => {
-          logFlightFlow("CheckoutPayStep", "paypal_v6_payment_cancelled", {
-            partialOfferRequestId: data.partialOfferRequestId,
-          })
-          onPayPalCancel()
-        }}
-        onError={(error) => {
-          logFlightFlow("CheckoutPayStep", "paypal_v6_session_error", {
-            partialOfferRequestId: data.partialOfferRequestId,
-            errorMessage: error.message,
-            errorCode: error.code,
-            recoverable: error.isRecoverable,
-          })
-          onPayPalError(error)
-        }}
-      />
+    <div className="space-y-4">
+      {cardEligible ? (
+        <div className="space-y-2">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-[#17201d]">Debit or credit card</p>
+            <p className="text-xs text-muted-foreground">
+              Pay securely by card without a PayPal account.
+            </p>
+          </div>
+          <PayPalGuestPaymentButton
+            disabled={disabled}
+            createOrder={async () => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_session_started", {
+                partialOfferRequestId: data.partialOfferRequestId,
+              })
+              const orderId = await onCreatePayPalOrder()
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_order_created", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                paypalOrderId: orderId,
+              })
+              return { orderId }
+            }}
+            onApprove={async (approvalData) => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_approval_received", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                paypalOrderId: approvalData.orderId,
+              })
+              await onCapturePayPalOrder(approvalData.orderId)
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_capture_succeeded", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                paypalOrderId: approvalData.orderId,
+              })
+            }}
+            onCancel={() => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_cancelled", {
+                partialOfferRequestId: data.partialOfferRequestId,
+              })
+              onPayPalCancel()
+            }}
+            onError={(error) => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_session_error", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                errorMessage: error.message,
+                errorCode: error.code,
+                recoverable: error.isRecoverable,
+              })
+              onPayPalError(error)
+            }}
+            onWarn={(warning) => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_guest_card_warning", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                warningCode: warning.code,
+                warningName: warning.name,
+                warningMessage: warning.message,
+              })
+            }}
+          />
+        </div>
+      ) : null}
+
+      {paypalEligible ? (
+        <div className="space-y-2">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-[#17201d]">PayPal</p>
+            <p className="text-xs text-muted-foreground">
+              Pay with your PayPal account.
+            </p>
+          </div>
+          <PayPalOneTimePaymentButton
+            type="pay"
+            disabled={disabled}
+            createOrder={async () => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_payment_session_started", {
+                partialOfferRequestId: data.partialOfferRequestId,
+              })
+              const orderId = await onCreatePayPalOrder()
+              logFlightFlow("CheckoutPayStep", "paypal_v6_order_created", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                paypalOrderId: orderId,
+              })
+              return { orderId }
+            }}
+            onApprove={async (approvalData) => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_approval_received", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                paypalOrderId: approvalData.orderId,
+              })
+              await onCapturePayPalOrder(approvalData.orderId)
+              logFlightFlow("CheckoutPayStep", "paypal_v6_capture_succeeded", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                paypalOrderId: approvalData.orderId,
+              })
+            }}
+            onCancel={() => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_payment_cancelled", {
+                partialOfferRequestId: data.partialOfferRequestId,
+              })
+              onPayPalCancel()
+            }}
+            onError={(error) => {
+              logFlightFlow("CheckoutPayStep", "paypal_v6_session_error", {
+                partialOfferRequestId: data.partialOfferRequestId,
+                errorMessage: error.message,
+                errorCode: error.code,
+                recoverable: error.isRecoverable,
+              })
+              onPayPalError(error)
+            }}
+          />
+        </div>
+      ) : null}
+
+      {!cardEligible ? (
+        <p className="rounded-md border border-[#d7d8ce] bg-[#f7f8f4] px-3 py-2 text-xs text-muted-foreground">
+          Cards are unavailable for this booking. Use PayPal if available.
+        </p>
+      ) : null}
       <p className="text-xs text-muted-foreground">
-        Opening PayPal may continue in a secure PayPal window.
+        Opening a secure PayPal payment window may be required.
       </p>
     </div>
   )
