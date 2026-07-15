@@ -38,14 +38,16 @@ AUTH_GUEST_SESSION_COOKIE_NAME=guest_session
 AUTH_GUEST_SESSION_TTL_MS=2592000000
 ```
 
-## Stripe checkout
+## PayPal checkout
 
-Set these variables to enable Stripe Checkout pay-now flow:
+Set these variables to enable PayPal Checkout pay-now flow:
 
 ```bash
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_APP_BASE_URL=https://your-domain.com
+PAYPAL_ENV=sandbox
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_WEBHOOK_ID=...
+NEXT_PUBLIC_PAYPAL_CLIENT_ID=...
 
 # Runtime tuning
 PRICING_QUOTE_TTL_MS=600000
@@ -62,17 +64,15 @@ FLIGHTS_DEBUG=false
 NEXT_PUBLIC_FLIGHTS_DEBUG=false
 ```
 
-Stripe Checkout returns customers to the existing checkout flow:
+PayPal checkout runs through Smart Buttons on the existing checkout pay step:
 
 ```text
-Success: /results/[partialOfferRequestId]/checkout?...&step=pay&status=processing&session=<checkout_session_id>
-Cancel:  /results/[partialOfferRequestId]/checkout?...&step=pay&session=<checkout_session_id>&cancelled=1
-Webhook: /api/webhooks/payments/stripe
+Webhook: /api/webhooks/payments/paypal
 ```
 
-The webhook is authoritative for booking finalization. Browser redirect alone does not confirm payment.
+Server-side PayPal capture is authoritative for booking finalization. Webhooks provide secondary reconciliation.
 
-Stripe v1 is intentionally limited to immediate card/wallet flows through hosted Checkout. Delayed methods are out of scope.
+PayPal v1 is intentionally limited to immediate capture through PayPal Checkout. Subscriptions, payouts, disputes, and custom refund workflows are out of scope.
 
 Multi-city search is enabled by default and supports 2 to 6 legs.
 For labeling: 2-leg mirrored journeys render `Outbound`/`Inbound`; 3+ legs render `Leg 1..N`.

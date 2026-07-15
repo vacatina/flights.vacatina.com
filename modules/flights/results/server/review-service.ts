@@ -2,6 +2,8 @@ import type { Offer, OfferRequest } from "@duffel/api/types"
 
 import {
   buildReviewPageModel,
+  formatOfferExpiryLabel,
+  getEarliestOfferExpiry,
   type ReviewPageData,
   type ReviewUrlState,
 } from "@/modules/flights/results/domain"
@@ -137,6 +139,7 @@ export async function fetchReviewPageData(
     airlineLogosByAirlineId,
     offerPricingByOfferId,
   })
+  const offerExpiresAt = getEarliestOfferExpiry(fares)
   logFlightFlow("fetchReviewPageData", "review_model_built", {
     partialOfferRequestId: input.partialOfferRequestId,
     totalLegs: reviewModel.totalLegs,
@@ -147,6 +150,8 @@ export async function fetchReviewPageData(
 
   const response = {
     partialOfferRequestId: input.partialOfferRequestId,
+    offerExpiresAtIso: offerExpiresAt?.toISOString() ?? null,
+    offerExpiresAtLabel: offerExpiresAt ? formatOfferExpiryLabel(offerExpiresAt) : null,
     ...reviewModel,
   }
 

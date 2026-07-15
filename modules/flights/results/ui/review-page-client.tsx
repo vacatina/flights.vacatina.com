@@ -24,6 +24,10 @@ import {
   type ReviewPageData,
 } from "@/modules/flights/results/domain"
 import { createCheckoutQuoteAction } from "@/modules/flights/results/server/actions"
+import {
+  OfferSessionTimer,
+  useOfferSessionExpiry,
+} from "@/modules/flights/results/ui/offer-session-timer"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
@@ -43,6 +47,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
     searchParams.get(REVIEW_FOCUS_LEG_QUERY_PARAM)
   )
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(buildRedirectPath(pathname, searchParams.toString()))}`
+  const offerSession = useOfferSessionExpiry(data.offerExpiresAtIso)
 
   const setLegSectionRef = useCallback((legIndex: number, node: HTMLElement | null) => {
     if (node) {
@@ -175,6 +180,12 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
       })
       return
     }
+
+    if (offerSession.expired) {
+      setCheckoutError("This search has expired. Start a fresh search before checkout.")
+      return
+    }
+
     const finalOfferId = data.summary.finalOfferId
     setCheckoutError(null)
 
@@ -240,6 +251,11 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
+
+        <OfferSessionTimer
+          expiresAtIso={data.offerExpiresAtIso}
+          expiresAtLabel={data.offerExpiresAtLabel}
+        />
 
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_290px]">
           <div className="space-y-10">
@@ -427,7 +443,11 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
                 <Button
                   className="h-12 w-full rounded-xl text-sm md:text-base"
-                  disabled={!data.summary.checkoutEnabled || isCreatingQuote}
+                  disabled={
+                    !data.summary.checkoutEnabled ||
+                    isCreatingQuote ||
+                    offerSession.expired
+                  }
                   onClick={onGoToCheckout}
                 >
                   {isCreatingQuote ? "Preparing checkout..." : "Go to checkout"}

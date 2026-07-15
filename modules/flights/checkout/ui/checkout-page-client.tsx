@@ -3,7 +3,15 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useFieldArray, useForm, useWatch } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm, useWatch } from "react-hook-form"
+import {
+  AlertCircleIcon,
+  CheckCircle2Icon,
+  Clock3Icon,
+  RefreshCcwIcon,
+  ShieldCheckIcon,
+} from "lucide-react"
 
 import {
   Breadcrumb,
@@ -23,7 +31,10 @@ import {
   type CheckoutWizardStep,
 } from "@/modules/flights/checkout/domain"
 import { CheckoutPaymentStatusView } from "@/modules/flights/checkout/ui/checkout-payment-status-view"
-import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
+import {
+  createCheckoutFormSchema,
+  type CheckoutFormValues,
+} from "@/modules/flights/checkout/ui/checkout-form-values"
 import { useCheckoutDraftPersistence } from "@/modules/flights/checkout/ui/hooks/use-checkout-draft-persistence"
 import {
   useCheckoutFlow,
@@ -36,6 +47,12 @@ import {
   CheckoutTravelerStep,
   CheckoutWizardShell,
 } from "@/modules/flights/checkout/ui/wizard"
+import { cn } from "@/lib/utils"
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const E164_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/
+const COUNTRY_CODE_PATTERN = /^[A-Za-z]{2}$/
+const QUOTE_EXPIRY_WARNING_MS = 5 * 60 * 1000
 
 interface CheckoutPageClientProps {
   data: CheckoutPageData
@@ -62,6 +79,13 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   )
 
   const form = useForm<CheckoutFormValues>({
+    resolver: zodResolver(
+      createCheckoutFormSchema({
+        identityDocumentsRequired: data.identityDocumentsRequired,
+      })
+    ),
+    mode: "onBlur",
+    reValidateMode: "onChange",
     defaultValues: {
       paymentMode:
         data.payment.payNowEnabled || !data.paymentRequirements.canHold
@@ -91,11 +115,6 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       },
     },
   })
-  const metadataFieldArray = useFieldArray({
-    control: form.control,
-    name: "metadata",
-  })
-
   const paymentMode = useWatch({
     control: form.control,
     name: "paymentMode",
@@ -151,6 +170,8 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   })
   const {
     activePollingSessionId,
+    capturePayPalOrder,
+    createPayPalOrder,
     isSubmitting,
     onSubmit,
     paymentProcessingMessage,
@@ -182,6 +203,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     [ancillarySelection?.metadata]
   )
   const totalPreview = data.quote.fareSellAmount + ancillaryPreviewTotal
+  const quoteCountdown = useQuoteCountdown(data.quote.expiresAtIso)
+  const quoteExpired = quoteCountdown.remainingMs <= 0
+  const quoteExpiringSoon =
+    quoteCountdown.remainingMs > 0 &&
+    quoteCountdown.remainingMs <= QUOTE_EXPIRY_WARNING_MS
+  const reviewHref = `/results/${data.partialOfferRequestId}/review`
   const currentStatus = data.state.status
   const currentSessionId = data.state.sessionId
   const resolvedCurrentSessionStatus =
@@ -210,6 +237,12 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
       paymentMode,
     ]
   )
+  const reviewReady =
+    travelerStepReady &&
+    !quoteExpired &&
+    !isSubmitting &&
+    !isStepNavigating &&
+    !statusModeActive
 
   useEffect(() => {
     if (paymentMode !== "hold") {
@@ -382,10 +415,36 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     return travelerStepReady
   }
 
-  function navigateStep(step: CheckoutWizardStep) {
+  async function validateTravelerForNavigation() {
+    if (quoteExpired) {
+      setStepError("This fare has expired. Return to review to refresh pricing.")
+      return false
+    }
+
+    const valid = await form.trigger(["contact", "passengers"], {
+      shouldFocus: true,
+    })
+
+    if (!valid) {
+      setStepError("Fix the highlighted traveler details before continuing.")
+      return false
+    }
+
+    setStepError(null)
+    return true
+  }
+
+  async function navigateStep(step: CheckoutWizardStep) {
     if (!canNavigateToStep(step)) {
-      setStepError("Complete required traveler details before continuing.")
+      await validateTravelerForNavigation()
       return
+    }
+
+    if (step !== "traveler") {
+      const valid = await validateTravelerForNavigation()
+      if (!valid) {
+        return
+      }
     }
 
     setStepError(null)
@@ -395,9 +454,10 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     })
   }
 
-  function continueFromTraveler() {
-    if (!travelerStepReady) {
-      setStepError("Complete required traveler details before continuing.")
+  async function continueFromTraveler() {
+    const valid = await validateTravelerForNavigation()
+
+    if (!valid) {
       return
     }
 
@@ -409,6 +469,11 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
   }
 
   function continueFromExtras() {
+    if (quoteExpired) {
+      setStepError("This fare has expired. Return to review to refresh pricing.")
+      return
+    }
+
     setStepError(null)
     setStepNavigationIntent("extras_continue")
     startStepNavigation(() => {
@@ -432,6 +497,32 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     })
   }
 
+  function handleCheckoutSubmit(values: CheckoutFormValues) {
+    if (quoteExpired) {
+      setSubmitError("This fare has expired. Return to review to refresh pricing.")
+      return
+    }
+
+    onSubmit(values)
+  }
+
+  function onPayPalCancel() {
+    setSubmitError("PayPal checkout was cancelled before payment confirmation.")
+    logFlightFlow("CheckoutPageClient", "paypal_checkout_cancelled", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      quoteId: data.state.quoteId,
+    })
+  }
+
+  function onPayPalError(error: unknown) {
+    setSubmitError("PayPal could not process this payment. Try PayPal login or refresh pricing.")
+    logFlightFlow("CheckoutPageClient", "paypal_checkout_error", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      quoteId: data.state.quoteId,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    })
+  }
+
   function onRetryPayStep() {
     setPayNowResolution(null)
     setSubmitError(null)
@@ -447,13 +538,13 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   const payStepError = checkoutFlow.submitError ?? fallbackMissingSessionMessage
   const payStepBanner = data.state.cancelled
-    ? "Stripe checkout was cancelled before payment confirmation."
+    ? "PayPal checkout was cancelled before payment confirmation."
     : null
 
   return (
-    <main className="min-h-svh bg-muted/40 py-6 md:py-10">
+    <main className="min-h-svh bg-[#f6f7f4] py-5 text-[#17201d] md:py-8">
       <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
-        <div className="space-y-6">
+        <div className="space-y-5">
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -472,25 +563,32 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </BreadcrumbList>
           </Breadcrumb>
 
-          <div className="flex flex-wrap gap-2 text-sm">
-            <span className="rounded-full bg-card px-3 py-1">{data.tripSummary.journeyTypeLabel}</span>
-            <span className="rounded-full bg-card px-3 py-1">{data.tripSummary.dateRangeLabel}</span>
-            <span className="rounded-full bg-card px-3 py-1">{data.tripSummary.passengersLabel}</span>
-            <span className="rounded-full bg-card px-3 py-1">{data.tripSummary.cabinLabel}</span>
+          <div className="border-y border-[#d7d8ce] py-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-[#6c746f]">
+                  Secure flight checkout
+                </p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">
+                  {data.tripSummary.routeLabel}
+                </h1>
+                <p className="mt-1 text-sm text-[#66706b]">
+                  {data.tripSummary.dateRangeLabel} · {data.tripSummary.passengersLabel} ·{" "}
+                  {data.tripSummary.cabinLabel}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="rounded-md border border-[#cfd4cc] bg-white px-3 py-1">
+                  {data.tripSummary.journeyTypeLabel}
+                </span>
+                <span className="rounded-md border border-[#cfd4cc] bg-white px-3 py-1">
+                  {paymentMode === "hold" ? "Hold booking" : "Pay now"}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              {data.tripSummary.routeLabel}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {data.tripSummary.offerExpiresAtLabel
-                ? `This offer will expire on ${data.tripSummary.offerExpiresAtLabel}`
-                : "Offer expiry time unavailable"}
-            </p>
-          </div>
-
-      {submitSuccess?.paymentMode === "hold" ? (
+          {submitSuccess?.paymentMode === "hold" ? (
             <Card className="rounded-2xl border-emerald-500/40 bg-emerald-50/30">
               <CardHeader>
                 <CardTitle className="text-xl">Order created successfully</CardTitle>
@@ -527,77 +625,131 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </Card>
           ) : null}
 
-          {statusModeActive && effectiveStatus ? (
-            <CheckoutPaymentStatusView
-              status={effectiveStatus}
-              sessionId={currentSessionId}
-              resolution={payNowResolution}
-              errorMessage={submitError}
-              onRetryPay={onRetryPayStep}
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+            <div className="min-w-0">
+              {statusModeActive && effectiveStatus ? (
+                <CheckoutPaymentStatusView
+                  status={effectiveStatus}
+                  sessionId={currentSessionId}
+                  resolution={payNowResolution}
+                  errorMessage={submitError}
+                  onRetryPay={onRetryPayStep}
+                />
+              ) : (
+                <form onSubmit={form.handleSubmit(handleCheckoutSubmit)} className="space-y-6">
+                  {quoteExpired ? (
+                    <ExpiredFareRecovery
+                      reviewHref={reviewHref}
+                      quoteExpiresAtLabel={data.quote.expiresAtLabel}
+                    />
+                  ) : quoteExpiringSoon ? (
+                    <FareExpiryNotice
+                      remainingLabel={quoteCountdown.label}
+                      quoteExpiresAtLabel={data.quote.expiresAtLabel}
+                    />
+                  ) : null}
+                  <CheckoutWizardShell
+                    currentStep={effectiveStep}
+                    onStepChange={(step) => {
+                      void navigateStep(step)
+                    }}
+                    canNavigateToStep={canNavigateToStep}
+                    travelerComplete={travelerStepReady}
+                    extrasComplete={(ancillarySelection?.services.length ?? 0) > 0}
+                  >
+                    {effectiveStep === "traveler" ? (
+                      <CheckoutTravelerStep
+                        data={data}
+                        form={form}
+                        paymentMode={paymentMode}
+                        passengers={passengersWatch}
+                        ancillaryServicesCount={ancillarySelection?.services.length ?? 0}
+                        stepError={stepError}
+                        onContinue={() => {
+                          void continueFromTraveler()
+                        }}
+                        disabled={isSubmitting || isStepNavigating || quoteExpired}
+                        isNavigating={
+                          isStepNavigating && stepNavigationIntent === "traveler_continue"
+                        }
+                      />
+                    ) : null}
+
+                    {effectiveStep === "extras" ? (
+                      <CheckoutExtrasStep
+                        data={data}
+                        form={form}
+                        paymentMode={paymentMode}
+                        onBack={backFromExtras}
+                        onContinue={continueFromExtras}
+                        disabled={isSubmitting || isStepNavigating || quoteExpired}
+                        isBackNavigating={
+                          isStepNavigating && stepNavigationIntent === "extras_back"
+                        }
+                        isContinueNavigating={
+                          isStepNavigating && stepNavigationIntent === "extras_continue"
+                        }
+                      />
+                    ) : null}
+
+                    {effectiveStep === "pay" ? (
+                      <CheckoutPayStep
+                        data={data}
+                        paymentMode={paymentMode}
+                        ancillaryPreviewTotal={ancillaryPreviewTotal}
+                        totalPreview={totalPreview}
+                        submitError={payStepError ?? payStepBanner}
+                        paymentProcessingMessage={paymentProcessingMessage}
+                        isSubmitting={isSubmitting}
+                        clerkEnabled={clerkEnabled}
+                        signInHref={signInHref}
+                        onBack={backFromPay}
+                        onPayPalCancel={onPayPalCancel}
+                        onPayPalError={onPayPalError}
+                        paymentReady={reviewReady}
+                        quoteExpired={quoteExpired}
+                        reviewHref={reviewHref}
+                        onCreatePayPalOrder={async () => {
+                          const valid = await validateTravelerForNavigation()
+                          if (!valid) {
+                            throw new Error("Fix traveler details before payment.")
+                          }
+                          return createPayPalOrder(form.getValues())
+                        }}
+                        onCapturePayPalOrder={async (paypalOrderId) => {
+                          await capturePayPalOrder(paypalOrderId)
+                        }}
+                        isBackNavigating={
+                          isStepNavigating && stepNavigationIntent === "pay_back"
+                        }
+                      />
+                    ) : null}
+                  </CheckoutWizardShell>
+                </form>
+              )}
+            </div>
+            <CheckoutSummaryRail
+              data={data}
+              paymentMode={paymentMode}
+              ancillaryPreviewTotal={ancillaryPreviewTotal}
+              totalPreview={totalPreview}
+              travelerComplete={travelerStepReady}
+              reviewReady={reviewReady}
+              quoteExpired={quoteExpired}
+              quoteExpiringSoon={quoteExpiringSoon}
+              quoteCountdownLabel={quoteCountdown.label}
             />
-          ) : (
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <CheckoutWizardShell
-                currentStep={effectiveStep}
-                onStepChange={navigateStep}
-                canNavigateToStep={canNavigateToStep}
-              >
-                {effectiveStep === "traveler" ? (
-                  <CheckoutTravelerStep
-                    data={data}
-                    form={form}
-                    paymentMode={paymentMode}
-                    passengers={passengersWatch}
-                    ancillaryServicesCount={ancillarySelection?.services.length ?? 0}
-                    stepError={stepError}
-                    onContinue={continueFromTraveler}
-                    disabled={isSubmitting || isStepNavigating}
-                    isNavigating={
-                      isStepNavigating && stepNavigationIntent === "traveler_continue"
-                    }
-                  />
-                ) : null}
-
-                {effectiveStep === "extras" ? (
-                  <CheckoutExtrasStep
-                    data={data}
-                    form={form}
-                    metadataFieldArray={metadataFieldArray}
-                    paymentMode={paymentMode}
-                    onBack={backFromExtras}
-                    onContinue={continueFromExtras}
-                    disabled={isSubmitting || isStepNavigating}
-                    isBackNavigating={
-                      isStepNavigating && stepNavigationIntent === "extras_back"
-                    }
-                    isContinueNavigating={
-                      isStepNavigating && stepNavigationIntent === "extras_continue"
-                    }
-                  />
-                ) : null}
-
-                {effectiveStep === "pay" ? (
-                  <CheckoutPayStep
-                    data={data}
-                    paymentMode={paymentMode}
-                    ancillaryPreviewTotal={ancillaryPreviewTotal}
-                    totalPreview={totalPreview}
-                    submitError={payStepError ?? payStepBanner}
-                    paymentProcessingMessage={paymentProcessingMessage}
-                    isSubmitting={isSubmitting}
-                    clerkEnabled={clerkEnabled}
-                    signInHref={signInHref}
-                    onBack={backFromPay}
-                    isBackNavigating={
-                      isStepNavigating && stepNavigationIntent === "pay_back"
-                    }
-                  />
-                ) : null}
-              </CheckoutWizardShell>
-            </form>
-          )}
+          </div>
         </div>
       </div>
+      <CheckoutMobileSummary
+        data={data}
+        paymentMode={paymentMode}
+        totalPreview={totalPreview}
+        quoteExpired={quoteExpired}
+        quoteExpiringSoon={quoteExpiringSoon}
+        quoteCountdownLabel={quoteCountdown.label}
+      />
     </main>
   )
 }
@@ -616,6 +768,289 @@ function mapResolutionStatusToQueryStatus(
     default:
       return "processing"
   }
+}
+
+function ExpiredFareRecovery(input: {
+  reviewHref: string
+  quoteExpiresAtLabel: string
+}) {
+  return (
+    <section className="rounded-lg border border-destructive/30 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+            <AlertCircleIcon className="size-5" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase text-destructive">Fare expired</p>
+            <h2 className="text-xl font-semibold tracking-tight">
+              Refresh this fare before payment
+            </h2>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              This quote expired at {input.quoteExpiresAtLabel}. Return to review to recheck the
+              airline price, then continue checkout with a fresh quote.
+            </p>
+          </div>
+        </div>
+        <Button className="h-10 px-4" render={<Link href={input.reviewHref} />}>
+          <RefreshCcwIcon data-icon="inline-start" />
+          Refresh pricing
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+function FareExpiryNotice(input: {
+  remainingLabel: string
+  quoteExpiresAtLabel: string
+}) {
+  return (
+    <section className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <div className="flex items-start gap-2">
+        <Clock3Icon className="mt-0.5 size-4" />
+        <p>
+          Fare expires in <strong>{input.remainingLabel}</strong>. Complete payment before{" "}
+          {input.quoteExpiresAtLabel}, or refresh pricing from review.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function CheckoutSummaryRail(input: {
+  data: CheckoutPageData
+  paymentMode: CheckoutFormValues["paymentMode"] | undefined
+  ancillaryPreviewTotal: number
+  totalPreview: number
+  travelerComplete: boolean
+  reviewReady: boolean
+  quoteExpired: boolean
+  quoteExpiringSoon: boolean
+  quoteCountdownLabel: string
+}) {
+  const paymentLabel = input.paymentMode === "hold" ? "Hold order" : "Pay now"
+
+  return (
+    <aside className="hidden lg:block">
+      <div className="sticky top-6 space-y-4 rounded-lg border border-[#d7d8ce] bg-white p-5 shadow-sm">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase text-[#6c746f]">Trip summary</p>
+          <h2 className="text-lg font-semibold">{input.data.tripSummary.routeLabel}</h2>
+          <p className="text-sm text-[#66706b]">{input.data.tripSummary.dateRangeLabel}</p>
+        </div>
+
+        <div className="space-y-3 border-y border-[#eceee8] py-4">
+          {input.data.selectedFlights.slice(0, 3).map((flight) => (
+            <div key={flight.legIndex} className="grid grid-cols-[72px_1fr] gap-3 text-sm">
+              <span className="font-medium text-[#47524d]">{flight.legTitle}</span>
+              <span>
+                {flight.routeLabel} · {flight.departureTimeLabel}
+              </span>
+            </div>
+          ))}
+          {input.data.selectedFlights.length > 3 ? (
+            <p className="text-sm text-[#66706b]">
+              +{input.data.selectedFlights.length - 3} more legs
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <SummaryLine label="Fare" value={input.data.quote.fareSellAmountLabel} />
+          <SummaryLine
+            label="Extras"
+            value={formatSummaryCurrency(input.ancillaryPreviewTotal, input.data.quote.currency)}
+          />
+          <div className="my-3 h-px bg-[#eceee8]" />
+          <SummaryLine
+            label="Total"
+            value={formatSummaryCurrency(
+              input.totalPreview,
+              input.paymentMode === "pay_now"
+                ? input.data.payment.chargeCurrency
+                : input.data.quote.currency
+            )}
+            strong
+          />
+        </div>
+
+        <div className="space-y-2 rounded-md bg-[#f6f7f4] p-3 text-sm">
+          <StatusRow
+            complete={input.travelerComplete}
+            label={input.travelerComplete ? "Traveler details complete" : "Traveler details needed"}
+          />
+          <StatusRow
+            complete={!input.quoteExpired && (input.reviewReady || input.paymentMode === "hold")}
+            label={
+              input.quoteExpired
+                ? "Refresh fare before payment"
+                : input.paymentMode === "hold"
+                  ? "Hold booking selected"
+                  : "Ready for PayPal"
+            }
+          />
+          <div className="flex items-center gap-2 pt-1 text-[#66706b]">
+            <ShieldCheckIcon className="size-4" />
+            <span>{paymentLabel} · secured checkout</span>
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "flex gap-2 rounded-md border p-3 text-sm",
+            input.quoteExpired
+              ? "border-destructive/30 bg-destructive/5 text-destructive"
+              : input.quoteExpiringSoon
+                ? "border-amber-300 bg-amber-50 text-amber-900"
+                : "border-[#d7d8ce] text-[#66706b]"
+          )}
+        >
+          <Clock3Icon className="mt-0.5 size-4" />
+          <span>
+            {input.quoteExpired
+              ? "Fare expired"
+              : `Fare hold ${input.quoteCountdownLabel}`}
+          </span>
+        </div>
+
+        {input.data.tripSummary.offerExpiresAtLabel ? (
+          <div className="flex gap-2 rounded-md border border-[#d7d8ce] p-3 text-sm text-[#66706b]">
+            <Clock3Icon className="mt-0.5 size-4" />
+            <span>Offer expires {input.data.tripSummary.offerExpiresAtLabel}</span>
+          </div>
+        ) : null}
+      </div>
+    </aside>
+  )
+}
+
+function CheckoutMobileSummary(input: {
+  data: CheckoutPageData
+  paymentMode: CheckoutFormValues["paymentMode"] | undefined
+  totalPreview: number
+  quoteExpired: boolean
+  quoteExpiringSoon: boolean
+  quoteCountdownLabel: string
+}) {
+  const currency =
+    input.paymentMode === "pay_now"
+      ? input.data.payment.chargeCurrency
+      : input.data.quote.currency
+
+  return (
+    <div
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-30 border-t bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden",
+        input.quoteExpired
+          ? "border-destructive/30"
+          : input.quoteExpiringSoon
+            ? "border-amber-300"
+            : ""
+      )}
+    >
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div>
+          <p className="text-xs text-muted-foreground">Total due</p>
+          <p className="text-base font-semibold">
+            {formatSummaryCurrency(input.totalPreview, currency)}
+          </p>
+        </div>
+        <div className="text-right text-xs text-muted-foreground">
+          <p>{input.paymentMode === "hold" ? "Hold order" : "Pay now"}</p>
+          <p>
+            {input.quoteExpired
+              ? "Fare expired"
+              : `Fare hold ${input.quoteCountdownLabel}`}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SummaryLine(input: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3",
+        input.strong ? "text-base font-semibold" : "text-sm"
+      )}
+    >
+      <span className="text-[#66706b]">{input.label}</span>
+      <span>{input.value}</span>
+    </div>
+  )
+}
+
+function StatusRow(input: { complete: boolean; label: string }) {
+  const Icon = input.complete ? CheckCircle2Icon : AlertCircleIcon
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        input.complete ? "text-emerald-700" : "text-amber-700"
+      )}
+    >
+      <Icon className="size-4" />
+      <span>{input.label}</span>
+    </div>
+  )
+}
+
+function formatSummaryCurrency(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: currency === "JPY" ? 0 : 2,
+      maximumFractionDigits: currency === "JPY" ? 0 : 2,
+    }).format(amount)
+  } catch {
+    return `${currency} ${amount.toFixed(currency === "JPY" ? 0 : 2)}`
+  }
+}
+
+function useQuoteCountdown(expiresAtIso: string) {
+  const expiresAtMs = useMemo(() => {
+    const parsed = Date.parse(expiresAtIso)
+    return Number.isFinite(parsed) ? parsed : 0
+  }, [expiresAtIso])
+  const [remainingMs, setRemainingMs] = useState(Number.POSITIVE_INFINITY)
+
+  useEffect(() => {
+    function updateRemaining() {
+      setRemainingMs(Math.max(0, expiresAtMs - Date.now()))
+    }
+
+    updateRemaining()
+
+    const intervalId = window.setInterval(updateRemaining, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [expiresAtMs])
+
+  return {
+    remainingMs,
+    label: formatDurationLabel(remainingMs),
+  }
+}
+
+function formatDurationLabel(ms: number) {
+  if (ms <= 0) {
+    return "expired"
+  }
+
+  const totalSeconds = Math.ceil(ms / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}h ${minutes.toString().padStart(2, "0")}m`
+  }
+
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`
 }
 
 function computeAncillaryPreviewTotal(
@@ -649,7 +1084,10 @@ function validateTravelerStep(input: {
   passengers: CheckoutFormValues["passengers"] | undefined
   identityDocumentsRequired: boolean
 }) {
-  if (!input.contact?.email?.trim() || !input.contact.phoneNumber?.trim()) {
+  const email = input.contact?.email?.trim() ?? ""
+  const phoneNumber = input.contact?.phoneNumber?.trim() ?? ""
+
+  if (!EMAIL_PATTERN.test(email) || !E164_PHONE_PATTERN.test(phoneNumber)) {
     return false
   }
 
@@ -658,19 +1096,19 @@ function validateTravelerStep(input: {
   }
 
   for (const passenger of input.passengers) {
-    if (
-      !passenger.givenName.trim() ||
-      !passenger.familyName.trim() ||
-      !passenger.bornOn.trim()
-    ) {
+    if (!passenger.givenName.trim() || !passenger.familyName.trim()) {
+      return false
+    }
+
+    if (!isIsoDate(passenger.bornOn)) {
       return false
     }
 
     if (input.identityDocumentsRequired) {
       if (
         !passenger.identityNumber.trim() ||
-        !passenger.identityCountryCode.trim() ||
-        !passenger.identityExpiresOn.trim()
+        !COUNTRY_CODE_PATTERN.test(passenger.identityCountryCode.trim()) ||
+        !isIsoDate(passenger.identityExpiresOn)
       ) {
         return false
       }
@@ -678,6 +1116,10 @@ function validateTravelerStep(input: {
   }
 
   return true
+}
+
+function isIsoDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
 function buildRedirectPath(pathname: string | null, search: string) {

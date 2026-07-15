@@ -63,6 +63,10 @@ import {
   type FareOptionsPageData,
 } from "@/modules/flights/results/domain"
 import { loadMoreFareOptionsAction } from "@/modules/flights/results/server/actions"
+import {
+  OfferSessionTimer,
+  useOfferSessionExpiry,
+} from "@/modules/flights/results/ui/offer-session-timer"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { cn } from "@/lib/utils"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
@@ -102,6 +106,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
     data.state.landingFrom,
     data.state.landingTo,
   ])
+  const offerSession = useOfferSessionExpiry(data.offerExpiresAtIso)
 
   const updateQuery = useCallback(
     function updateQuery(
@@ -229,7 +234,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
   ])
 
   function selectOffer(offerId: string) {
-    if (isSelectingOffer) {
+    if (isSelectingOffer || offerSession.expired) {
       return
     }
 
@@ -364,6 +369,11 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
+
+        <OfferSessionTimer
+          expiresAtIso={data.offerExpiresAtIso}
+          expiresAtLabel={data.offerExpiresAtLabel}
+        />
 
         <div className="lg:hidden">
           <Dialog open={isFilterDialogOpen} onOpenChange={setFilterDialogOpen}>
@@ -603,7 +613,7 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                       ) : (
                         <Button
                           className="h-11 rounded-xl px-7 text-sm"
-                          disabled={isSelectingOffer}
+                          disabled={isSelectingOffer || offerSession.expired}
                           onClick={() => selectOffer(offer.id)}
                         >
                           {isSelectingOffer && pendingOfferId === offer.id ? (

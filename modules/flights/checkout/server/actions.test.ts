@@ -1,8 +1,9 @@
 import { expect, test } from "vitest"
 
 import {
+  executeCapturePayPalOrderAction,
+  executeCreatePayPalOrderAction,
   executeGetCheckoutSessionStatusAction,
-  executeStartCheckoutPaymentAction,
   executeSubmitCheckoutAction,
 } from "@/modules/flights/checkout/server/actions"
 
@@ -60,8 +61,8 @@ test("executeSubmitCheckoutAction returns success for hold payload", async () =>
   expect(result.ok && result.data.paymentMode).toBe("hold")
 })
 
-test("executeStartCheckoutPaymentAction returns success for pay_now payload", async () => {
-  const result = await executeStartCheckoutPaymentAction(
+test("executeCreatePayPalOrderAction returns success for pay_now payload", async () => {
+  const result = await executeCreatePayPalOrderAction(
     {
       ...validPayload,
       paymentMode: "pay_now",
@@ -73,10 +74,10 @@ test("executeStartCheckoutPaymentAction returns success for pay_now payload", as
           guestId: "gst_1",
         }
       },
-      async startCheckoutPayment() {
+      async createCheckoutPayPalOrder() {
         return {
           checkoutSessionId: "chs_1",
-          redirectUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
+          paypalOrderId: "PAYPAL-ORDER-1",
           chargeAmount: 1000,
           chargeCurrency: "USD",
           chargeAmountLabel: "USD 1000.00",
@@ -87,7 +88,37 @@ test("executeStartCheckoutPaymentAction returns success for pay_now payload", as
   )
 
   expect(result.ok).toBe(true)
-  expect(result.ok && result.data.redirectUrl).toContain("stripe.com")
+  expect(result.ok && result.data.paypalOrderId).toBe("PAYPAL-ORDER-1")
+})
+
+test("executeCapturePayPalOrderAction returns success for valid input", async () => {
+  const result = await executeCapturePayPalOrderAction(
+    {
+      checkoutSessionId: "chs_1",
+      paypalOrderId: "PAYPAL-ORDER-1",
+    },
+    {
+      async getActorContext() {
+        return {
+          type: "guest",
+          guestId: "gst_1",
+        }
+      },
+      async captureCheckoutPayPalOrder() {
+        return {
+          checkoutSessionId: "chs_1",
+          status: "completed",
+          message: null,
+          duffelOrderId: "ord_1",
+          bookingReference: "BK-TESTREF001",
+          totalChargeAmountLabel: "USD 1000.00",
+        }
+      },
+    }
+  )
+
+  expect(result.ok).toBe(true)
+  expect(result.ok && result.data.status).toBe("completed")
 })
 
 test("executeGetCheckoutSessionStatusAction returns success for valid input", async () => {
@@ -119,8 +150,8 @@ test("executeGetCheckoutSessionStatusAction returns success for valid input", as
   expect(result.ok && result.data.status).toBe("processing")
 })
 
-test("executeStartCheckoutPaymentAction sanitizes upstream errors", async () => {
-  const result = await executeStartCheckoutPaymentAction(
+test("executeCreatePayPalOrderAction sanitizes upstream errors", async () => {
+  const result = await executeCreatePayPalOrderAction(
     {
       ...validPayload,
       paymentMode: "pay_now",
@@ -132,7 +163,7 @@ test("executeStartCheckoutPaymentAction sanitizes upstream errors", async () => 
           guestId: "gst_1",
         }
       },
-      async startCheckoutPayment() {
+      async createCheckoutPayPalOrder() {
         throw new Error('Failed query: insert into "checkout_sessions" ...')
       },
     }
@@ -141,7 +172,7 @@ test("executeStartCheckoutPaymentAction sanitizes upstream errors", async () => 
   expect(result.ok).toBe(false)
   expect(!result.ok && result.error.code).toBe("UPSTREAM_ERROR")
   expect(!result.ok && result.error.message).toBe(
-    "Could not start payment right now. Please try again."
+    "Could not create PayPal order right now. Please try again."
   )
 })
 

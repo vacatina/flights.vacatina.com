@@ -6,7 +6,7 @@ Use this checklist for manual end-to-end validation with a 3-leg itinerary.
 
 - `DUFFEL_ACCESS_TOKEN` points to the intended environment (sandbox/live).
 - `DATABASE_URL` is configured and migrations are up to date.
-- Checkout dependencies are configured (`STRIPE_*`, pricing quote/session TTL envs).
+- Checkout dependencies are configured (`PAYPAL_*`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID`, pricing quote/session TTL envs).
 
 ## Scenario A: Search → Fare Options Leg Progression
 
@@ -33,10 +33,9 @@ Use this checklist for manual end-to-end validation with a 3-leg itinerary.
 1. On checkout, verify trip summary journey type is `Multi-city`.
 2. Verify selected flights render `Leg 1..N` labels (not Outbound/Inbound).
 3. For `pay_now`:
-   - Redirect to Stripe Checkout.
-   - Complete or cancel the hosted payment flow.
-   - On return, verify processing/cancelled state appears in checkout.
-   - Verify final state transitions to success/reconciliation/failed per webhook outcome.
+   - Verify PayPal buttons render on the pay step.
+   - Complete or cancel the PayPal approval flow.
+   - Verify server-side capture transitions to success/reconciliation/failed.
 4. For `hold`:
    - Submit hold order.
    - Verify success response and booking reference generation.
@@ -53,4 +52,4 @@ Use this checklist for manual end-to-end validation with a 3-leg itinerary.
 
 - One-way trips still show one-leg behavior.
 - Mirrored 2-leg return still shows `Outbound` and `Inbound`.
-- Stripe webhook confirms or expires the checkout session without manual refresh loops breaking.
+- PayPal capture/webhook confirmation updates the checkout session without manual refresh loops breaking.

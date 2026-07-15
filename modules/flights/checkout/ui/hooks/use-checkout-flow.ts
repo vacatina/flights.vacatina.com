@@ -7,8 +7,9 @@ import {
   type CheckoutPassengerInput,
 } from "@/modules/flights/checkout/domain"
 import {
+  capturePayPalOrderAction,
+  createPayPalOrderAction,
   getCheckoutSessionStatusAction,
-  startCheckoutPaymentAction,
   submitCheckoutAction,
 } from "@/modules/flights/checkout/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
@@ -47,6 +48,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
   const [submitSuccess, setSubmitSuccess] = useState<CheckoutSubmitSuccessState | null>(null)
   const [activePollingSessionId, setActivePollingSessionId] = useState<string | null>(null)
   const activePollingSessionRef = useRef<string | null>(null)
+  const paypalOrderSessionRef = useRef(new Map<string, string>())
 
   const resetFeedback = useCallback(function resetFeedback() {
     setSubmitError(null)
@@ -214,46 +216,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
 
   const onSubmit = useCallback(function onSubmit(values: CheckoutFormValues) {
     resetFeedback()
-
-    const passengers: CheckoutPassengerInput[] = values.passengers.map((passenger) => {
-      const identityDocument =
-        passenger.identityNumber.trim() &&
-        passenger.identityCountryCode.trim() &&
-        passenger.identityExpiresOn.trim()
-          ? {
-              type: passenger.identityType,
-              uniqueIdentifier: passenger.identityNumber.trim(),
-              issuingCountryCode: passenger.identityCountryCode.trim().toUpperCase(),
-              expiresOn: passenger.identityExpiresOn.trim(),
-            }
-          : null
-
-      return {
-        id: passenger.id,
-        type: passenger.type,
-        title: passenger.title,
-        givenName: passenger.givenName,
-        familyName: passenger.familyName,
-        bornOn: passenger.bornOn,
-        gender: passenger.gender,
-        identityDocument,
-      }
-    })
-
-    const payload = {
-      partialOfferRequestId: data.partialOfferRequestId,
-      offerId: data.state.offerId,
-      quoteId: data.state.quoteId,
-      selectedPartialOffers: data.state.selectedPartialOffers,
-      paymentMode: values.paymentMode,
-      contact: values.contact,
-      passengers,
-      metadata: values.metadata,
-      ancillarySelection:
-        values.ancillarySelection.services.length > 0
-          ? values.ancillarySelection
-          : null,
-    } as const
+    const payload = buildCheckoutPayload({ data, values })
 
     logFlightFlow("CheckoutPageClient", "submit_clicked", {
       partialOfferRequestId: data.partialOfferRequestId,
@@ -265,31 +228,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
     startSubmit(() => {
       void (async () => {
         if (values.paymentMode === "pay_now") {
-          if (!data.payment.payNowEnabled) {
-            setSubmitError(
-              data.payment.unavailableReason ?? "Pay now is unavailable for this fare."
-            )
-            return
-          }
-
-          const startResult = await startCheckoutPaymentAction(payload)
-
-          if (!startResult.ok) {
-            setSubmitError(
-              toSafeUserErrorMessage(
-                startResult.error.message,
-                "Could not start payment right now. Please try again."
-              )
-            )
-            return
-          }
-
-          setPaymentProcessingMessage("Redirecting to Stripe Checkout...")
-          logFlightFlow("CheckoutPageClient", "stripe_checkout_redirect_started", {
-            partialOfferRequestId: data.partialOfferRequestId,
-            checkoutSessionId: startResult.data.checkoutSessionId,
-          })
-          redirectToCheckout(startResult.data.redirectUrl)
+          setSubmitError("Use the PayPal buttons to complete pay now checkout.")
           return
         }
 
@@ -317,15 +256,124 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
       })()
     })
   }, [
-    data.partialOfferRequestId,
-    data.payment.payNowEnabled,
-    data.payment.unavailableReason,
-    data.state.offerId,
-    data.state.quoteId,
-    data.state.selectedPartialOffers,
+    data,
+    onSuccess,
+    resetFeedback,
+  ])
+
+  const createPayPalOrder = useCallback(async function createPayPalOrder(
+    values: CheckoutFormValues
+  ) {
+    resetFeedback()
+
+    if (!data.payment.payNowEnabled) {
+      const message = data.payment.unavailableReason ?? "Pay now is unavailable for this fare."
+      setSubmitError(message)
+      throw new Error(message)
+    }
+
+    const payload = buildCheckoutPayload({
+      data,
+      values: {
+        ...values,
+        paymentMode: "pay_now",
+      },
+    })
+
+    const result = await createPayPalOrderAction(payload)
+
+    if (!result.ok) {
+      const message = toSafeUserErrorMessage(
+        result.error.message,
+        "Could not create PayPal order right now. Please try again."
+      )
+      setSubmitError(message)
+      throw new Error(message)
+    }
+
+    paypalOrderSessionRef.current.set(
+      result.data.paypalOrderId,
+      result.data.checkoutSessionId
+    )
+    setPaymentProcessingMessage(null)
+    logFlightFlow("CheckoutPageClient", "paypal_order_created", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      checkoutSessionId: result.data.checkoutSessionId,
+      paypalOrderId: result.data.paypalOrderId,
+    })
+
+    return result.data.paypalOrderId
+  }, [
+    data,
+    resetFeedback,
+  ])
+
+  const capturePayPalOrder = useCallback(async function capturePayPalOrder(
+    paypalOrderId: string
+  ) {
+    const checkoutSessionId = paypalOrderSessionRef.current.get(paypalOrderId)
+
+    if (!checkoutSessionId) {
+      const message = "PayPal order state is incomplete. Please retry payment."
+      setSubmitError(message)
+      throw new Error(message)
+    }
+
+    setPaymentProcessingMessage("Capturing PayPal payment...")
+    const result = await capturePayPalOrderAction({
+      checkoutSessionId,
+      paypalOrderId,
+    })
+
+    if (!result.ok) {
+      const message = toSafeUserErrorMessage(
+        result.error.message,
+        "Could not capture PayPal payment right now. Please try again."
+      )
+      setSubmitError(message)
+      setPaymentProcessingMessage(null)
+      throw new Error(message)
+    }
+
+    const resolution = toPayNowResolution(result.data)
+
+    if (resolution.status === "success") {
+      const success: CheckoutSubmitSuccessState = {
+        duffelOrderId: resolution.duffelOrderId ?? "unknown",
+        bookingReference: resolution.bookingReference,
+        totalSellAmountLabel:
+          resolution.totalChargeAmountLabel ?? data.quote.fareSellAmountLabel,
+        paymentRequiredByLabel: null,
+        paymentMode: "pay_now",
+      }
+      setSubmitSuccess(success)
+      setPaymentProcessingMessage(null)
+      onSuccess?.(success)
+      onPayNowResolved?.(resolution)
+      return resolution
+    }
+
+    if (resolution.status === "failed" || resolution.status === "reconciliation") {
+      setSubmitError(
+        toSafeActionMessage(
+          resolution.message,
+          "Payment was received but booking needs manual reconciliation."
+        )
+      )
+      setPaymentProcessingMessage(null)
+      onPayNowResolved?.(resolution)
+      return resolution
+    }
+
+    setPaymentProcessingMessage("Payment is processing. Waiting for confirmation...")
+    onPayNowResolved?.(resolution)
+    await pollCheckoutCompletion(checkoutSessionId)
+    return resolution
+  }, [
+    data.quote.fareSellAmountLabel,
+    onPayNowResolved,
     onSuccess,
     pollCheckoutCompletion,
-    resetFeedback,
   ])
 
   const syncPayNowResolution = useCallback(async function syncPayNowResolution(
@@ -348,6 +396,8 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
     paymentProcessingMessage,
     submitSuccess,
     activePollingSessionId,
+    capturePayPalOrder,
+    createPayPalOrder,
     onSubmit,
     resetFeedback,
     syncPayNowResolution,
@@ -365,6 +415,93 @@ function toSafeActionMessage(message: string | null | undefined, fallback: strin
   return toSafeUserErrorMessage(message, fallback)
 }
 
-function redirectToCheckout(url: string) {
-  window.location.assign(url)
+function buildCheckoutPayload(input: {
+  data: CheckoutPageData
+  values: CheckoutFormValues
+}) {
+  const passengers: CheckoutPassengerInput[] = input.values.passengers.map((passenger) => {
+    const identityDocument =
+      passenger.identityNumber.trim() &&
+      passenger.identityCountryCode.trim() &&
+      passenger.identityExpiresOn.trim()
+        ? {
+            type: passenger.identityType,
+            uniqueIdentifier: passenger.identityNumber.trim(),
+            issuingCountryCode: passenger.identityCountryCode.trim().toUpperCase(),
+            expiresOn: passenger.identityExpiresOn.trim(),
+          }
+        : null
+
+    return {
+      id: passenger.id,
+      type: passenger.type,
+      title: passenger.title,
+      givenName: passenger.givenName,
+      familyName: passenger.familyName,
+      bornOn: passenger.bornOn,
+      gender: passenger.gender,
+      identityDocument,
+    }
+  })
+
+  return {
+    partialOfferRequestId: input.data.partialOfferRequestId,
+    offerId: input.data.state.offerId,
+    quoteId: input.data.state.quoteId,
+    selectedPartialOffers: input.data.state.selectedPartialOffers,
+    paymentMode: input.values.paymentMode,
+    contact: input.values.contact,
+    passengers,
+    metadata: input.values.metadata,
+    ancillarySelection:
+      input.values.ancillarySelection.services.length > 0
+        ? input.values.ancillarySelection
+        : null,
+  } as const
+}
+
+function toPayNowResolution(
+  result: import("@/modules/flights/checkout/domain").CheckoutSessionStatusResult
+): CheckoutPayNowResolution {
+  if (result.status === "completed") {
+    return {
+      sessionId: result.checkoutSessionId,
+      status: "success",
+      duffelOrderId: result.duffelOrderId,
+      bookingReference: result.bookingReference,
+      totalChargeAmountLabel: result.totalChargeAmountLabel,
+      message: null,
+    }
+  }
+
+  if (result.status === "failed") {
+    return {
+      sessionId: result.checkoutSessionId,
+      status: "failed",
+      duffelOrderId: result.duffelOrderId,
+      bookingReference: result.bookingReference,
+      totalChargeAmountLabel: result.totalChargeAmountLabel,
+      message: result.message,
+    }
+  }
+
+  if (result.status === "reconciliation_required") {
+    return {
+      sessionId: result.checkoutSessionId,
+      status: "reconciliation",
+      duffelOrderId: result.duffelOrderId,
+      bookingReference: result.bookingReference,
+      totalChargeAmountLabel: result.totalChargeAmountLabel,
+      message: result.message,
+    }
+  }
+
+  return {
+    sessionId: result.checkoutSessionId,
+    status: "processing",
+    duffelOrderId: result.duffelOrderId,
+    bookingReference: result.bookingReference,
+    totalChargeAmountLabel: result.totalChargeAmountLabel,
+    message: result.message,
+  }
 }

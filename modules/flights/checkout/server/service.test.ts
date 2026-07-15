@@ -1,6 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest"
-import type { Offer, Order, SeatMap } from "@duffel/api/types"
-import type Stripe from "stripe"
+import type { CreateOrder, Offer, Order, SeatMap } from "@duffel/api/types"
 
 import type { CheckoutSubmitInput } from "@/modules/flights/checkout/domain"
 import type {
@@ -13,9 +12,10 @@ import type {
 } from "@/modules/flights/checkout/server/order-repository"
 import type { PaymentWebhookEventRepository } from "@/modules/flights/checkout/server/payment-webhook-event-repository"
 
-const stripeMocks = vi.hoisted(() => ({
-  createCheckoutSession: vi.fn(),
-  retrieveCheckoutSession: vi.fn(),
+const paypalMocks = vi.hoisted(() => ({
+  createPayPalOrder: vi.fn(),
+  getPayPalOrder: vi.fn(),
+  capturePayPalOrder: vi.fn(),
 }))
 
 const mockFns = vi.hoisted(() => ({
@@ -28,7 +28,6 @@ const mockFns = vi.hoisted(() => ({
   getAirlineLogosByAirlineId: vi.fn(),
   incrementCheckoutMetric: vi.fn(),
   buildCheckoutPageModel: vi.fn(),
-  getStripeConfig: vi.fn(),
   createBookingReference: vi.fn(() => "BK-TESTREF001"),
   enqueueNotification: vi.fn(),
   dispatchPendingNotifications: vi.fn(),
@@ -37,17 +36,15 @@ const mockFns = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}))
 
-vi.mock("@/lib/stripe", () => ({
-  getStripeClient: () => ({
-    checkout: {
-      sessions: {
-        create: stripeMocks.createCheckoutSession,
-        retrieve: stripeMocks.retrieveCheckoutSession,
-      },
-    },
-  }),
-  getStripeConfig: mockFns.getStripeConfig,
-  toStripeAmountMinorUnit: (amount: number) => Math.round(amount * 100),
+vi.mock("@/lib/paypal", () => ({
+  createPayPalOrder: paypalMocks.createPayPalOrder,
+  getPayPalOrder: paypalMocks.getPayPalOrder,
+  capturePayPalOrder: paypalMocks.capturePayPalOrder,
+  getPayPalCaptureFromOrder: (order: {
+    purchase_units?: Array<{ payments?: { captures?: unknown[] } }>
+  }) => order.purchase_units?.[0]?.payments?.captures?.[0] ?? null,
+  getPayPalCheckoutSessionIdFromResource: (resource: { custom_id?: string } | null) =>
+    resource?.custom_id ?? null,
 }))
 
 vi.mock("@/modules/flights/pricing/server", () => ({
@@ -95,10 +92,11 @@ vi.mock("@/modules/flights/checkout/domain", async () => {
 })
 
 import {
+  captureCheckoutPayPalOrder,
+  createCheckoutPayPalOrder,
   fetchCheckoutPageData,
   getCheckoutSessionStatus,
-  processStripeWebhookEvent,
-  startCheckoutPayment,
+  processPayPalWebhookEvent,
   submitCheckout,
 } from "@/modules/flights/checkout/server/service"
 
@@ -138,11 +136,6 @@ beforeEach(() => {
   })
   mockFns.getAirlineLogosByAirlineId.mockResolvedValue({})
   mockFns.incrementCheckoutMetric.mockImplementation(() => undefined)
-  mockFns.getStripeConfig.mockReturnValue({
-    secretKey: "sk_test_123",
-    webhookSecret: "whsec_test_123",
-    appBaseUrl: "https://example.com",
-  })
   mockFns.enqueueNotification.mockResolvedValue(undefined)
   mockFns.dispatchPendingNotifications.mockResolvedValue({
     scannedCount: 1,
@@ -173,55 +166,24 @@ beforeEach(() => {
   })
   mockFns.buildCheckoutPageModel.mockReturnValue(createCheckoutPageModel())
 
-  stripeMocks.createCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_1",
-      url: "https://checkout.stripe.com/c/pay/cs_test_1",
-      status: "open",
-      payment_status: "unpaid",
-    })
-  )
-  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_1",
-      url: "https://checkout.stripe.com/c/pay/cs_test_1",
-      status: "open",
-      payment_status: "unpaid",
-    })
-  )
+  paypalMocks.createPayPalOrder.mockResolvedValue({
+    id: "PAYPAL-ORDER-1",
+    status: "CREATED",
+  })
+  paypalMocks.getPayPalOrder.mockResolvedValue({
+    id: "PAYPAL-ORDER-1",
+    status: "CREATED",
+  })
+  paypalMocks.capturePayPalOrder.mockResolvedValue(createCapturedPayPalOrder())
 })
 
-test("fetchCheckoutPageData builds Stripe payment preview from sell amount", async () => {
-  const result = await fetchCheckoutPageData(
-    {
-      partialOfferRequestId: "prq_1",
-      state: {
-        offerId: "off_1",
-        selectedPartialOffers: ["off_partial_1"],
-        quoteId: "pqt_1",
-        step: "traveler",
-      },
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => {
-        throw new Error("not used")
-      },
-      sessionRepository: createSessionRepository().repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
+test("fetchCheckoutPageData builds PayPal payment preview from sell amount", async () => {
+  const result = await fetchCheckoutPageData(createFetchInput(), createDeps())
 
   expect(result.payment).toEqual({
-    provider: "stripe",
-    checkoutUi: "hosted",
+    provider: "paypal",
+    checkoutUi: "buttons",
+    paypalEnvironment: "sandbox",
     payNowEnabled: true,
     unavailableReason: null,
     chargeAmount: 120,
@@ -230,420 +192,92 @@ test("fetchCheckoutPageData builds Stripe payment preview from sell amount", asy
   })
 })
 
-test("startCheckoutPayment creates a Stripe Checkout session using sellTotal", async () => {
+test("createCheckoutPayPalOrder creates a PayPal order using sellTotal", async () => {
   const sessionRepo = createSessionRepository()
 
-  const result = await startCheckoutPayment(
+  const result = await createCheckoutPayPalOrder(
     {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
+      actor: createGuestActor(),
       payload: createSubmitInput({ paymentMode: "pay_now" }),
     },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
+    createDeps({ sessionRepository: sessionRepo.repo })
   )
 
   expect(result).toMatchObject({
     status: "processing",
-    redirectUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
+    paypalOrderId: "PAYPAL-ORDER-1",
     chargeAmount: 120,
     chargeCurrency: "USD",
     chargeAmountLabel: "USD 120.00",
   })
-
-  expect(stripeMocks.createCheckoutSession).toHaveBeenCalledWith(
+  expect(paypalMocks.createPayPalOrder).toHaveBeenCalledWith(
     expect.objectContaining({
-      mode: "payment",
-      payment_method_types: ["card"],
-      currency: "usd",
-      customer_email: "guest@example.com",
-      client_reference_id: result.checkoutSessionId,
-      success_url:
-        `https://example.com/results/prq_1/checkout?offer=off_1&selected=off_partial_1&quote=pqt_1&step=pay&status=processing&session=${result.checkoutSessionId}`,
-      cancel_url:
-        `https://example.com/results/prq_1/checkout?offer=off_1&selected=off_partial_1&quote=pqt_1&step=pay&session=${result.checkoutSessionId}&cancelled=1`,
-      line_items: [
-        expect.objectContaining({
-          quantity: 1,
-          price_data: expect.objectContaining({
-            currency: "usd",
-            unit_amount: 12000,
-          }),
-        }),
-      ],
+      checkoutSessionId: result.checkoutSessionId,
+      amount: 120,
+      currency: "USD",
+      contactEmail: "guest@example.com",
     })
   )
-
-  const createdRecord = sessionRepo.spies.create.mock.calls[0]?.[0]
-  expect(createdRecord).toMatchObject({
-    paymentProvider: "stripe",
-    paymentCurrency: "USD",
-    paymentAmount: 120,
-    paymentMode: "pay_now",
-    netAmount: 100,
-    sellAmount: 120,
-  })
+  expect(sessionRepo.spies.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      paymentProvider: "paypal",
+      providerOrderId: "PAYPAL-ORDER-1",
+      paymentCurrency: "USD",
+      paymentAmount: 120,
+      paymentMode: "pay_now",
+    })
+  )
 })
 
-test("startCheckoutPayment reuses an open Stripe Checkout session", async () => {
+test("createCheckoutPayPalOrder reuses an existing processing PayPal order", async () => {
   const sessionRepo = createSessionRepository()
 
-  await startCheckoutPayment(
+  const first = await createCheckoutPayPalOrder(
     {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
+      actor: createGuestActor(),
       payload: createSubmitInput({ paymentMode: "pay_now" }),
     },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
+    createDeps({ sessionRepository: sessionRepo.repo })
   )
+  paypalMocks.createPayPalOrder.mockClear()
 
-  stripeMocks.createCheckoutSession.mockClear()
-  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_1",
-      url: "https://checkout.stripe.com/c/pay/cs_existing",
-      status: "open",
-      payment_status: "unpaid",
-    })
-  )
-
-  const result = await startCheckoutPayment(
+  const second = await createCheckoutPayPalOrder(
     {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
+      actor: createGuestActor(),
       payload: createSubmitInput({ paymentMode: "pay_now" }),
     },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
+    createDeps({ sessionRepository: sessionRepo.repo })
   )
 
-  expect(result.redirectUrl).toBe("https://checkout.stripe.com/c/pay/cs_existing")
-  expect(stripeMocks.retrieveCheckoutSession).toHaveBeenCalledWith("cs_test_1")
-  expect(stripeMocks.createCheckoutSession).not.toHaveBeenCalled()
+  expect(second.checkoutSessionId).toBe(first.checkoutSessionId)
+  expect(second.paypalOrderId).toBe("PAYPAL-ORDER-1")
+  expect(paypalMocks.getPayPalOrder).toHaveBeenCalledWith("PAYPAL-ORDER-1")
+  expect(paypalMocks.createPayPalOrder).not.toHaveBeenCalled()
 })
 
-test("startCheckoutPayment recreates an expired Stripe Checkout session", async () => {
-  const sessionRepo = createSessionRepository()
-
-  await startCheckoutPayment(
-    {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-      payload: createSubmitInput({ paymentMode: "pay_now" }),
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_1",
-      url: null,
-      status: "expired",
-      payment_status: "unpaid",
-    })
-  )
-  stripeMocks.createCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_2",
-      url: "https://checkout.stripe.com/c/pay/cs_test_2",
-      status: "open",
-      payment_status: "unpaid",
-    })
-  )
-
-  const result = await startCheckoutPayment(
-    {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-      payload: createSubmitInput({ paymentMode: "pay_now" }),
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  expect(result.redirectUrl).toBe("https://checkout.stripe.com/c/pay/cs_test_2")
-  expect(sessionRepo.spies.update).toHaveBeenCalledWith(
-    expect.any(String),
-    expect.objectContaining({
-      status: "processing",
-      providerOrderId: "cs_test_2",
-      providerStatusCode: "open",
-      providerStatusMessage: "unpaid",
-    })
-  )
-})
-
-test("startCheckoutPayment retries sessions failed by stripe expiration and refreshes contact snapshot", async () => {
-  const sessionRepo = createSessionRepository()
-  const originalPayload = {
-    ...createSubmitInput({ paymentMode: "pay_now" }),
-    passengers: [
-      {
-        id: "pas_1",
-        type: "adult" as const,
-        title: "mr" as const,
-        givenName: "Tony",
-        familyName: "Stark",
-        bornOn: "1980-07-24",
-        gender: "m" as const,
-        email: "traveler@example.com",
-        phoneNumber: "+94770000000",
-        identityDocument: null,
-      },
-    ],
-  }
-
-  const initialResult = await startCheckoutPayment(
-    {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-      payload: originalPayload,
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  await sessionRepo.repo.update(initialResult.checkoutSessionId, {
-    status: "failed",
-    errorCode: "stripe_checkout_expired",
-    errorMessage: "Stripe checkout session expired before payment was completed.",
-  })
-  sessionRepo.spies.update.mockClear()
-
-  stripeMocks.retrieveCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_1",
-      url: null,
-      status: "expired",
-      payment_status: "unpaid",
-    })
-  )
-  stripeMocks.createCheckoutSession.mockResolvedValue(
-    createStripeCheckoutSession({
-      id: "cs_test_3",
-      url: "https://checkout.stripe.com/c/pay/cs_test_3",
-      status: "open",
-      payment_status: "unpaid",
-    })
-  )
-
-  const result = await startCheckoutPayment(
-    {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-      payload: {
-        ...originalPayload,
-        contact: {
-          email: "updated@example.com",
-          phoneNumber: "+94770000001",
-        },
-      },
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  expect(result.redirectUrl).toBe("https://checkout.stripe.com/c/pay/cs_test_3")
-  expect(sessionRepo.spies.update).toHaveBeenCalledWith(
-    initialResult.checkoutSessionId,
-    expect.objectContaining({
-      status: "processing",
-      errorCode: null,
-      errorMessage: null,
-      providerOrderId: "cs_test_3",
-      providerStatusCode: "open",
-      providerStatusMessage: "unpaid",
-      checkoutPayloadSnapshot: expect.objectContaining({
-        contact: {
-          email: "updated@example.com",
-          phoneNumber: "+94770000001",
-        },
-      }),
-    })
-  )
-
-  const refreshedSession = await sessionRepo.repo.findById(initialResult.checkoutSessionId)
-  expect(refreshedSession?.status).toBe("processing")
-  expect(refreshedSession?.errorCode).toBeNull()
-  expect(refreshedSession?.errorMessage).toBeNull()
-  expect(refreshedSession?.providerOrderId).toBe("cs_test_3")
-  expect(refreshedSession?.checkoutPayloadSnapshot).toMatchObject({
-    contact: {
-      email: "updated@example.com",
-      phoneNumber: "+94770000001",
-    },
-  })
-})
-
-test("submitCheckout keeps the hold flow unchanged", async () => {
-  const sessionRepo = createSessionRepository()
-  const createOrderSpy = vi.fn(async () => createDuffelOrder())
-
-  const result = await submitCheckout(
-    {
-      actor: {
-        type: "guest",
-        guestId: "gst_1",
-      },
-      payload: createSubmitInput({ paymentMode: "hold" }),
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: createOrderSpy,
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
-  )
-
-  expect(result.paymentMode).toBe("hold")
-  expect(createOrderSpy).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: "pay_later",
-    })
-  )
-  expect(stripeMocks.createCheckoutSession).not.toHaveBeenCalled()
-})
-
-test("processStripeWebhookEvent finalizes checkout on paid completion", async () => {
+test("captureCheckoutPayPalOrder finalizes checkout on completed capture", async () => {
   const sessionRepo = createSessionRepository()
   const orderRepo = createOrderRepository()
   const createOrderSpy = vi.fn(async () => createDuffelOrder())
+  const session = await createPayNowSession(sessionRepo)
 
-  const createdSession = await sessionRepo.repo.create({
-    id: "chs_1",
-    idempotencyKey: "idempotency_1",
-    partialOfferRequestId: "prq_1",
-    quoteId: "pqt_1",
-    offerId: "off_1",
-    selectedPartialOffers: ["off_partial_1"],
-    ownerUserId: null,
-    ownerGuestId: "gst_1",
-    ownerOrgId: null,
-    paymentMode: "pay_now",
-    currency: "USD",
-    netAmount: 100,
-    sellAmount: 120,
-    paymentProvider: "stripe",
-    providerOrderId: "cs_test_1",
-    providerPaymentId: null,
-    providerStatusCode: null,
-    providerStatusMessage: null,
-    paymentCurrency: "USD",
-    paymentAmount: 120,
-    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
-    status: "processing",
-    paymentInitiatedAt: NOW,
-    paymentConfirmedAt: null,
-    finalizedAt: null,
-    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
-  })
-
-  await processStripeWebhookEvent(
+  const result = await captureCheckoutPayPalOrder(
     {
-      event: createStripeEvent({
-        id: "evt_1",
-        type: "checkout.session.completed",
-        session: createStripeCheckoutSession({
-          id: "cs_test_1",
-          url: "https://checkout.stripe.com/c/pay/cs_test_1",
-          status: "complete",
-          payment_status: "paid",
-          client_reference_id: createdSession.id,
-          payment_intent: "pi_1",
-          amount_total: 12000,
-          currency: "usd",
-          metadata: {
-            checkout_session_id: createdSession.id,
-          },
-        }),
-      }),
+      actor: createGuestActor(),
+      checkoutSessionId: session.id,
+      paypalOrderId: "PAYPAL-ORDER-1",
     },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
+    createDeps({
       createOrder: createOrderSpy,
       sessionRepository: sessionRepo.repo,
       orderRepository: orderRepo.repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
+    })
   )
 
-  const finalizedSession = await sessionRepo.repo.findById(createdSession.id)
+  expect(result.status).toBe("completed")
+  const finalizedSession = await sessionRepo.repo.findById(session.id)
   expect(finalizedSession?.status).toBe("completed")
-  expect(finalizedSession?.providerPaymentId).toBe("pi_1")
-  expect(finalizedSession?.checkoutPayloadSnapshot).toMatchObject({
-    snapshotType: "checkout_terminal_summary",
-    paymentMode: "pay_now",
-  })
+  expect(finalizedSession?.providerPaymentId).toBe("PAYPAL-CAPTURE-1")
   expect(createOrderSpy).toHaveBeenCalledWith(
     expect.objectContaining({
       type: "instant",
@@ -660,205 +294,74 @@ test("processStripeWebhookEvent finalizes checkout on paid completion", async ()
   expect(orderRepo.spies.create).toHaveBeenCalledTimes(1)
 })
 
-test("processStripeWebhookEvent ignores duplicate events", async () => {
+test("captureCheckoutPayPalOrder marks mismatched payments for reconciliation", async () => {
   const sessionRepo = createSessionRepository()
-  const orderRepo = createOrderRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
+  const session = await createPayNowSession(sessionRepo)
+  paypalMocks.capturePayPalOrder.mockResolvedValue(
+    createCapturedPayPalOrder({
+      value: "119.00",
+    })
+  )
+
+  const result = await captureCheckoutPayPalOrder(
+    {
+      actor: createGuestActor(),
+      checkoutSessionId: session.id,
+      paypalOrderId: "PAYPAL-ORDER-1",
+    },
+    createDeps({
+      createOrder: createOrderSpy,
+      sessionRepository: sessionRepo.repo,
+    })
+  )
+
+  expect(result.status).toBe("reconciliation_required")
+  const reconciledSession = await sessionRepo.repo.findById(session.id)
+  expect(reconciledSession?.errorCode).toBe("paypal_amount_mismatch")
+  expect(createOrderSpy).not.toHaveBeenCalled()
+})
+
+test("processPayPalWebhookEvent ignores duplicate completed capture events", async () => {
+  const sessionRepo = createSessionRepository()
   const webhookRepo = createPaymentWebhookEventRepository()
   const createOrderSpy = vi.fn(async () => createDuffelOrder())
-
-  const createdSession = await sessionRepo.repo.create({
-    id: "chs_1",
-    idempotencyKey: "idempotency_1",
-    partialOfferRequestId: "prq_1",
-    quoteId: "pqt_1",
-    offerId: "off_1",
-    selectedPartialOffers: ["off_partial_1"],
-    ownerUserId: null,
-    ownerGuestId: "gst_1",
-    ownerOrgId: null,
-    paymentMode: "pay_now",
-    currency: "USD",
-    netAmount: 100,
-    sellAmount: 120,
-    paymentProvider: "stripe",
-    providerOrderId: "cs_test_1",
-    providerPaymentId: null,
-    providerStatusCode: null,
-    providerStatusMessage: null,
-    paymentCurrency: "USD",
-    paymentAmount: 120,
-    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
-    status: "processing",
-    paymentInitiatedAt: NOW,
-    paymentConfirmedAt: null,
-    finalizedAt: null,
-    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
-  })
-
-  const event = createStripeEvent({
-    id: "evt_duplicate_1",
-    type: "checkout.session.completed",
-    session: createStripeCheckoutSession({
-      id: "cs_test_1",
-      status: "complete",
-      payment_status: "paid",
-      client_reference_id: createdSession.id,
-      payment_intent: "pi_duplicate_1",
-      amount_total: 12000,
-      currency: "usd",
-      metadata: {
-        checkout_session_id: createdSession.id,
-      },
-    }),
-  })
-
-  const deps = {
-    now: () => NOW,
-    getOfferById: async () => createOffer(),
-    getSeatMapsByOfferId: async () => [] as SeatMap[],
+  await createPayNowSession(sessionRepo)
+  const event = createPayPalWebhookEvent("WH-1")
+  const deps = createDeps({
     createOrder: createOrderSpy,
     sessionRepository: sessionRepo.repo,
-    orderRepository: orderRepo.repo,
     paymentWebhookEventRepository: webhookRepo,
-  }
+  })
 
-  await processStripeWebhookEvent({ event }, deps)
-  await processStripeWebhookEvent({ event }, deps)
+  await processPayPalWebhookEvent({ event }, deps)
+  await processPayPalWebhookEvent({ event }, deps)
 
   expect(createOrderSpy).toHaveBeenCalledTimes(1)
 })
 
-test("processStripeWebhookEvent marks mismatched payments for reconciliation", async () => {
+test("submitCheckout keeps the hold flow unchanged", async () => {
   const sessionRepo = createSessionRepository()
   const createOrderSpy = vi.fn(async () => createDuffelOrder())
 
-  const createdSession = await sessionRepo.repo.create({
-    id: "chs_1",
-    idempotencyKey: "idempotency_1",
-    partialOfferRequestId: "prq_1",
-    quoteId: "pqt_1",
-    offerId: "off_1",
-    selectedPartialOffers: ["off_partial_1"],
-    ownerUserId: null,
-    ownerGuestId: "gst_1",
-    ownerOrgId: null,
-    paymentMode: "pay_now",
-    currency: "USD",
-    netAmount: 100,
-    sellAmount: 120,
-    paymentProvider: "stripe",
-    providerOrderId: "cs_test_1",
-    providerPaymentId: null,
-    providerStatusCode: null,
-    providerStatusMessage: null,
-    paymentCurrency: "USD",
-    paymentAmount: 120,
-    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
-    status: "processing",
-    paymentInitiatedAt: NOW,
-    paymentConfirmedAt: null,
-    finalizedAt: null,
-    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
-  })
-
-  await processStripeWebhookEvent(
+  const result = await submitCheckout(
     {
-      event: createStripeEvent({
-        id: "evt_mismatch_1",
-        type: "checkout.session.completed",
-        session: createStripeCheckoutSession({
-          id: "cs_test_1",
-          status: "complete",
-          payment_status: "paid",
-          client_reference_id: createdSession.id,
-          payment_intent: "pi_mismatch_1",
-          amount_total: 11900,
-          currency: "usd",
-          metadata: {
-            checkout_session_id: createdSession.id,
-          },
-        }),
-      }),
+      actor: createGuestActor(),
+      payload: createSubmitInput({ paymentMode: "hold" }),
     },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
+    createDeps({
       createOrder: createOrderSpy,
       sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
+    })
   )
 
-  const reconciledSession = await sessionRepo.repo.findById(createdSession.id)
-  expect(reconciledSession?.status).toBe("reconciliation_required")
-  expect(reconciledSession?.errorCode).toBe("stripe_amount_mismatch")
-  expect(createOrderSpy).not.toHaveBeenCalled()
-})
-
-test("processStripeWebhookEvent marks expired Stripe sessions as failed", async () => {
-  const sessionRepo = createSessionRepository()
-
-  const createdSession = await sessionRepo.repo.create({
-    id: "chs_1",
-    idempotencyKey: "idempotency_1",
-    partialOfferRequestId: "prq_1",
-    quoteId: "pqt_1",
-    offerId: "off_1",
-    selectedPartialOffers: ["off_partial_1"],
-    ownerUserId: null,
-    ownerGuestId: "gst_1",
-    ownerOrgId: null,
-    paymentMode: "pay_now",
-    currency: "USD",
-    netAmount: 100,
-    sellAmount: 120,
-    paymentProvider: "stripe",
-    providerOrderId: "cs_test_1",
-    providerPaymentId: null,
-    providerStatusCode: null,
-    providerStatusMessage: null,
-    paymentCurrency: "USD",
-    paymentAmount: 120,
-    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
-    status: "processing",
-    paymentInitiatedAt: NOW,
-    paymentConfirmedAt: null,
-    finalizedAt: null,
-    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
-  })
-
-  await processStripeWebhookEvent(
-    {
-      event: createStripeEvent({
-        id: "evt_expired_1",
-        type: "checkout.session.expired",
-        session: createStripeCheckoutSession({
-          id: "cs_test_1",
-          status: "expired",
-          payment_status: "unpaid",
-          client_reference_id: createdSession.id,
-          metadata: {
-            checkout_session_id: createdSession.id,
-          },
-        }),
-      }),
-    },
-    {
-      now: () => NOW,
-      getOfferById: async () => createOffer(),
-      getSeatMapsByOfferId: async () => [] as SeatMap[],
-      createOrder: async () => createDuffelOrder(),
-      sessionRepository: sessionRepo.repo,
-      orderRepository: createOrderRepository().repo,
-      paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-    }
+  expect(result.paymentMode).toBe("hold")
+  expect(createOrderSpy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "pay_later",
+    })
   )
-
-  const failedSession = await sessionRepo.repo.findById(createdSession.id)
-  expect(failedSession?.status).toBe("failed")
-  expect(failedSession?.errorCode).toBe("stripe_checkout_expired")
+  expect(paypalMocks.createPayPalOrder).not.toHaveBeenCalled()
 })
 
 test("getCheckoutSessionStatus enforces actor ownership", async () => {
@@ -877,8 +380,8 @@ test("getCheckoutSessionStatus enforces actor ownership", async () => {
     currency: "USD",
     netAmount: 100,
     sellAmount: 120,
-    paymentProvider: "stripe",
-    providerOrderId: "cs_test_2",
+    paymentProvider: "paypal",
+    providerOrderId: "PAYPAL-ORDER-2",
     providerPaymentId: null,
     providerStatusCode: null,
     providerStatusMessage: null,
@@ -901,18 +404,50 @@ test("getCheckoutSessionStatus enforces actor ownership", async () => {
         },
         checkoutSessionId: createdSession.id,
       },
-      {
-        now: () => NOW,
-        getOfferById: async () => createOffer(),
-        getSeatMapsByOfferId: async () => [] as SeatMap[],
-        createOrder: async () => createDuffelOrder(),
-        sessionRepository: sessionRepo.repo,
-        orderRepository: createOrderRepository().repo,
-        paymentWebhookEventRepository: createPaymentWebhookEventRepository(),
-      }
+      createDeps({ sessionRepository: sessionRepo.repo })
     )
   ).rejects.toThrow("ownership mismatch")
 })
+
+function createFetchInput() {
+  return {
+    partialOfferRequestId: "prq_1",
+    state: {
+      offerId: "off_1",
+      selectedPartialOffers: ["off_partial_1"],
+      quoteId: "pqt_1",
+      step: "traveler" as const,
+    },
+    actor: createGuestActor(),
+  }
+}
+
+function createDeps(
+  overrides: Partial<{
+    createOrder: (payload: CreateOrder) => Promise<Order>
+    sessionRepository: CheckoutSessionRepository
+    orderRepository: FlightOrderRepository
+    paymentWebhookEventRepository: PaymentWebhookEventRepository
+  }> = {}
+) {
+  return {
+    now: () => NOW,
+    getOfferById: async () => createOffer(),
+    getSeatMapsByOfferId: async () => [] as SeatMap[],
+    createOrder: overrides.createOrder ?? (async () => createDuffelOrder()),
+    sessionRepository: overrides.sessionRepository ?? createSessionRepository().repo,
+    orderRepository: overrides.orderRepository ?? createOrderRepository().repo,
+    paymentWebhookEventRepository:
+      overrides.paymentWebhookEventRepository ?? createPaymentWebhookEventRepository(),
+  }
+}
+
+function createGuestActor() {
+  return {
+    type: "guest" as const,
+    guestId: "gst_1",
+  }
+}
 
 function createSubmitInput(input: {
   paymentMode: "pay_now" | "hold"
@@ -992,7 +527,7 @@ function createCheckoutPageModel() {
       dateRangeLabel: "Date unavailable",
       passengersLabel: "1 passenger",
       cabinLabel: "Economy",
-      routeLabel: "CMB ⇄ DXB",
+      routeLabel: "CMB - DXB",
       offerExpiresAtLabel: null,
     },
     selectedFlights: [],
@@ -1012,8 +547,9 @@ function createCheckoutPageModel() {
       seatMaps: [],
     },
     payment: {
-      provider: "stripe" as const,
-      checkoutUi: "hosted" as const,
+      provider: "paypal" as const,
+      checkoutUi: "buttons" as const,
+      paypalEnvironment: "sandbox" as const,
       payNowEnabled: false,
       unavailableReason: null,
       chargeAmount: null,
@@ -1091,37 +627,79 @@ function createDuffelOrder() {
   } as unknown as Order
 }
 
-function createStripeCheckoutSession(
-  overrides: Partial<Stripe.Checkout.Session>
-): Stripe.Checkout.Session {
+function createCapturedPayPalOrder(input: { value?: string; status?: string } = {}) {
   return {
-    id: "cs_test_default",
-    object: "checkout.session",
-    url: "https://checkout.stripe.com/c/pay/cs_test_default",
-    status: "open",
-    payment_status: "unpaid",
-    client_reference_id: null,
-    payment_intent: null,
-    amount_total: 12000,
-    currency: "usd",
-    metadata: {},
-    ...overrides,
-  } as Stripe.Checkout.Session
+    id: "PAYPAL-ORDER-1",
+    status: "COMPLETED",
+    purchase_units: [
+      {
+        payments: {
+          captures: [
+            {
+              id: "PAYPAL-CAPTURE-1",
+              status: input.status ?? "COMPLETED",
+              amount: {
+                value: input.value ?? "120.00",
+                currency_code: "USD",
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }
 }
 
-function createStripeEvent(input: {
-  id: string
-  type: Stripe.Event.Type
-  session: Stripe.Checkout.Session
-}): Stripe.Event {
+function createPayPalWebhookEvent(id: string) {
   return {
-    id: input.id,
-    object: "event",
-    type: input.type,
-    data: {
-      object: input.session,
+    id,
+    event_type: "PAYMENT.CAPTURE.COMPLETED",
+    resource: {
+      id: "PAYPAL-CAPTURE-1",
+      status: "COMPLETED",
+      custom_id: "chs_1",
+      amount: {
+        value: "120.00",
+        currency_code: "USD",
+      },
+      supplementary_data: {
+        related_ids: {
+          order_id: "PAYPAL-ORDER-1",
+        },
+      },
     },
-  } as Stripe.Event
+  }
+}
+
+async function createPayNowSession(sessionRepo: ReturnType<typeof createSessionRepository>) {
+  return sessionRepo.repo.create({
+    id: "chs_1",
+    idempotencyKey: "idempotency_1",
+    partialOfferRequestId: "prq_1",
+    quoteId: "pqt_1",
+    offerId: "off_1",
+    selectedPartialOffers: ["off_partial_1"],
+    ownerUserId: null,
+    ownerGuestId: "gst_1",
+    ownerOrgId: null,
+    paymentMode: "pay_now",
+    currency: "USD",
+    netAmount: 100,
+    sellAmount: 120,
+    paymentProvider: "paypal",
+    providerOrderId: "PAYPAL-ORDER-1",
+    providerPaymentId: null,
+    providerStatusCode: null,
+    providerStatusMessage: null,
+    paymentCurrency: "USD",
+    paymentAmount: 120,
+    checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
+    status: "processing",
+    paymentInitiatedAt: NOW,
+    paymentConfirmedAt: null,
+    finalizedAt: null,
+    expiresAt: new Date("2026-04-13T11:00:00.000Z"),
+  })
 }
 
 function createSessionRepository() {
@@ -1143,129 +721,94 @@ function createSessionRepository() {
           return session
         }
       }
-
       return null
     }),
-    create: vi.fn(async (record: SessionCreateInput) => {
-      const created: CheckoutSessionRecord = {
-        ...record,
-        paymentProvider: record.paymentProvider ?? null,
-        providerOrderId: record.providerOrderId ?? null,
-        providerPaymentId: record.providerPaymentId ?? null,
-        providerStatusCode: record.providerStatusCode ?? null,
-        providerStatusMessage: record.providerStatusMessage ?? null,
-        paymentCurrency: record.paymentCurrency ?? null,
-        paymentAmount: record.paymentAmount ?? null,
-        checkoutPayloadSnapshot: record.checkoutPayloadSnapshot ?? null,
+    create: vi.fn(async (input: SessionCreateInput) => {
+      const record: CheckoutSessionRecord = {
+        ...input,
+        providerOrderId: input.providerOrderId ?? null,
+        providerPaymentId: input.providerPaymentId ?? null,
+        providerStatusCode: input.providerStatusCode ?? null,
+        providerStatusMessage: input.providerStatusMessage ?? null,
+        paymentProvider: input.paymentProvider ?? null,
+        paymentCurrency: input.paymentCurrency ?? null,
+        paymentAmount: input.paymentAmount ?? null,
+        checkoutPayloadSnapshot: input.checkoutPayloadSnapshot ?? null,
         duffelOrderId: null,
-        paymentInitiatedAt: record.paymentInitiatedAt ?? null,
-        paymentConfirmedAt: record.paymentConfirmedAt ?? null,
-        finalizedAt: record.finalizedAt ?? null,
+        paymentInitiatedAt: input.paymentInitiatedAt ?? null,
+        paymentConfirmedAt: input.paymentConfirmedAt ?? null,
+        finalizedAt: input.finalizedAt ?? null,
         errorCode: null,
         errorMessage: null,
         createdAt: NOW,
         updatedAt: NOW,
       }
-      sessionsById.set(record.id, created)
+      sessionsById.set(record.id, record)
       sessionsByIdempotency.set(record.idempotencyKey, record.id)
-      return created
+      return record
     }),
     update: vi.fn(async (id: string, patch: SessionUpdatePatch) => {
       const existing = sessionsById.get(id)
-
       if (!existing) {
         return null
       }
-
-      const next = {
+      const updated = {
         ...existing,
         ...patch,
         updatedAt: NOW,
       }
-      sessionsById.set(id, next)
-      return next
+      sessionsById.set(id, updated)
+      return updated
     }),
   }
 
-  const repo: CheckoutSessionRepository = {
-    findByIdempotencyKey: spies.findByIdempotencyKey,
-    findById: spies.findById,
-    findByProviderOrderId: spies.findByProviderOrderId,
-    create: spies.create,
-    update: spies.update,
-  }
-
   return {
-    repo,
+    repo: spies as CheckoutSessionRepository,
     spies,
   }
 }
 
 function createOrderRepository() {
-  type CreateOrderInput = Parameters<FlightOrderRepository["create"]>[0]
-
-  const bySessionId = new Map<string, FlightOrderRecord>()
-  const byBookingReference = new Map<string, FlightOrderRecord>()
+  type OrderCreateInput = Parameters<FlightOrderRepository["create"]>[0]
+  const ordersBySession = new Map<string, FlightOrderRecord>()
 
   const spies = {
     findByCheckoutSessionId: vi.fn(async (checkoutSessionId: string) => {
-      return bySessionId.get(checkoutSessionId) ?? null
+      return ordersBySession.get(checkoutSessionId) ?? null
     }),
-    findByBookingReference: vi.fn(async (bookingReference: string) => {
-      return byBookingReference.get(bookingReference) ?? null
-    }),
-    findByBookingReferenceAndEmailHash: vi.fn(
-      async (bookingReference: string, contactEmailHash: string) => {
-        const order = byBookingReference.get(bookingReference) ?? null
-        if (!order) {
-          return null
-        }
-        return order.contactEmailHash === contactEmailHash ? order : null
-      }
-    ),
-    listByOwnerUserId: vi.fn(
-      async (input: { ownerUserId: string; limit: number; offset: number }) => {
-        const records = Array.from(bySessionId.values())
-          .filter((record) => record.ownerUserId === input.ownerUserId)
-          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-        return {
-          records: records.slice(input.offset, input.offset + input.limit),
-          total: records.length,
-        }
-      }
-    ),
-    create: vi.fn(async (record: CreateOrderInput) => {
-      const created: FlightOrderRecord = {
-        ...record,
+    findByBookingReference: vi.fn(async () => null),
+    findByBookingReferenceAndEmailHash: vi.fn(async () => null),
+    listByOwnerUserId: vi.fn(async () => ({
+      records: [],
+      total: 0,
+    })),
+    create: vi.fn(async (input: OrderCreateInput) => {
+      const record: FlightOrderRecord = {
+        ...input,
+        id: input.id,
         createdAt: NOW,
         updatedAt: NOW,
       }
-      bySessionId.set(record.checkoutSessionId, created)
-      byBookingReference.set(record.bookingReference, created)
-      return created
+      ordersBySession.set(record.checkoutSessionId, record)
+      return record
     }),
   }
 
-  const repo: FlightOrderRepository = {
-    findByCheckoutSessionId: spies.findByCheckoutSessionId,
-    findByBookingReference: spies.findByBookingReference,
-    findByBookingReferenceAndEmailHash: spies.findByBookingReferenceAndEmailHash,
-    listByOwnerUserId: spies.listByOwnerUserId,
-    create: spies.create,
+  return {
+    repo: spies as FlightOrderRepository,
+    spies,
   }
-
-  return { repo, spies }
 }
 
 function createPaymentWebhookEventRepository(): PaymentWebhookEventRepository {
-  const eventSet = new Set<string>()
+  const processed = new Set<string>()
 
   return {
     async isProcessed(input) {
-      return eventSet.has(`${input.provider}:${input.eventKey}`)
+      return processed.has(`${input.provider}:${input.eventKey}`)
     },
     async record(input) {
-      eventSet.add(`${input.provider}:${input.eventKey}`)
+      processed.add(`${input.provider}:${input.eventKey}`)
     },
   }
 }

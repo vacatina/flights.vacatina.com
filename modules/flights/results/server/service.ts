@@ -7,6 +7,8 @@ import {
   applyOfferClientSorting,
   createLegBreadcrumbs,
   createSearchSummary,
+  formatOfferExpiryLabel,
+  getEarliestOfferExpiry,
   normalizeOfferForLeg,
   toDuffelListOffersSort,
   toDuffelMaxConnections,
@@ -177,6 +179,7 @@ export async function fetchFareOptionsData(
   const offerPricingByOfferId = await (deps.getOfferPricingMap ?? getOfferPricingMapFromService)(
     listResponse.data
   )
+  const offerExpiresAt = getEarliestOfferExpiry(listResponse.data)
   const pricingSummary = summarizeOfferPricing(offerPricingByOfferId)
   logFlightFlow("fetchFareOptionsData", "airline_logos_resolved", {
     partialOfferRequestId: input.partialOfferRequestId,
@@ -214,6 +217,8 @@ export async function fetchFareOptionsData(
     editSearchHref: createSearchPrefillHrefFromOfferRequest(baseOfferRequest),
     breadcrumbs: createLegBreadcrumbs(offerRequest),
     searchSummary: createSearchSummary(offerRequest, leg),
+    offerExpiresAtIso: offerExpiresAt?.toISOString() ?? null,
+    offerExpiresAtLabel: offerExpiresAt ? formatOfferExpiryLabel(offerExpiresAt) : null,
     offers: sortedOffers,
     airlines,
     after: listResponse.meta?.after ?? null,

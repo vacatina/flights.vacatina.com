@@ -39,7 +39,7 @@ export function CheckoutPaymentStatusView({
             </div>
             <p className="text-sm font-medium text-foreground">Processing payment...</p>
           </div>
-          <p>Stripe payment was received. We are confirming your order with the airline.</p>
+          <p>PayPal payment was received. We are confirming your order with the airline.</p>
           <p>This can take a few moments. Keep this page open or refresh if needed.</p>
           {sessionId ? <p>Checkout session: {sessionId}</p> : null}
         </CardContent>
