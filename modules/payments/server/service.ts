@@ -10,6 +10,7 @@ import {
   createCheckoutPayPalOrder,
   getCheckoutSessionStatus,
 } from "@/modules/flights/checkout/server/service-core"
+import { logFlightFlowError } from "@/lib/logging/flow-debug"
 import {
   defaultCheckoutSessionRepository,
   type CheckoutSessionRecord,
@@ -127,12 +128,21 @@ export async function capturePayPalPayment(
       attempt,
       eventType: "CAPTURE_COMPLETED",
     })
+    await tryProcessCapturedPaymentFulfillment({
+      paymentAttemptId: attempt.id,
+      checkoutSessionId: input.checkoutSessionId,
+      deps,
+    })
   } else if (nextStatus === "capture_failed" || nextStatus === "capture_denied") {
     await appendEventOnce({
       deps,
       attempt,
       eventType: "CAPTURE_DENIED",
     })
+  }
+
+  if (nextStatus === "capture_completed") {
+    return getCheckoutSessionStatus(input)
   }
 
   return result
@@ -212,6 +222,43 @@ async function appendEventOnce(input: {
     amount: input.attempt.amount,
     currency: input.attempt.currency,
   })
+}
+
+async function tryProcessCapturedPaymentFulfillment(input: {
+  paymentAttemptId: string
+  checkoutSessionId: string
+  deps: PaymentServiceDeps
+}) {
+  try {
+    const { processPaymentOutboxByPaymentAttemptId } = await import(
+      "@/modules/payments/server/workers/outbox-worker"
+    )
+    await processPaymentOutboxByPaymentAttemptId({
+      paymentAttemptId: input.paymentAttemptId,
+    })
+  } catch (error) {
+    logFlightFlowError("payments.capture", "opportunistic_fulfillment_failed", error, {
+      paymentAttemptId: input.paymentAttemptId,
+    })
+
+    if (isPassengerDobTypeMismatchError(error)) {
+      await input.deps.sessionRepository.update(input.checkoutSessionId, {
+        status: "reconciliation_required",
+        errorCode: "passenger_dob_type_mismatch",
+        errorMessage:
+          "Payment was received, but the passenger date of birth does not match the selected passenger type. Support will reconcile this booking.",
+      })
+    }
+  }
+}
+
+function isPassengerDobTypeMismatchError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes("date of birth does not match") ||
+      error.message.includes("does not match date of birth") ||
+      error.message.includes("born_on_does_not_match"))
+  )
 }
 
 function toAttemptStatus(status: CheckoutSessionRecord["status"]): PaymentAttemptStatus {
