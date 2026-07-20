@@ -13,6 +13,7 @@ export type CheckoutMetricName =
   | "paypal_capture_total"
   | "paypal_webhook_total"
   | "paypal_webhook_invalid_sig_total"
+  | "payment_fulfillment_enqueued_total"
   | "checkout_payment_success_total"
   | "checkout_payment_failed_total"
   | "checkout_reconciliation_required_total"

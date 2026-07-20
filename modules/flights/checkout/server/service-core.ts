@@ -14,7 +14,7 @@ import {
   getPayPalOrder,
   type PayPalCapture,
   type PayPalWebhookEvent,
-} from "@/lib/paypal"
+} from "@/modules/payments/server/providers/paypal"
 import {
   buildCheckoutPageModel,
   computeAncillaryPricing,
@@ -34,9 +34,11 @@ import {
   type FlightOrderRepository,
 } from "@/modules/flights/checkout/server/order-repository"
 import {
-  defaultPaymentWebhookEventRepository,
-  type PaymentWebhookEventRepository,
-} from "@/modules/flights/checkout/server/payment-webhook-event-repository"
+  defaultPaymentOutboxRepository,
+  type PaymentOutboxRepository,
+} from "@/modules/payments/server/outbox-repository"
+import { publishPaymentFulfillmentTask } from "@/modules/payments/server/job-publisher"
+import { createPaymentOutboxId } from "@/modules/payments/server/ids"
 import {
   incrementCheckoutMetric,
 } from "@/modules/flights/checkout/server/metrics"
@@ -49,7 +51,6 @@ import {
   createCheckoutSessionId,
   createFlightOrderId,
   createTerminalCheckoutSnapshot,
-  createWebhookEventId,
   doesSessionOwnerMatch,
   isPaymentAmountMatch,
   parseOptionalDate,
@@ -59,7 +60,6 @@ import {
   toPayNowUnavailableReason,
   toQuoteOwner,
   toQuoteValidationErrorMessage,
-  toPaymentEventKey,
 } from "@/modules/flights/checkout/server/service-helpers"
 import { buildFlightOrderSnapshot } from "@/modules/flights/orders/domain"
 import {
@@ -122,7 +122,11 @@ interface CheckoutServiceDeps {
   createOrder: (payload: CreateOrder) => Promise<Order>
   sessionRepository: CheckoutSessionRepository
   orderRepository: FlightOrderRepository
-  paymentWebhookEventRepository: PaymentWebhookEventRepository
+  paymentOutboxRepository: PaymentOutboxRepository
+  publishFulfillmentTask: (input: {
+    paymentAttemptId: string
+    checkoutSessionId: string
+  }) => Promise<unknown>
 }
 
 interface CheckoutQuoteViewSource {
@@ -241,7 +245,8 @@ const defaultDeps: CheckoutServiceDeps = {
   },
   sessionRepository: defaultCheckoutSessionRepository,
   orderRepository: defaultFlightOrderRepository,
-  paymentWebhookEventRepository: defaultPaymentWebhookEventRepository,
+  paymentOutboxRepository: defaultPaymentOutboxRepository,
+  publishFulfillmentTask: publishPaymentFulfillmentTask,
 }
 
 export async function fetchCheckoutPageData(
@@ -882,31 +887,8 @@ export async function processPayPalWebhookEvent(
   incrementCheckoutMetric("paypal_webhook_total")
   const eventId = typeof input.event.id === "string" ? input.event.id : ""
   const eventType = typeof input.event.event_type === "string" ? input.event.event_type : ""
-  const eventKey = toPaymentEventKey(eventId || `${eventType}:${Date.now()}`)
-
-  const alreadyProcessed = await deps.paymentWebhookEventRepository.isProcessed({
-    provider: "paypal",
-    eventKey,
-  })
-
-  if (alreadyProcessed) {
-    logFlightFlow("checkout.paypal", "webhook_ignored_duplicate_event", {
-      eventId,
-      eventType,
-    })
-    return
-  }
 
   const session = await resolveCheckoutSessionFromPayPalResource(input.event.resource, deps)
-
-  await deps.paymentWebhookEventRepository.record({
-    id: createWebhookEventId(),
-    provider: "paypal",
-    eventKey,
-    providerOrderId: session?.providerOrderId ?? readPayPalResourceOrderId(input.event.resource) ?? "unknown",
-    providerPaymentId: readPayPalResourceId(input.event.resource),
-    payload: input.event,
-  })
 
   if (!session) {
     throw new Error("Checkout session not found for PayPal webhook event.")
@@ -1046,21 +1028,7 @@ async function processVerifiedPayPalCapture(input: {
     errorMessage: null,
   })
 
-  try {
-    await finalizeAuthorizedCheckoutSession({
-      session: input.session,
-      deps: input.deps,
-      now: input.now,
-      paymentProvider: "paypal",
-      providerPaymentId: input.capture.id,
-    })
-  } catch (error) {
-    logFlightFlowError("checkout.paypal", "finalize_failed", error, {
-      checkoutSessionId: input.session.id,
-      providerPaymentId: input.capture.id,
-      source: input.source,
-    })
-
+  if (!input.session.paymentAttemptId) {
     await input.deps.sessionRepository.update(input.session.id, {
       status: "reconciliation_required",
       checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
@@ -1073,17 +1041,75 @@ async function processVerifiedPayPalCapture(input: {
         netTotal: input.session.netAmount,
         sellTotal: input.session.sellAmount,
       }),
-      errorCode: "paypal_finalize_failed",
+      errorCode: "payment_attempt_missing",
       errorMessage:
-        "Payment received but booking confirmation is pending manual reconciliation.",
+        "Payment received but booking confirmation is pending payment reconciliation.",
     })
     incrementCheckoutMetric("checkout_reconciliation_required_total", {
       checkoutSessionId: input.session.id,
-      reason: "finalize_failed",
+      reason: "payment_attempt_missing",
       source: input.source,
     })
     await queueReconciliationNotificationForSession(input.session)
+    return
   }
+
+  const outboxTask = await input.deps.paymentOutboxRepository.enqueueUnique({
+    id: createPaymentOutboxId(),
+    taskType: "fulfill_flight_order",
+    uniqueKey: `fulfill_flight_order:${input.session.paymentAttemptId}`,
+    paymentAttemptId: input.session.paymentAttemptId,
+    internalOrderType: "flight_checkout",
+    internalOrderId: input.session.id,
+    payload: {
+      provider: "paypal",
+      providerPaymentId: input.capture.id,
+      source: input.source,
+    },
+    nextAttemptAt: input.now,
+  })
+  await input.deps.publishFulfillmentTask({
+    paymentAttemptId: outboxTask.paymentAttemptId,
+    checkoutSessionId: outboxTask.internalOrderId,
+  })
+  incrementCheckoutMetric("payment_fulfillment_enqueued_total", {
+    checkoutSessionId: input.session.id,
+    source: input.source,
+  })
+}
+
+export async function fulfillAuthorizedCheckoutSession(input: {
+  checkoutSessionId: string
+  paymentProvider: "paypal"
+  providerPaymentId: string | null
+  deps?: CheckoutServiceDeps
+}) {
+  const deps = input.deps ?? defaultDeps
+  const session = await deps.sessionRepository.findById(input.checkoutSessionId)
+
+  if (!session) {
+    throw new Error("Checkout session not found.")
+  }
+
+  if (session.status === "completed") {
+    const existingOrder = await deps.orderRepository.findByCheckoutSessionId(session.id)
+
+    if (existingOrder) {
+      return existingOrder
+    }
+  }
+
+  if (session.status !== "payment_authorized") {
+    throw new Error("Checkout session is not ready for fulfillment.")
+  }
+
+  return finalizeAuthorizedCheckoutSession({
+    session,
+    deps,
+    now: deps.now(),
+    paymentProvider: input.paymentProvider,
+    providerPaymentId: input.providerPaymentId,
+  })
 }
 
 async function markPayPalPaymentFailed(input: {
@@ -1125,6 +1151,22 @@ async function finalizeAuthorizedCheckoutSession(input: {
   paymentProvider: "paypal"
   providerPaymentId: string | null
 }) {
+  const existingOrder = await input.deps.orderRepository.findByCheckoutSessionId(
+    input.session.id
+  )
+
+  if (existingOrder) {
+    await input.deps.sessionRepository.update(input.session.id, {
+      status: "completed",
+      duffelOrderId: existingOrder.duffelOrderId,
+      providerPaymentId: input.providerPaymentId,
+      finalizedAt: input.now,
+      errorCode: null,
+      errorMessage: null,
+    })
+    return existingOrder
+  }
+
   const snapshotParsed = checkoutPayloadSnapshotSchema.safeParse(
     input.session.checkoutPayloadSnapshot
   )
@@ -1265,6 +1307,8 @@ async function finalizeAuthorizedCheckoutSession(input: {
     checkoutSessionId: input.session.id,
     statusLabel: "Confirmed",
   })
+
+  return flightOrder
 }
 
 async function prepareCheckoutForSubmission(input: {

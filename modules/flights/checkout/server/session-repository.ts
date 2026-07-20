@@ -33,6 +33,7 @@ export interface CheckoutSessionRecord {
   providerStatusMessage: string | null
   paymentCurrency: string | null
   paymentAmount: number | null
+  paymentAttemptId: string | null
   checkoutPayloadSnapshot: unknown
   duffelOrderId: string | null
   paymentInitiatedAt: Date | null
@@ -67,6 +68,7 @@ interface CreateCheckoutSessionInput {
   providerStatusMessage?: string | null
   paymentCurrency?: string | null
   paymentAmount?: number | null
+  paymentAttemptId?: string | null
   checkoutPayloadSnapshot?: unknown
   status: CheckoutSessionStatus
   paymentInitiatedAt?: Date | null
@@ -81,6 +83,7 @@ interface UpdateCheckoutSessionInput {
   providerOrderId?: string | null
   paymentCurrency?: string | null
   paymentAmount?: number | null
+  paymentAttemptId?: string | null
   checkoutPayloadSnapshot?: unknown
   paymentInitiatedAt?: Date | null
   duffelOrderId?: string | null
@@ -180,6 +183,7 @@ export const defaultCheckoutSessionRepository: CheckoutSessionRepository = {
         providerStatusMessage: input.providerStatusMessage ?? null,
         paymentCurrency: input.paymentCurrency ?? null,
         paymentAmount: input.paymentAmount ?? null,
+        paymentAttemptId: input.paymentAttemptId ?? null,
         checkoutPayloadSnapshot: input.checkoutPayloadSnapshot ?? null,
         duffelOrderId: null,
         paymentInitiatedAt: input.paymentInitiatedAt ?? null,
@@ -223,6 +227,7 @@ export const defaultCheckoutSessionRepository: CheckoutSessionRepository = {
           input.paymentAmount === undefined || input.paymentAmount === null
             ? null
             : toDbNumeric(input.paymentAmount),
+        paymentAttemptId: input.paymentAttemptId ?? null,
         checkoutPayloadSnapshot: input.checkoutPayloadSnapshot ?? null,
         paymentInitiatedAt: input.paymentInitiatedAt ?? null,
         paymentConfirmedAt: input.paymentConfirmedAt ?? null,
@@ -292,6 +297,7 @@ function toSessionRecord(row: typeof checkoutSessions.$inferSelect): CheckoutSes
     providerStatusMessage: row.providerStatusMessage,
     paymentCurrency: row.paymentCurrency,
     paymentAmount: row.paymentAmount === null ? null : Number(row.paymentAmount),
+    paymentAttemptId: row.paymentAttemptId,
     checkoutPayloadSnapshot: row.checkoutPayloadSnapshot ?? null,
     duffelOrderId: row.duffelOrderId,
     paymentInitiatedAt: row.paymentInitiatedAt,

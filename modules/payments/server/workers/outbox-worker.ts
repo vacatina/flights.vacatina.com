@@ -1,0 +1,251 @@
+import "server-only"
+
+import { logFlightFlowError } from "@/lib/logging/flow-debug"
+import { fulfillAuthorizedCheckoutSession } from "@/modules/flights/checkout/server/service-core"
+import type { PaymentEventType } from "@/modules/payments/domain"
+import {
+  defaultPaymentAttemptsRepository,
+  type PaymentAttemptRecord,
+  type PaymentAttemptsRepository,
+} from "@/modules/payments/server/attempts-repository"
+import {
+  defaultPaymentEventsRepository,
+  type PaymentEventsRepository,
+} from "@/modules/payments/server/events-repository"
+import { createPaymentEventId } from "@/modules/payments/server/ids"
+import {
+  defaultPaymentOutboxRepository,
+  type PaymentOutboxRecord,
+  type PaymentOutboxRepository,
+} from "@/modules/payments/server/outbox-repository"
+
+interface PaymentOutboxWorkerDeps {
+  outboxRepository: PaymentOutboxRepository
+  attemptsRepository: PaymentAttemptsRepository
+  eventsRepository: PaymentEventsRepository
+  fulfillFlightOrder: typeof fulfillAuthorizedCheckoutSession
+}
+
+const defaultDeps: PaymentOutboxWorkerDeps = {
+  outboxRepository: defaultPaymentOutboxRepository,
+  attemptsRepository: defaultPaymentAttemptsRepository,
+  eventsRepository: defaultPaymentEventsRepository,
+  fulfillFlightOrder: fulfillAuthorizedCheckoutSession,
+}
+
+export async function processPaymentOutbox(input: {
+  limit?: number
+  now?: Date
+  deps?: Partial<PaymentOutboxWorkerDeps>
+} = {}) {
+  const deps = { ...defaultDeps, ...input.deps }
+  const now = input.now ?? new Date()
+  const tasks = await deps.outboxRepository.findPending(now, input.limit ?? 10)
+  let processed = 0
+  let failed = 0
+  let ignored = 0
+
+  for (const task of tasks) {
+    const claimedTask = await deps.outboxRepository.claimPending(task.id, new Date())
+
+    if (!claimedTask) {
+      ignored += 1
+      continue
+    }
+
+    try {
+      if (claimedTask.taskType !== "fulfill_flight_order") {
+        ignored += 1
+        await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+        continue
+      }
+
+      await processFulfillFlightOrderTask(claimedTask, deps)
+      await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+      processed += 1
+    } catch (error) {
+      failed += 1
+      await deps.outboxRepository.markFailed({
+        id: claimedTask.id,
+        lastError: error instanceof Error ? error.message : "Unknown outbox worker error",
+        nextAttemptAt: new Date(Date.now() + retryDelayMs(claimedTask.attemptCount + 1)),
+      })
+      logFlightFlowError("payments.outbox", "task_failed", error, {
+        outboxId: claimedTask.id,
+        taskType: claimedTask.taskType,
+        paymentAttemptId: claimedTask.paymentAttemptId,
+      })
+    }
+  }
+
+  return {
+    claimed: tasks.length,
+    processed,
+    failed,
+    ignored,
+  }
+}
+
+export async function processPaymentOutboxByPaymentAttemptId(input: {
+  paymentAttemptId: string
+  now?: Date
+  deps?: Partial<PaymentOutboxWorkerDeps>
+}) {
+  const deps = { ...defaultDeps, ...input.deps }
+  const task = await deps.outboxRepository.findByUniqueKey(
+    `fulfill_flight_order:${input.paymentAttemptId}`
+  )
+
+  if (!task) {
+    throw new Error("Payment fulfillment outbox task not found.")
+  }
+
+  if (task.status === "completed") {
+    return {
+      claimed: 1,
+      processed: 0,
+      failed: 0,
+      ignored: 1,
+      alreadyCompleted: true,
+    }
+  }
+
+  const claimedTask = await deps.outboxRepository.claimPending(
+    task.id,
+    input.now ?? new Date()
+  )
+
+  if (!claimedTask) {
+    return {
+      claimed: 0,
+      processed: 0,
+      failed: 0,
+      ignored: 1,
+      alreadyCompleted: false,
+    }
+  }
+
+  try {
+    if (claimedTask.taskType !== "fulfill_flight_order") {
+      await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+      return {
+        claimed: 1,
+        processed: 0,
+        failed: 0,
+        ignored: 1,
+        alreadyCompleted: false,
+      }
+    }
+
+    await processFulfillFlightOrderTask(claimedTask, deps)
+    await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+    return {
+      claimed: 1,
+      processed: 1,
+      failed: 0,
+      ignored: 0,
+      alreadyCompleted: false,
+    }
+  } catch (error) {
+    await deps.outboxRepository.markFailed({
+      id: claimedTask.id,
+      lastError: error instanceof Error ? error.message : "Unknown outbox worker error",
+      nextAttemptAt: new Date(Date.now() + retryDelayMs(claimedTask.attemptCount + 1)),
+    })
+    logFlightFlowError("payments.outbox", "task_failed", error, {
+      outboxId: claimedTask.id,
+      taskType: claimedTask.taskType,
+      paymentAttemptId: claimedTask.paymentAttemptId,
+    })
+    throw error
+  }
+}
+
+async function processFulfillFlightOrderTask(
+  task: PaymentOutboxRecord,
+  deps: PaymentOutboxWorkerDeps
+) {
+  const attempt = await deps.attemptsRepository.findById(task.paymentAttemptId)
+
+  if (!attempt) {
+    throw new Error("Payment attempt not found for fulfillment task.")
+  }
+
+  if (attempt.status === "fulfilled") {
+    return
+  }
+
+  if (
+    attempt.status !== "capture_completed" &&
+    attempt.status !== "fulfillment_pending" &&
+    attempt.status !== "capture_pending" &&
+    attempt.status !== "buyer_approved"
+  ) {
+    throw new Error(`Payment attempt cannot be fulfilled from ${attempt.status}.`)
+  }
+
+  await appendPaymentEventOnce({
+    deps,
+    attempt,
+    eventType: "FULFILLMENT_REQUESTED",
+  })
+  await deps.attemptsRepository.update(attempt.id, {
+    status: "fulfillment_pending",
+  })
+
+  try {
+    await deps.fulfillFlightOrder({
+      checkoutSessionId: task.internalOrderId,
+      paymentProvider: attempt.provider,
+      providerPaymentId: attempt.providerCaptureId,
+    })
+  } catch (error) {
+    await appendPaymentEventOnce({
+      deps,
+      attempt,
+      eventType: "FULFILLMENT_FAILED",
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown fulfillment error",
+      },
+    })
+    throw error
+  }
+
+  await deps.attemptsRepository.update(attempt.id, {
+    status: "fulfilled",
+  })
+  await appendPaymentEventOnce({
+    deps,
+    attempt,
+    eventType: "FULFILLMENT_COMPLETED",
+  })
+}
+
+async function appendPaymentEventOnce(input: {
+  deps: Pick<PaymentOutboxWorkerDeps, "eventsRepository">
+  attempt: PaymentAttemptRecord
+  eventType: PaymentEventType
+  metadata?: unknown
+}) {
+  const existing = await input.deps.eventsRepository.listByAttemptId(input.attempt.id)
+
+  if (existing.some((event) => event.eventType === input.eventType)) {
+    return
+  }
+
+  await input.deps.eventsRepository.append({
+    id: createPaymentEventId(),
+    paymentAttemptId: input.attempt.id,
+    eventType: input.eventType,
+    provider: input.attempt.provider,
+    providerOrderId: input.attempt.providerOrderId,
+    providerCaptureId: input.attempt.providerCaptureId,
+    amount: input.attempt.amount,
+    currency: input.attempt.currency,
+    metadata: input.metadata,
+  })
+}
+
+function retryDelayMs(attemptCount: number) {
+  return Math.min(60_000 * 2 ** Math.max(attemptCount - 1, 0), 15 * 60_000)
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/jobs/payments/outbox/process",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/jobs/payments/webhooks/process",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/jobs/payments/reconcile",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

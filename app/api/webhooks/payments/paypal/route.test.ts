@@ -1,17 +1,12 @@
 import { beforeEach, expect, test, vi } from "vitest"
 
 const mockFns = vi.hoisted(() => ({
-  verifyPayPalWebhookSignature: vi.fn(),
-  processPayPalWebhookEvent: vi.fn(),
+  verifyAndStorePayPalWebhook: vi.fn(),
   incrementCheckoutMetric: vi.fn(),
 }))
 
-vi.mock("@/lib/paypal", () => ({
-  verifyPayPalWebhookSignature: mockFns.verifyPayPalWebhookSignature,
-}))
-
-vi.mock("@/modules/flights/checkout/server/service", () => ({
-  processPayPalWebhookEvent: mockFns.processPayPalWebhookEvent,
+vi.mock("@/modules/payments/server/webhooks/paypal", () => ({
+  verifyAndStorePayPalWebhook: mockFns.verifyAndStorePayPalWebhook,
 }))
 
 vi.mock("@/modules/flights/checkout/server/metrics", () => ({
@@ -29,8 +24,12 @@ test("POST returns 200 for a valid PayPal webhook", async () => {
     id: "WH-1",
     event_type: "PAYMENT.CAPTURE.COMPLETED",
   }
-  mockFns.verifyPayPalWebhookSignature.mockResolvedValue(true)
-  mockFns.processPayPalWebhookEvent.mockResolvedValue(undefined)
+  mockFns.verifyAndStorePayPalWebhook.mockResolvedValue({
+    ok: true,
+    inbox: {
+      id: "pwi_1",
+    },
+  })
 
   const response = await POST(
     new Request("https://example.com/api/webhooks/payments/paypal", {
@@ -44,16 +43,18 @@ test("POST returns 200 for a valid PayPal webhook", async () => {
   )
 
   expect(response.status).toBe(200)
-  expect(mockFns.verifyPayPalWebhookSignature).toHaveBeenCalledWith(
+  expect(mockFns.verifyAndStorePayPalWebhook).toHaveBeenCalledWith(
     expect.objectContaining({
       event,
     })
   )
-  expect(mockFns.processPayPalWebhookEvent).toHaveBeenCalledWith({ event })
 })
 
 test("POST returns 400 for an invalid PayPal signature", async () => {
-  mockFns.verifyPayPalWebhookSignature.mockResolvedValue(false)
+  mockFns.verifyAndStorePayPalWebhook.mockResolvedValue({
+    ok: false,
+    reason: "verification_failed",
+  })
 
   const response = await POST(
     new Request("https://example.com/api/webhooks/payments/paypal", {
