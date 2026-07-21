@@ -265,6 +265,8 @@ function toAttemptStatus(status: CheckoutSessionRecord["status"]): PaymentAttemp
   switch (status) {
     case "completed":
       return "fulfilled"
+    case "finalizing":
+      return "fulfillment_pending"
     case "payment_authorized":
       return "capture_completed"
     case "failed":

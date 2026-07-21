@@ -38,6 +38,7 @@ test("listMyBookings applies q/status/sort filters and paginates", async () => {
         findByProviderOrderId: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        claimFinalization: vi.fn(),
       },
       notificationOutboxRepository: {
         create: vi.fn(),

@@ -1,6 +1,6 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 
 import { checkoutSessions, getDbClient } from "@/lib/db"
 import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
@@ -8,6 +8,7 @@ import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
 export type CheckoutSessionStatus =
   | "processing"
   | "payment_authorized"
+  | "finalizing"
   | "completed"
   | "failed"
   | "reconciliation_required"
@@ -102,6 +103,10 @@ export interface CheckoutSessionRepository {
   findByProviderOrderId(providerOrderId: string): Promise<CheckoutSessionRecord | null>
   create(input: CreateCheckoutSessionInput): Promise<CheckoutSessionRecord>
   update(id: string, patch: UpdateCheckoutSessionInput): Promise<CheckoutSessionRecord | null>
+  claimFinalization(input: {
+    checkoutSessionId: string
+    now: Date
+  }): Promise<CheckoutSessionRecord | null>
 }
 
 const inMemorySessions = new Map<string, CheckoutSessionRecord>()
@@ -269,6 +274,42 @@ export const defaultCheckoutSessionRepository: CheckoutSessionRepository = {
         updatedAt: now,
       })
       .where(eq(checkoutSessions.id, id))
+      .returning()
+
+    return row ? toSessionRecord(row) : null
+  },
+
+  async claimFinalization(input) {
+    const db = getDbClient()
+
+    if (!db) {
+      const existing = inMemorySessions.get(input.checkoutSessionId)
+
+      if (!existing || existing.status !== "payment_authorized") {
+        return null
+      }
+
+      const updated: CheckoutSessionRecord = {
+        ...existing,
+        status: "finalizing",
+        updatedAt: input.now,
+      }
+      inMemorySessions.set(input.checkoutSessionId, updated)
+      return updated
+    }
+
+    const [row] = await db
+      .update(checkoutSessions)
+      .set({
+        status: "finalizing",
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(checkoutSessions.id, input.checkoutSessionId),
+          eq(checkoutSessions.status, "payment_authorized")
+        )
+      )
       .returning()
 
     return row ? toSessionRecord(row) : null

@@ -95,6 +95,7 @@ import {
   captureCheckoutPayPalOrder,
   createCheckoutPayPalOrder,
   fetchCheckoutPageData,
+  fulfillAuthorizedCheckoutSession,
   getCheckoutSessionStatus,
   processPayPalWebhookEvent,
   submitCheckout,
@@ -322,6 +323,74 @@ test("captureCheckoutPayPalOrder marks mismatched payments for reconciliation", 
   const reconciledSession = await sessionRepo.repo.findById(session.id)
   expect(reconciledSession?.errorCode).toBe("paypal_amount_mismatch")
   expect(createOrderSpy).not.toHaveBeenCalled()
+})
+
+test("fulfillAuthorizedCheckoutSession allows only one finalizer to create the Duffel order", async () => {
+  const sessionRepo = createSessionRepository()
+  const orderRepo = createOrderRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
+  const session = await createPayNowSession(sessionRepo)
+  await sessionRepo.repo.update(session.id, {
+    status: "payment_authorized",
+    providerPaymentId: "PAYPAL-CAPTURE-1",
+    paymentConfirmedAt: NOW,
+  })
+  const deps = createDeps({
+    createOrder: createOrderSpy,
+    sessionRepository: sessionRepo.repo,
+    orderRepository: orderRepo.repo,
+  })
+
+  const results = await Promise.allSettled([
+    fulfillAuthorizedCheckoutSession({
+      checkoutSessionId: session.id,
+      paymentProvider: "paypal",
+      providerPaymentId: "PAYPAL-CAPTURE-1",
+      deps,
+    }),
+    fulfillAuthorizedCheckoutSession({
+      checkoutSessionId: session.id,
+      paymentProvider: "paypal",
+      providerPaymentId: "PAYPAL-CAPTURE-1",
+      deps,
+    }),
+  ])
+
+  expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1)
+  expect(results.filter((result) => result.status === "rejected")).toHaveLength(1)
+  expect(createOrderSpy).toHaveBeenCalledTimes(1)
+  const completedSession = await sessionRepo.repo.findById(session.id)
+  expect(completedSession?.status).toBe("completed")
+  expect(sessionRepo.spies.claimFinalization).toHaveBeenCalledTimes(2)
+})
+
+test("fulfillAuthorizedCheckoutSession marks claimed finalization failures for reconciliation", async () => {
+  const sessionRepo = createSessionRepository()
+  const createOrderSpy = vi.fn(async () => {
+    throw new Error("Duffel timeout")
+  })
+  const session = await createPayNowSession(sessionRepo)
+  await sessionRepo.repo.update(session.id, {
+    status: "payment_authorized",
+    providerPaymentId: "PAYPAL-CAPTURE-1",
+    paymentConfirmedAt: NOW,
+  })
+
+  await expect(
+    fulfillAuthorizedCheckoutSession({
+      checkoutSessionId: session.id,
+      paymentProvider: "paypal",
+      providerPaymentId: "PAYPAL-CAPTURE-1",
+      deps: createDeps({
+        createOrder: createOrderSpy,
+        sessionRepository: sessionRepo.repo,
+      }),
+    })
+  ).rejects.toThrow("Duffel timeout")
+
+  const reconciledSession = await sessionRepo.repo.findById(session.id)
+  expect(reconciledSession?.status).toBe("reconciliation_required")
+  expect(reconciledSession?.errorCode).toBe("finalization_failed_after_payment_authorized")
 })
 
 test("processPayPalWebhookEvent uses one fulfillment task for duplicate completed captures", async () => {
@@ -775,6 +844,24 @@ function createSessionRepository() {
       sessionsById.set(id, updated)
       return updated
     }),
+    claimFinalization: vi.fn(async (input: {
+      checkoutSessionId: string
+      now: Date
+    }) => {
+      const existing = sessionsById.get(input.checkoutSessionId)
+
+      if (!existing || existing.status !== "payment_authorized") {
+        return null
+      }
+
+      const updated: CheckoutSessionRecord = {
+        ...existing,
+        status: "finalizing",
+        updatedAt: input.now,
+      }
+      sessionsById.set(input.checkoutSessionId, updated)
+      return updated
+    }),
   }
 
   return {
@@ -841,6 +928,9 @@ function createPaymentOutboxRepository() {
         attemptCount: 0,
         lastError: null,
         nextAttemptAt: input.nextAttemptAt ?? now,
+        claimedBy: null,
+        claimExpiresAt: null,
+        processingStartedAt: null,
         createdAt: now,
         updatedAt: now,
         completedAt: null,
@@ -850,13 +940,23 @@ function createPaymentOutboxRepository() {
     }),
     findByUniqueKey: vi.fn(async (uniqueKey: string) => tasksByUniqueKey.get(uniqueKey) ?? null),
     findPending: vi.fn(async () => Array.from(tasksByUniqueKey.values())),
-    claimPending: vi.fn(async (id: string) => {
+    claimPending: vi.fn(async (input: Parameters<PaymentOutboxRepository["claimPending"]>[0]) => {
       for (const [uniqueKey, task] of tasksByUniqueKey.entries()) {
-        if (task.id === id && task.status === "pending") {
+        if (
+          task.id === input.id &&
+          (task.status === "pending" ||
+            (task.status === "processing" &&
+              task.claimExpiresAt !== null &&
+              task.claimExpiresAt <= input.now)) &&
+          task.nextAttemptAt <= input.now
+        ) {
           const claimed = {
             ...task,
             status: "processing" as const,
-            updatedAt: NOW,
+            claimedBy: input.workerId,
+            claimExpiresAt: input.leaseExpiresAt,
+            processingStartedAt: input.now,
+            updatedAt: input.now,
           }
           tasksByUniqueKey.set(uniqueKey, claimed)
           return claimed
@@ -864,8 +964,7 @@ function createPaymentOutboxRepository() {
       }
       return null
     }),
-    markProcessing: vi.fn(async () => undefined),
-    markCompleted: vi.fn(async () => undefined),
+    markCompleted: vi.fn(async () => true),
     markFailed: vi.fn(async () => undefined),
   }
 

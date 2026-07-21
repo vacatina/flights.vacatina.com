@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, eq, lte } from "drizzle-orm"
+import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm"
 
 import { getDbClient, paymentOutbox } from "@/lib/db"
 import type {
@@ -22,6 +22,9 @@ export interface PaymentOutboxRecord {
   attemptCount: number
   lastError: string | null
   nextAttemptAt: Date
+  claimedBy: string | null
+  claimExpiresAt: Date | null
+  processingStartedAt: Date | null
   createdAt: Date
   updatedAt: Date
   completedAt: Date | null
@@ -42,11 +45,16 @@ export interface PaymentOutboxRepository {
   enqueueUnique(input: EnqueuePaymentOutboxTaskInput): Promise<PaymentOutboxRecord>
   findByUniqueKey(uniqueKey: string): Promise<PaymentOutboxRecord | null>
   findPending(now: Date, limit: number): Promise<PaymentOutboxRecord[]>
-  claimPending(id: string, now: Date): Promise<PaymentOutboxRecord | null>
-  markProcessing(id: string, now: Date): Promise<void>
-  markCompleted(id: string, now: Date): Promise<void>
+  claimPending(input: {
+    id: string
+    workerId: string
+    now: Date
+    leaseExpiresAt: Date
+  }): Promise<PaymentOutboxRecord | null>
+  markCompleted(input: { id: string; workerId: string; now: Date }): Promise<boolean>
   markFailed(input: {
     id: string
+    workerId: string
     lastError: string
     nextAttemptAt: Date
     permanent?: boolean
@@ -81,6 +89,9 @@ export const defaultPaymentOutboxRepository: PaymentOutboxRepository = {
         attemptCount: 0,
         lastError: null,
         nextAttemptAt: input.nextAttemptAt ?? now,
+        claimedBy: null,
+        claimExpiresAt: null,
+        processingStartedAt: null,
         createdAt: now,
         updatedAt: now,
         completedAt: null,
@@ -146,39 +157,39 @@ export const defaultPaymentOutboxRepository: PaymentOutboxRepository = {
     if (!db) {
       assertPaymentPersistenceAvailable()
       return Array.from(inMemoryOutbox.values())
-        .filter((record) => record.status === "pending" && record.nextAttemptAt <= now)
+        .filter((record) => isOutboxRecordClaimable(record, now))
         .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
         .slice(0, limit)
     }
 
     const rows = await db.query.paymentOutbox.findMany({
-      where: and(
-        eq(paymentOutbox.status, "pending"),
-        lte(paymentOutbox.nextAttemptAt, now)
-      ),
+      where: claimableOutboxWhere(now),
       orderBy: [asc(paymentOutbox.createdAt)],
       limit,
     })
     return rows.map(toOutboxRecord)
   },
 
-  async claimPending(id, now) {
+  async claimPending(input) {
     const db = getDbClient()
 
     if (!db) {
       assertPaymentPersistenceAvailable()
-      const current = inMemoryOutbox.get(id)
+      const current = inMemoryOutbox.get(input.id)
 
-      if (!current || current.status !== "pending" || current.nextAttemptAt > now) {
+      if (!current || !isOutboxRecordClaimable(current, input.now)) {
         return null
       }
 
       const claimed: PaymentOutboxRecord = {
         ...current,
         status: "processing",
-        updatedAt: now,
+        claimedBy: input.workerId,
+        claimExpiresAt: input.leaseExpiresAt,
+        processingStartedAt: input.now,
+        updatedAt: input.now,
       }
-      inMemoryOutbox.set(id, claimed)
+      inMemoryOutbox.set(input.id, claimed)
       return claimed
     }
 
@@ -186,13 +197,15 @@ export const defaultPaymentOutboxRepository: PaymentOutboxRepository = {
       .update(paymentOutbox)
       .set({
         status: "processing",
-        updatedAt: now,
+        claimedBy: input.workerId,
+        claimExpiresAt: input.leaseExpiresAt,
+        processingStartedAt: input.now,
+        updatedAt: input.now,
       })
       .where(
         and(
-          eq(paymentOutbox.id, id),
-          eq(paymentOutbox.status, "pending"),
-          lte(paymentOutbox.nextAttemptAt, now)
+          eq(paymentOutbox.id, input.id),
+          claimableOutboxWhere(input.now)
         )
       )
       .returning()
@@ -200,19 +213,48 @@ export const defaultPaymentOutboxRepository: PaymentOutboxRepository = {
     return row ? toOutboxRecord(row) : null
   },
 
-  async markProcessing(id, now) {
-    await updateOutboxRecord(id, {
-      status: "processing",
-      updatedAt: now,
-    })
-  },
+  async markCompleted(input) {
+    const db = getDbClient()
 
-  async markCompleted(id, now) {
-    await updateOutboxRecord(id, {
-      status: "completed",
-      completedAt: now,
-      updatedAt: now,
-    })
+    if (!db) {
+      assertPaymentPersistenceAvailable()
+      const current = inMemoryOutbox.get(input.id)
+
+      if (!current || !isOutboxLeaseHeldBy(current, input.workerId, input.now)) {
+        return false
+      }
+
+      inMemoryOutbox.set(input.id, {
+        ...current,
+        status: "completed",
+        claimedBy: null,
+        claimExpiresAt: null,
+        completedAt: input.now,
+        updatedAt: input.now,
+      })
+      return true
+    }
+
+    const [row] = await db
+      .update(paymentOutbox)
+      .set({
+        status: "completed",
+        claimedBy: null,
+        claimExpiresAt: null,
+        completedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(paymentOutbox.id, input.id),
+          eq(paymentOutbox.status, "processing"),
+          eq(paymentOutbox.claimedBy, input.workerId),
+          gt(paymentOutbox.claimExpiresAt, input.now)
+        )
+      )
+      .returning({ id: paymentOutbox.id })
+
+    return Boolean(row)
   },
 
   async markFailed(input) {
@@ -222,7 +264,7 @@ export const defaultPaymentOutboxRepository: PaymentOutboxRepository = {
     if (!db) {
       assertPaymentPersistenceAvailable()
       const current = inMemoryOutbox.get(input.id)
-      if (!current) {
+      if (!current || !isOutboxLeaseHeldBy(current, input.workerId, now)) {
         return
       }
       inMemoryOutbox.set(input.id, {
@@ -231,46 +273,46 @@ export const defaultPaymentOutboxRepository: PaymentOutboxRepository = {
         attemptCount: current.attemptCount + 1,
         lastError: input.lastError,
         nextAttemptAt: input.nextAttemptAt,
+        claimedBy: null,
+        claimExpiresAt: null,
         updatedAt: now,
       })
       return
     }
 
     const current = await db.query.paymentOutbox.findFirst({
-      where: eq(paymentOutbox.id, input.id),
+      where: and(
+        eq(paymentOutbox.id, input.id),
+        eq(paymentOutbox.status, "processing"),
+        eq(paymentOutbox.claimedBy, input.workerId),
+        gt(paymentOutbox.claimExpiresAt, now)
+      ),
       columns: { attemptCount: true },
     })
+
+    if (!current) {
+      return
+    }
 
     await db
       .update(paymentOutbox)
       .set({
         status: input.permanent ? "failed" : "pending",
-        attemptCount: (current?.attemptCount ?? 0) + 1,
+        attemptCount: current.attemptCount + 1,
         lastError: input.lastError,
         nextAttemptAt: input.nextAttemptAt,
+        claimedBy: null,
+        claimExpiresAt: null,
         updatedAt: now,
       })
-      .where(eq(paymentOutbox.id, input.id))
+      .where(
+        and(
+          eq(paymentOutbox.id, input.id),
+          eq(paymentOutbox.status, "processing"),
+          eq(paymentOutbox.claimedBy, input.workerId)
+        )
+      )
   },
-}
-
-async function updateOutboxRecord(id: string, patch: Partial<PaymentOutboxRecord>) {
-  const db = getDbClient()
-
-  if (!db) {
-    assertPaymentPersistenceAvailable()
-    const current = inMemoryOutbox.get(id)
-    if (!current) {
-      return
-    }
-    inMemoryOutbox.set(id, {
-      ...current,
-      ...patch,
-    })
-    return
-  }
-
-  await db.update(paymentOutbox).set(patch).where(eq(paymentOutbox.id, id))
 }
 
 function toOutboxRecord(row: typeof paymentOutbox.$inferSelect): PaymentOutboxRecord {
@@ -286,10 +328,56 @@ function toOutboxRecord(row: typeof paymentOutbox.$inferSelect): PaymentOutboxRe
     attemptCount: row.attemptCount,
     lastError: row.lastError,
     nextAttemptAt: row.nextAttemptAt,
+    claimedBy: row.claimedBy,
+    claimExpiresAt: row.claimExpiresAt,
+    processingStartedAt: row.processingStartedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     completedAt: row.completedAt,
   }
+}
+
+function claimableOutboxWhere(now: Date) {
+  return and(
+    lte(paymentOutbox.nextAttemptAt, now),
+    or(
+      eq(paymentOutbox.status, "pending"),
+      and(
+        eq(paymentOutbox.status, "processing"),
+        lte(paymentOutbox.claimExpiresAt, now)
+      )
+    ),
+    or(isNull(paymentOutbox.claimExpiresAt), lte(paymentOutbox.claimExpiresAt, now))
+  )
+}
+
+function isOutboxRecordClaimable(record: PaymentOutboxRecord, now: Date) {
+  if (record.nextAttemptAt > now) {
+    return false
+  }
+
+  if (record.status === "pending") {
+    return !record.claimExpiresAt || record.claimExpiresAt <= now
+  }
+
+  const claimExpiresAt = record.claimExpiresAt
+
+  return record.status === "processing" && claimExpiresAt !== null && claimExpiresAt <= now
+}
+
+function isOutboxLeaseHeldBy(
+  record: PaymentOutboxRecord,
+  workerId: string,
+  now: Date
+) {
+  const claimExpiresAt = record.claimExpiresAt
+
+  return (
+    record.status === "processing" &&
+    record.claimedBy === workerId &&
+    claimExpiresAt !== null &&
+    claimExpiresAt > now
+  )
 }
 
 export function resetInMemoryPaymentOutboxForTests() {

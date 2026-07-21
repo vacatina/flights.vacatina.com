@@ -200,7 +200,13 @@ export interface CheckoutPaymentStartResult {
 
 export interface CheckoutSessionStatusResult {
   checkoutSessionId: string
-  status: "processing" | "payment_authorized" | "completed" | "failed" | "reconciliation_required"
+  status:
+    | "processing"
+    | "payment_authorized"
+    | "finalizing"
+    | "completed"
+    | "failed"
+    | "reconciliation_required"
   message: string | null
   duffelOrderId: string | null
   bookingReference: string | null

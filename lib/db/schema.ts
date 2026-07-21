@@ -32,6 +32,7 @@ export const pricedQuoteStatusEnum = pgEnum("priced_quote_status", [
 export const checkoutSessionStatusEnum = pgEnum("checkout_session_status", [
   "processing",
   "payment_authorized",
+  "finalizing",
   "completed",
   "failed",
   "reconciliation_required",
@@ -468,6 +469,8 @@ export const paymentWebhookInbox = pgTable(
       .notNull(),
     processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
     processedAt: timestamp("processed_at", { withTimezone: true }),
+    claimedBy: text("claimed_by"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -485,6 +488,15 @@ export const paymentWebhookInbox = pgTable(
     statusRetryIdx: index("payment_webhook_inbox_status_retry_idx").on(
       table.status,
       table.nextAttemptAt
+    ),
+    claimableIdx: index("payment_webhook_inbox_claimable_idx").on(
+      table.status,
+      table.nextAttemptAt,
+      table.claimExpiresAt
+    ),
+    claimedIdx: index("payment_webhook_inbox_claimed_idx").on(
+      table.claimedBy,
+      table.claimExpiresAt
     ),
     providerOrderLookupIdx: index("payment_webhook_inbox_provider_order_lookup_idx").on(
       table.provider,
@@ -514,6 +526,9 @@ export const paymentOutbox = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    claimedBy: text("claimed_by"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
+    processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -527,6 +542,15 @@ export const paymentOutbox = pgTable(
     statusRetryIdx: index("payment_outbox_status_retry_idx").on(
       table.status,
       table.nextAttemptAt
+    ),
+    claimableIdx: index("payment_outbox_claimable_idx").on(
+      table.status,
+      table.nextAttemptAt,
+      table.claimExpiresAt
+    ),
+    claimedIdx: index("payment_outbox_claimed_idx").on(
+      table.claimedBy,
+      table.claimExpiresAt
     ),
     attemptTimelineIdx: index("payment_outbox_attempt_timeline_idx").on(
       table.paymentAttemptId,

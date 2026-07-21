@@ -167,9 +167,77 @@ describe("payment webhook inbox repository", () => {
       eventType: "PAYMENT.CAPTURE.COMPLETED",
     })
 
-    await defaultPaymentWebhookInboxRepository.markProcessed(inbox.id, now)
+    const claimed = await defaultPaymentWebhookInboxRepository.claimReady({
+      id: inbox.id,
+      workerId: "worker_a",
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
+    })
+
+    expect(claimed?.claimedBy).toBe("worker_a")
+
+    await defaultPaymentWebhookInboxRepository.markProcessed({
+      id: inbox.id,
+      workerId: "worker_a",
+      now,
+    })
 
     await expect(defaultPaymentWebhookInboxRepository.findReady(now, 10)).resolves.toEqual([])
+  })
+
+  test("allows only one worker to claim a webhook inbox record", async () => {
+    const now = new Date("2099-01-01T00:00:00.000Z")
+    const inbox = await defaultPaymentWebhookInboxRepository.storeReceived({
+      id: "pwi_claim_once",
+      provider: "paypal",
+      providerEventId: "WH-CLAIM",
+      eventType: "PAYMENT.CAPTURE.COMPLETED",
+    })
+
+    const first = await defaultPaymentWebhookInboxRepository.claimReady({
+      id: inbox.id,
+      workerId: "worker_a",
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
+    })
+    const second = await defaultPaymentWebhookInboxRepository.claimReady({
+      id: inbox.id,
+      workerId: "worker_b",
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
+    })
+
+    expect(first?.claimedBy).toBe("worker_a")
+    expect(second).toBeNull()
+  })
+
+  test("returns expired processing webhook records for retry", async () => {
+    const firstNow = new Date("2099-01-01T00:00:00.000Z")
+    const retryNow = new Date("2099-01-01T00:02:00.000Z")
+    const inbox = await defaultPaymentWebhookInboxRepository.storeReceived({
+      id: "pwi_expired",
+      provider: "paypal",
+      providerEventId: "WH-EXPIRED",
+      eventType: "PAYMENT.CAPTURE.COMPLETED",
+    })
+
+    await defaultPaymentWebhookInboxRepository.claimReady({
+      id: inbox.id,
+      workerId: "worker_a",
+      now: firstNow,
+      leaseExpiresAt: new Date(firstNow.getTime() + 60_000),
+    })
+
+    const ready = await defaultPaymentWebhookInboxRepository.findReady(retryNow, 10)
+    const reclaimed = await defaultPaymentWebhookInboxRepository.claimReady({
+      id: inbox.id,
+      workerId: "worker_b",
+      now: retryNow,
+      leaseExpiresAt: new Date(retryNow.getTime() + 60_000),
+    })
+
+    expect(ready.map((record) => record.id)).toContain(inbox.id)
+    expect(reclaimed?.claimedBy).toBe("worker_b")
   })
 })
 
@@ -200,6 +268,7 @@ describe("payment outbox repository", () => {
 
   test("requeues transiently failed outbox tasks", async () => {
     const now = new Date("2099-01-01T00:00:00.000Z")
+    const workerId = "worker_retry"
     const task = await defaultPaymentOutboxRepository.enqueueUnique({
       id: "pob_retry",
       taskType: "fulfill_flight_order",
@@ -209,17 +278,121 @@ describe("payment outbox repository", () => {
       internalOrderId: "chs_retry",
     })
 
-    await defaultPaymentOutboxRepository.markFailed({
+    await defaultPaymentOutboxRepository.claimPending({
       id: task.id,
-      lastError: "Duffel request failed",
-      nextAttemptAt: now,
+      workerId,
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
     })
 
-    const pending = await defaultPaymentOutboxRepository.findPending(now, 10)
+    await defaultPaymentOutboxRepository.markFailed({
+      id: task.id,
+      workerId,
+      lastError: "Duffel request failed",
+      nextAttemptAt: new Date(now.getTime() + 1_000),
+    })
+
+    const pending = await defaultPaymentOutboxRepository.findPending(
+      new Date(now.getTime() + 1_000),
+      10
+    )
 
     expect(pending).toHaveLength(1)
     expect(pending[0]?.attemptCount).toBe(1)
     expect(pending[0]?.lastError).toBe("Duffel request failed")
+    expect(pending[0]?.claimedBy).toBeNull()
+  })
+
+  test("allows only one worker to claim an outbox task", async () => {
+    const now = new Date("2099-01-01T00:00:00.000Z")
+    const task = await defaultPaymentOutboxRepository.enqueueUnique({
+      id: "pob_claim_once",
+      taskType: "fulfill_flight_order",
+      uniqueKey: "fulfill:claim_once",
+      paymentAttemptId: "pat_claim_once",
+      internalOrderType: "flight_checkout",
+      internalOrderId: "chs_claim_once",
+    })
+
+    const first = await defaultPaymentOutboxRepository.claimPending({
+      id: task.id,
+      workerId: "worker_a",
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
+    })
+    const second = await defaultPaymentOutboxRepository.claimPending({
+      id: task.id,
+      workerId: "worker_b",
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
+    })
+
+    expect(first?.claimedBy).toBe("worker_a")
+    expect(second).toBeNull()
+  })
+
+  test("allows expired processing outbox tasks to be reclaimed", async () => {
+    const firstNow = new Date("2099-01-01T00:00:00.000Z")
+    const retryNow = new Date("2099-01-01T00:06:00.000Z")
+    const task = await defaultPaymentOutboxRepository.enqueueUnique({
+      id: "pob_expired",
+      taskType: "fulfill_flight_order",
+      uniqueKey: "fulfill:expired",
+      paymentAttemptId: "pat_expired",
+      internalOrderType: "flight_checkout",
+      internalOrderId: "chs_expired",
+    })
+
+    await defaultPaymentOutboxRepository.claimPending({
+      id: task.id,
+      workerId: "worker_a",
+      now: firstNow,
+      leaseExpiresAt: new Date(firstNow.getTime() + 60_000),
+    })
+
+    const reclaimed = await defaultPaymentOutboxRepository.claimPending({
+      id: task.id,
+      workerId: "worker_b",
+      now: retryNow,
+      leaseExpiresAt: new Date(retryNow.getTime() + 60_000),
+    })
+
+    expect(reclaimed?.claimedBy).toBe("worker_b")
+  })
+
+  test("does not let another worker complete a claimed outbox task", async () => {
+    const now = new Date("2099-01-01T00:00:00.000Z")
+    const task = await defaultPaymentOutboxRepository.enqueueUnique({
+      id: "pob_complete_owner",
+      taskType: "fulfill_flight_order",
+      uniqueKey: "fulfill:complete_owner",
+      paymentAttemptId: "pat_complete_owner",
+      internalOrderType: "flight_checkout",
+      internalOrderId: "chs_complete_owner",
+    })
+
+    await defaultPaymentOutboxRepository.claimPending({
+      id: task.id,
+      workerId: "worker_a",
+      now,
+      leaseExpiresAt: new Date(now.getTime() + 60_000),
+    })
+
+    await expect(
+      defaultPaymentOutboxRepository.markCompleted({
+        id: task.id,
+        workerId: "worker_b",
+        now,
+      })
+    ).resolves.toBe(false)
+
+    await expect(
+      defaultPaymentOutboxRepository.markCompleted({
+        id: task.id,
+        workerId: "worker_a",
+        now,
+      })
+    ).resolves.toBe(true)
   })
 })
 

@@ -36,17 +36,25 @@ const defaultDeps: PaymentOutboxWorkerDeps = {
 export async function processPaymentOutbox(input: {
   limit?: number
   now?: Date
+  workerId?: string
   deps?: Partial<PaymentOutboxWorkerDeps>
 } = {}) {
   const deps = { ...defaultDeps, ...input.deps }
   const now = input.now ?? new Date()
+  const workerId = input.workerId ?? createPaymentWorkerId("outbox")
   const tasks = await deps.outboxRepository.findPending(now, input.limit ?? 10)
   let processed = 0
   let failed = 0
   let ignored = 0
 
   for (const task of tasks) {
-    const claimedTask = await deps.outboxRepository.claimPending(task.id, new Date())
+    const claimNow = new Date()
+    const claimedTask = await deps.outboxRepository.claimPending({
+      id: task.id,
+      workerId,
+      now: claimNow,
+      leaseExpiresAt: new Date(claimNow.getTime() + outboxLeaseMs()),
+    })
 
     if (!claimedTask) {
       ignored += 1
@@ -56,17 +64,26 @@ export async function processPaymentOutbox(input: {
     try {
       if (claimedTask.taskType !== "fulfill_flight_order") {
         ignored += 1
-        await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+        await deps.outboxRepository.markCompleted({
+          id: claimedTask.id,
+          workerId,
+          now: new Date(),
+        })
         continue
       }
 
       await processFulfillFlightOrderTask(claimedTask, deps)
-      await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+      await deps.outboxRepository.markCompleted({
+        id: claimedTask.id,
+        workerId,
+        now: new Date(),
+      })
       processed += 1
     } catch (error) {
       failed += 1
       await deps.outboxRepository.markFailed({
         id: claimedTask.id,
+        workerId,
         lastError: error instanceof Error ? error.message : "Unknown outbox worker error",
         nextAttemptAt: new Date(Date.now() + retryDelayMs(claimedTask.attemptCount + 1)),
       })
@@ -89,9 +106,11 @@ export async function processPaymentOutbox(input: {
 export async function processPaymentOutboxByPaymentAttemptId(input: {
   paymentAttemptId: string
   now?: Date
+  workerId?: string
   deps?: Partial<PaymentOutboxWorkerDeps>
 }) {
   const deps = { ...defaultDeps, ...input.deps }
+  const workerId = input.workerId ?? createPaymentWorkerId("outbox-single")
   const task = await deps.outboxRepository.findByUniqueKey(
     `fulfill_flight_order:${input.paymentAttemptId}`
   )
@@ -110,10 +129,13 @@ export async function processPaymentOutboxByPaymentAttemptId(input: {
     }
   }
 
-  const claimedTask = await deps.outboxRepository.claimPending(
-    task.id,
-    input.now ?? new Date()
-  )
+  const claimNow = input.now ?? new Date()
+  const claimedTask = await deps.outboxRepository.claimPending({
+    id: task.id,
+    workerId,
+    now: claimNow,
+    leaseExpiresAt: new Date(claimNow.getTime() + outboxLeaseMs()),
+  })
 
   if (!claimedTask) {
     return {
@@ -127,7 +149,11 @@ export async function processPaymentOutboxByPaymentAttemptId(input: {
 
   try {
     if (claimedTask.taskType !== "fulfill_flight_order") {
-      await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+      await deps.outboxRepository.markCompleted({
+        id: claimedTask.id,
+        workerId,
+        now: new Date(),
+      })
       return {
         claimed: 1,
         processed: 0,
@@ -138,7 +164,11 @@ export async function processPaymentOutboxByPaymentAttemptId(input: {
     }
 
     await processFulfillFlightOrderTask(claimedTask, deps)
-    await deps.outboxRepository.markCompleted(claimedTask.id, new Date())
+    await deps.outboxRepository.markCompleted({
+      id: claimedTask.id,
+      workerId,
+      now: new Date(),
+    })
     return {
       claimed: 1,
       processed: 1,
@@ -149,6 +179,7 @@ export async function processPaymentOutboxByPaymentAttemptId(input: {
   } catch (error) {
     await deps.outboxRepository.markFailed({
       id: claimedTask.id,
+      workerId,
       lastError: error instanceof Error ? error.message : "Unknown outbox worker error",
       nextAttemptAt: new Date(Date.now() + retryDelayMs(claimedTask.attemptCount + 1)),
     })
@@ -248,4 +279,12 @@ async function appendPaymentEventOnce(input: {
 
 function retryDelayMs(attemptCount: number) {
   return Math.min(60_000 * 2 ** Math.max(attemptCount - 1, 0), 15 * 60_000)
+}
+
+function outboxLeaseMs() {
+  return 5 * 60_000
+}
+
+function createPaymentWorkerId(scope: string) {
+  return `payment-worker:${scope}:${Date.now()}:${Math.random().toString(36).slice(2)}`
 }

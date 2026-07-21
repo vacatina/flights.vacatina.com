@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, eq, inArray, lte } from "drizzle-orm"
+import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm"
 
 import { getDbClient, paymentWebhookInbox } from "@/lib/db"
 import type {
@@ -24,6 +24,8 @@ export interface PaymentWebhookInboxRecord {
   receivedAt: Date
   processingStartedAt: Date | null
   processedAt: Date | null
+  claimedBy: string | null
+  claimExpiresAt: Date | null
   nextAttemptAt: Date
   createdAt: Date
   updatedAt: Date
@@ -47,10 +49,16 @@ export interface PaymentWebhookInboxRepository {
     providerEventId: string
   }): Promise<PaymentWebhookInboxRecord | null>
   findReady(now: Date, limit: number): Promise<PaymentWebhookInboxRecord[]>
-  markProcessing(id: string, now: Date): Promise<void>
-  markProcessed(id: string, now: Date): Promise<void>
+  claimReady(input: {
+    id: string
+    workerId: string
+    now: Date
+    leaseExpiresAt: Date
+  }): Promise<PaymentWebhookInboxRecord | null>
+  markProcessed(input: { id: string; workerId: string; now: Date }): Promise<boolean>
   markFailed(input: {
     id: string
+    workerId: string
     lastError: string
     nextAttemptAt: Date
   }): Promise<void>
@@ -90,6 +98,8 @@ export const defaultPaymentWebhookInboxRepository: PaymentWebhookInboxRepository
         receivedAt: now,
         processingStartedAt: null,
         processedAt: null,
+        claimedBy: null,
+        claimExpiresAt: null,
         nextAttemptAt: now,
         createdAt: now,
         updatedAt: now,
@@ -163,40 +173,104 @@ export const defaultPaymentWebhookInboxRepository: PaymentWebhookInboxRepository
     if (!db) {
       assertPaymentPersistenceAvailable()
       return Array.from(inMemoryInbox.values())
-        .filter(
-          (record) =>
-            (record.status === "received" || record.status === "failed") &&
-            record.nextAttemptAt <= now
-        )
+        .filter((record) => isInboxRecordClaimable(record, now))
         .sort((left, right) => left.receivedAt.getTime() - right.receivedAt.getTime())
         .slice(0, limit)
     }
 
     const rows = await db.query.paymentWebhookInbox.findMany({
-      where: and(
-        inArray(paymentWebhookInbox.status, ["received", "failed"]),
-        lte(paymentWebhookInbox.nextAttemptAt, now)
-      ),
+      where: claimableInboxWhere(now),
       orderBy: [asc(paymentWebhookInbox.receivedAt)],
       limit,
     })
     return rows.map(toInboxRecord)
   },
 
-  async markProcessing(id, now) {
-    await updateInboxRecord(id, {
-      status: "processing",
-      processingStartedAt: now,
-      updatedAt: now,
-    })
+  async claimReady(input) {
+    const db = getDbClient()
+
+    if (!db) {
+      assertPaymentPersistenceAvailable()
+      const current = inMemoryInbox.get(input.id)
+
+      if (!current || !isInboxRecordClaimable(current, input.now)) {
+        return null
+      }
+
+      const claimed: PaymentWebhookInboxRecord = {
+        ...current,
+        status: "processing",
+        claimedBy: input.workerId,
+        claimExpiresAt: input.leaseExpiresAt,
+        processingStartedAt: input.now,
+        updatedAt: input.now,
+      }
+      inMemoryInbox.set(input.id, claimed)
+      return claimed
+    }
+
+    const [row] = await db
+      .update(paymentWebhookInbox)
+      .set({
+        status: "processing",
+        claimedBy: input.workerId,
+        claimExpiresAt: input.leaseExpiresAt,
+        processingStartedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(paymentWebhookInbox.id, input.id),
+          claimableInboxWhere(input.now)
+        )
+      )
+      .returning()
+
+    return row ? toInboxRecord(row) : null
   },
 
-  async markProcessed(id, now) {
-    await updateInboxRecord(id, {
-      status: "processed",
-      processedAt: now,
-      updatedAt: now,
-    })
+  async markProcessed(input) {
+    const db = getDbClient()
+
+    if (!db) {
+      assertPaymentPersistenceAvailable()
+      const current = inMemoryInbox.get(input.id)
+
+      if (!current || !isInboxLeaseHeldBy(current, input.workerId, input.now)) {
+        return false
+      }
+
+      inMemoryInbox.set(input.id, {
+        ...current,
+        status: "processed",
+        claimedBy: null,
+        claimExpiresAt: null,
+        processedAt: input.now,
+        updatedAt: input.now,
+      })
+      return true
+    }
+
+    const [row] = await db
+      .update(paymentWebhookInbox)
+      .set({
+        status: "processed",
+        claimedBy: null,
+        claimExpiresAt: null,
+        processedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(paymentWebhookInbox.id, input.id),
+          eq(paymentWebhookInbox.status, "processing"),
+          eq(paymentWebhookInbox.claimedBy, input.workerId),
+          gt(paymentWebhookInbox.claimExpiresAt, input.now)
+        )
+      )
+      .returning({ id: paymentWebhookInbox.id })
+
+    return Boolean(row)
   },
 
   async markFailed(input) {
@@ -206,7 +280,7 @@ export const defaultPaymentWebhookInboxRepository: PaymentWebhookInboxRepository
     if (!db) {
       assertPaymentPersistenceAvailable()
       const current = inMemoryInbox.get(input.id)
-      if (!current) {
+      if (!current || !isInboxLeaseHeldBy(current, input.workerId, now)) {
         return
       }
       inMemoryInbox.set(input.id, {
@@ -215,49 +289,46 @@ export const defaultPaymentWebhookInboxRepository: PaymentWebhookInboxRepository
         attemptCount: current.attemptCount + 1,
         lastError: input.lastError,
         nextAttemptAt: input.nextAttemptAt,
+        claimedBy: null,
+        claimExpiresAt: null,
         updatedAt: now,
       })
       return
     }
 
     const current = await db.query.paymentWebhookInbox.findFirst({
-      where: eq(paymentWebhookInbox.id, input.id),
+      where: and(
+        eq(paymentWebhookInbox.id, input.id),
+        eq(paymentWebhookInbox.status, "processing"),
+        eq(paymentWebhookInbox.claimedBy, input.workerId),
+        gt(paymentWebhookInbox.claimExpiresAt, now)
+      ),
       columns: { attemptCount: true },
     })
+
+    if (!current) {
+      return
+    }
 
     await db
       .update(paymentWebhookInbox)
       .set({
         status: "failed",
-        attemptCount: (current?.attemptCount ?? 0) + 1,
+        attemptCount: current.attemptCount + 1,
         lastError: input.lastError,
         nextAttemptAt: input.nextAttemptAt,
+        claimedBy: null,
+        claimExpiresAt: null,
         updatedAt: now,
       })
-      .where(eq(paymentWebhookInbox.id, input.id))
+      .where(
+        and(
+          eq(paymentWebhookInbox.id, input.id),
+          eq(paymentWebhookInbox.status, "processing"),
+          eq(paymentWebhookInbox.claimedBy, input.workerId)
+        )
+      )
   },
-}
-
-async function updateInboxRecord(
-  id: string,
-  patch: Partial<PaymentWebhookInboxRecord>
-) {
-  const db = getDbClient()
-
-  if (!db) {
-    assertPaymentPersistenceAvailable()
-    const current = inMemoryInbox.get(id)
-    if (!current) {
-      return
-    }
-    inMemoryInbox.set(id, {
-      ...current,
-      ...patch,
-    })
-    return
-  }
-
-  await db.update(paymentWebhookInbox).set(patch).where(eq(paymentWebhookInbox.id, id))
 }
 
 function toInboxRecord(
@@ -278,10 +349,58 @@ function toInboxRecord(
     receivedAt: row.receivedAt,
     processingStartedAt: row.processingStartedAt,
     processedAt: row.processedAt,
+    claimedBy: row.claimedBy,
+    claimExpiresAt: row.claimExpiresAt,
     nextAttemptAt: row.nextAttemptAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
+}
+
+function claimableInboxWhere(now: Date) {
+  return and(
+    lte(paymentWebhookInbox.nextAttemptAt, now),
+    or(
+      inArray(paymentWebhookInbox.status, ["received", "failed"]),
+      and(
+        eq(paymentWebhookInbox.status, "processing"),
+        lte(paymentWebhookInbox.claimExpiresAt, now)
+      )
+    ),
+    or(
+      isNull(paymentWebhookInbox.claimExpiresAt),
+      lte(paymentWebhookInbox.claimExpiresAt, now)
+    )
+  )
+}
+
+function isInboxRecordClaimable(record: PaymentWebhookInboxRecord, now: Date) {
+  if (record.nextAttemptAt > now) {
+    return false
+  }
+
+  if (record.status === "received" || record.status === "failed") {
+    return !record.claimExpiresAt || record.claimExpiresAt <= now
+  }
+
+  const claimExpiresAt = record.claimExpiresAt
+
+  return record.status === "processing" && claimExpiresAt !== null && claimExpiresAt <= now
+}
+
+function isInboxLeaseHeldBy(
+  record: PaymentWebhookInboxRecord,
+  workerId: string,
+  now: Date
+) {
+  const claimExpiresAt = record.claimExpiresAt
+
+  return (
+    record.status === "processing" &&
+    record.claimedBy === workerId &&
+    claimExpiresAt !== null &&
+    claimExpiresAt > now
+  )
 }
 
 function toProviderEventKey(input: {

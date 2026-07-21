@@ -664,7 +664,11 @@ export async function submitCheckout(
       }
     }
 
-    if (existingSession.status === "processing" || existingSession.status === "payment_authorized") {
+    if (
+      existingSession.status === "processing" ||
+      existingSession.status === "payment_authorized" ||
+      existingSession.status === "finalizing"
+    ) {
       throw new Error("Checkout is already processing. Please wait a moment.")
     }
   }
@@ -1103,13 +1107,59 @@ export async function fulfillAuthorizedCheckoutSession(input: {
     throw new Error("Checkout session is not ready for fulfillment.")
   }
 
-  return finalizeAuthorizedCheckoutSession({
-    session,
-    deps,
-    now: deps.now(),
-    paymentProvider: input.paymentProvider,
-    providerPaymentId: input.providerPaymentId,
+  const now = deps.now()
+  const claimedSession = await deps.sessionRepository.claimFinalization({
+    checkoutSessionId: session.id,
+    now,
   })
+
+  if (!claimedSession) {
+    const refreshed = await deps.sessionRepository.findById(session.id)
+
+    if (refreshed?.status === "completed") {
+      const existingOrder = await deps.orderRepository.findByCheckoutSessionId(session.id)
+
+      if (existingOrder) {
+        return existingOrder
+      }
+    }
+
+    throw new Error("Checkout session finalization is already in progress.")
+  }
+
+  try {
+    return await finalizeAuthorizedCheckoutSession({
+      session: claimedSession,
+      deps,
+      now,
+      paymentProvider: input.paymentProvider,
+      providerPaymentId: input.providerPaymentId,
+    })
+  } catch (error) {
+    await deps.sessionRepository.update(claimedSession.id, {
+      status: "reconciliation_required",
+      providerPaymentId: input.providerPaymentId,
+      checkoutPayloadSnapshot: createTerminalCheckoutSnapshot({
+        partialOfferRequestId: claimedSession.partialOfferRequestId,
+        offerId: claimedSession.offerId,
+        quoteId: claimedSession.quoteId,
+        selectedPartialOffers: claimedSession.selectedPartialOffers,
+        paymentMode: claimedSession.paymentMode,
+        sourceCurrency: claimedSession.currency,
+        netTotal: claimedSession.netAmount,
+        sellTotal: claimedSession.sellAmount,
+      }),
+      errorCode: "finalization_failed_after_payment_authorized",
+      errorMessage:
+        "Payment was received, but booking finalization needs manual reconciliation.",
+    })
+    incrementCheckoutMetric("checkout_reconciliation_required_total", {
+      checkoutSessionId: claimedSession.id,
+      reason: "finalization_failed",
+    })
+    await queueReconciliationNotificationForSession(claimedSession)
+    throw error
+  }
 }
 
 async function markPayPalPaymentFailed(input: {
