@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm"
 import {
   boolean,
   index,
@@ -31,6 +32,7 @@ export const pricedQuoteStatusEnum = pgEnum("priced_quote_status", [
 export const checkoutSessionStatusEnum = pgEnum("checkout_session_status", [
   "processing",
   "payment_authorized",
+  "finalizing",
   "completed",
   "failed",
   "reconciliation_required",
@@ -55,6 +57,69 @@ export const notificationEventTypeEnum = pgEnum("notification_event_type", [
   "booking_confirmed",
   "hold_created",
   "reconciliation_required",
+])
+
+export const paymentProviderEnum = pgEnum("payment_provider", ["paypal"])
+
+export const paymentAttemptStatusEnum = pgEnum("payment_attempt_status", [
+  "created",
+  "provider_order_created",
+  "buyer_approved",
+  "capture_pending",
+  "capture_completed",
+  "capture_denied",
+  "capture_failed",
+  "refunded",
+  "reversed",
+  "disputed",
+  "fulfillment_pending",
+  "fulfilled",
+  "reconciliation_required",
+  "cancelled",
+])
+
+export const paymentEventTypeEnum = pgEnum("payment_event_type", [
+  "PAYMENT_INITIATED",
+  "PROVIDER_ORDER_CREATED",
+  "BUYER_APPROVED",
+  "CAPTURE_REQUESTED",
+  "CAPTURE_COMPLETED",
+  "CAPTURE_PENDING",
+  "CAPTURE_DENIED",
+  "WEBHOOK_RECEIVED",
+  "WEBHOOK_PROCESSED",
+  "FULFILLMENT_REQUESTED",
+  "FULFILLMENT_COMPLETED",
+  "FULFILLMENT_FAILED",
+  "REFUND_DETECTED",
+  "REVERSAL_DETECTED",
+  "DISPUTE_DETECTED",
+  "RECONCILIATION_CHECKED",
+  "RECONCILIATION_REPAIRED",
+  "RECONCILIATION_REQUIRED",
+])
+
+export const paymentWebhookInboxStatusEnum = pgEnum("payment_webhook_inbox_status", [
+  "received",
+  "processing",
+  "processed",
+  "failed",
+  "ignored",
+])
+
+export const paymentOutboxStatusEnum = pgEnum("payment_outbox_status", [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+])
+
+export const paymentOutboxTaskTypeEnum = pgEnum("payment_outbox_task_type", [
+  "fulfill_flight_order",
+  "fulfill_paid_resource",
+  "send_receipt",
+  "notify_admin",
+  "sync_payment_state",
 ])
 
 export const guestSessionStatusEnum = pgEnum("guest_session_status", [
@@ -283,6 +348,218 @@ export const pricedQuotes = pgTable(
   })
 )
 
+export const paymentAttempts = pgTable(
+  "payment_attempts",
+  {
+    id: text("id").primaryKey(),
+    internalOrderType: text("internal_order_type").notNull(),
+    internalOrderId: text("internal_order_id").notNull(),
+    ownerUserId: text("owner_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ownerGuestId: text("owner_guest_id").references(() => guestSessions.id, {
+      onDelete: "set null",
+    }),
+    ownerOrgId: text("owner_org_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    provider: paymentProviderEnum("provider").notNull(),
+    status: paymentAttemptStatusEnum("status").notNull().default("created"),
+    currency: text("currency").notNull(),
+    amount: numeric("amount", { precision: 14, scale: 4 }).notNull(),
+    providerOrderId: text("provider_order_id"),
+    providerCaptureId: text("provider_capture_id"),
+    providerStatus: text("provider_status"),
+    createIdempotencyKey: text("create_idempotency_key").notNull(),
+    captureIdempotencyKey: text("capture_idempotency_key").notNull(),
+    clientIdempotencyKey: text("client_idempotency_key").notNull(),
+    checkoutPayloadSnapshot: jsonb("checkout_payload_snapshot"),
+    lastProviderPayload: jsonb("last_provider_payload"),
+    failureCode: text("failure_code"),
+    failureMessage: text("failure_message"),
+    reconciliationRequiredAt: timestamp("reconciliation_required_at", {
+      withTimezone: true,
+    }),
+    nextReconciliationAt: timestamp("next_reconciliation_at", {
+      withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    providerOrderUniqueIdx: uniqueIndex("payment_attempts_provider_order_unique_idx").on(
+      table.provider,
+      table.providerOrderId
+    ).where(sql`${table.providerOrderId} is not null`),
+    internalIdempotencyUniqueIdx: uniqueIndex(
+      "payment_attempts_internal_idempotency_unique_idx"
+    ).on(table.internalOrderType, table.internalOrderId, table.clientIdempotencyKey),
+    createIdempotencyUniqueIdx: uniqueIndex(
+      "payment_attempts_create_idempotency_unique_idx"
+    ).on(table.createIdempotencyKey),
+    captureIdempotencyUniqueIdx: uniqueIndex(
+      "payment_attempts_capture_idempotency_unique_idx"
+    ).on(table.captureIdempotencyKey),
+    reconciliationIdx: index("payment_attempts_reconciliation_idx").on(
+      table.status,
+      table.nextReconciliationAt
+    ),
+    ownerLookupIdx: index("payment_attempts_owner_lookup_idx").on(
+      table.ownerUserId,
+      table.ownerGuestId,
+      table.createdAt
+    ),
+  })
+)
+
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    id: text("id").primaryKey(),
+    paymentAttemptId: text("payment_attempt_id")
+      .notNull()
+      .references(() => paymentAttempts.id, {
+        onDelete: "cascade",
+      }),
+    eventType: paymentEventTypeEnum("event_type").notNull(),
+    provider: paymentProviderEnum("provider").notNull(),
+    providerEventId: text("provider_event_id"),
+    providerOrderId: text("provider_order_id"),
+    providerCaptureId: text("provider_capture_id"),
+    amount: numeric("amount", { precision: 14, scale: 4 }),
+    currency: text("currency"),
+    payload: jsonb("payload"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    attemptTimelineIdx: index("payment_events_attempt_timeline_idx").on(
+      table.paymentAttemptId,
+      table.createdAt
+    ),
+    providerEventUniqueIdx: uniqueIndex("payment_events_provider_event_unique_idx").on(
+      table.provider,
+      table.providerEventId,
+      table.eventType
+    ).where(sql`${table.providerEventId} is not null`),
+  })
+)
+
+export const paymentWebhookInbox = pgTable(
+  "payment_webhook_inbox",
+  {
+    id: text("id").primaryKey(),
+    provider: paymentProviderEnum("provider").notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    providerOrderId: text("provider_order_id"),
+    providerCaptureId: text("provider_capture_id"),
+    status: paymentWebhookInboxStatusEnum("status").notNull().default("received"),
+    payload: jsonb("payload"),
+    headers: jsonb("headers"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastError: text("last_error"),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    claimedBy: text("claimed_by"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    providerEventUniqueIdx: uniqueIndex(
+      "payment_webhook_inbox_provider_event_unique_idx"
+    ).on(table.provider, table.providerEventId),
+    statusRetryIdx: index("payment_webhook_inbox_status_retry_idx").on(
+      table.status,
+      table.nextAttemptAt
+    ),
+    claimableIdx: index("payment_webhook_inbox_claimable_idx").on(
+      table.status,
+      table.nextAttemptAt,
+      table.claimExpiresAt
+    ),
+    claimedIdx: index("payment_webhook_inbox_claimed_idx").on(
+      table.claimedBy,
+      table.claimExpiresAt
+    ),
+    providerOrderLookupIdx: index("payment_webhook_inbox_provider_order_lookup_idx").on(
+      table.provider,
+      table.providerOrderId,
+      table.receivedAt
+    ),
+  })
+)
+
+export const paymentOutbox = pgTable(
+  "payment_outbox",
+  {
+    id: text("id").primaryKey(),
+    taskType: paymentOutboxTaskTypeEnum("task_type").notNull(),
+    status: paymentOutboxStatusEnum("status").notNull().default("pending"),
+    uniqueKey: text("unique_key").notNull(),
+    paymentAttemptId: text("payment_attempt_id")
+      .notNull()
+      .references(() => paymentAttempts.id, {
+        onDelete: "cascade",
+      }),
+    internalOrderType: text("internal_order_type").notNull(),
+    internalOrderId: text("internal_order_id").notNull(),
+    payload: jsonb("payload"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    claimedBy: text("claimed_by"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
+    processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => ({
+    uniqueKeyIdx: uniqueIndex("payment_outbox_unique_key_idx").on(table.uniqueKey),
+    statusRetryIdx: index("payment_outbox_status_retry_idx").on(
+      table.status,
+      table.nextAttemptAt
+    ),
+    claimableIdx: index("payment_outbox_claimable_idx").on(
+      table.status,
+      table.nextAttemptAt,
+      table.claimExpiresAt
+    ),
+    claimedIdx: index("payment_outbox_claimed_idx").on(
+      table.claimedBy,
+      table.claimExpiresAt
+    ),
+    attemptTimelineIdx: index("payment_outbox_attempt_timeline_idx").on(
+      table.paymentAttemptId,
+      table.createdAt
+    ),
+  })
+)
+
 export const checkoutSessions = pgTable(
   "checkout_sessions",
   {
@@ -317,6 +594,9 @@ export const checkoutSessions = pgTable(
     paymentCurrency: text("payment_currency"),
     paymentAmount: numeric("payment_amount", { precision: 14, scale: 4 }),
     checkoutPayloadSnapshot: jsonb("checkout_payload_snapshot"),
+    paymentAttemptId: text("payment_attempt_id").references(() => paymentAttempts.id, {
+      onDelete: "set null",
+    }),
     duffelOrderId: text("duffel_order_id"),
     paymentInitiatedAt: timestamp("payment_initiated_at", { withTimezone: true }),
     paymentConfirmedAt: timestamp("payment_confirmed_at", { withTimezone: true }),
@@ -390,6 +670,9 @@ export const flightOrders = pgTable(
       .references(() => checkoutSessions.id, {
         onDelete: "cascade",
       }),
+    paymentAttemptId: text("payment_attempt_id").references(() => paymentAttempts.id, {
+      onDelete: "set null",
+    }),
     duffelOrderId: text("duffel_order_id").notNull(),
     partialOfferRequestId: text("partial_offer_request_id").notNull(),
     offerId: text("offer_id").notNull(),
@@ -435,6 +718,9 @@ export const flightOrders = pgTable(
     checkoutSessionUniqueIdx: uniqueIndex("flight_orders_checkout_session_unique_idx").on(
       table.checkoutSessionId
     ),
+    paymentAttemptUniqueIdx: uniqueIndex("flight_orders_payment_attempt_unique_idx").on(
+      table.paymentAttemptId
+    ).where(sql`${table.paymentAttemptId} is not null`),
     bookingReferenceUniqueIdx: uniqueIndex("flight_orders_booking_reference_unique_idx").on(
       table.bookingReference
     ),
@@ -510,6 +796,18 @@ export type NewPricedQuoteRow = typeof pricedQuotes.$inferInsert
 
 export type CheckoutSessionRow = typeof checkoutSessions.$inferSelect
 export type NewCheckoutSessionRow = typeof checkoutSessions.$inferInsert
+
+export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect
+export type NewPaymentAttemptRow = typeof paymentAttempts.$inferInsert
+
+export type PaymentEventRow = typeof paymentEvents.$inferSelect
+export type NewPaymentEventRow = typeof paymentEvents.$inferInsert
+
+export type PaymentWebhookInboxRow = typeof paymentWebhookInbox.$inferSelect
+export type NewPaymentWebhookInboxRow = typeof paymentWebhookInbox.$inferInsert
+
+export type PaymentOutboxRow = typeof paymentOutbox.$inferSelect
+export type NewPaymentOutboxRow = typeof paymentOutbox.$inferInsert
 
 export type FlightOrderRow = typeof flightOrders.$inferSelect
 export type NewFlightOrderRow = typeof flightOrders.$inferInsert

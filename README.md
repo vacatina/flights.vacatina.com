@@ -68,9 +68,26 @@ PayPal checkout runs through Smart Buttons on the existing checkout pay step:
 
 ```text
 Webhook: /api/webhooks/payments/paypal
+Webhook worker: POST /api/jobs/payments/webhooks/process
+Fulfillment outbox worker: POST /api/jobs/payments/outbox/process
+QStash fulfillment endpoint: POST /api/jobs/payments/outbox/fulfill
+Reconciliation worker: POST /api/jobs/payments/reconcile
 ```
 
-Server-side PayPal capture is authoritative for booking finalization. Webhooks provide secondary reconciliation.
+Server-side PayPal capture is authoritative for payment authorization. Completed captures enqueue a durable `fulfill_flight_order` payment outbox task and publish a QStash job for that payment attempt. Duffel order creation runs from the outbox fulfillment endpoint/worker so duplicate capture callbacks, queue retries, cron runs, and webhook replays share one fulfillment key. Webhooks are verified into a payment inbox first, and reconciliation can repair completed PayPal captures that missed normal webhook or browser callback processing.
+
+Production payment jobs need:
+
+```bash
+PAYMENTS_PUBLIC_BASE_URL=https://your-production-domain.example
+PAYMENTS_JOB_SECRET=...
+CRON_SECRET=...
+QSTASH_TOKEN=...
+QSTASH_CURRENT_SIGNING_KEY=...
+QSTASH_NEXT_SIGNING_KEY=...
+```
+
+QStash signs `/api/jobs/payments/outbox/fulfill`, and `PAYMENTS_JOB_SECRET` is forwarded as an extra header. Vercel Cron calls the batch worker routes in `vercel.json` as a fallback and uses `Authorization: Bearer $CRON_SECRET`.
 
 PayPal v1 is intentionally limited to immediate capture through PayPal Checkout. Subscriptions, payouts, disputes, and custom refund workflows are out of scope.
 

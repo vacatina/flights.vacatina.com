@@ -37,6 +37,7 @@ export function statusToMessage(input: {
     case "processing":
       return "Payment is processing. Waiting for confirmation."
     case "payment_authorized":
+    case "finalizing":
       return "Payment received. Finalizing booking."
     case "failed":
       if (input.errorCode === "checkout_submit_failed") {

@@ -2,6 +2,7 @@ export {
   captureCheckoutPayPalOrder,
   createCheckoutPayPalOrder,
   fetchCheckoutPageData,
+  fulfillAuthorizedCheckoutSession,
   getCheckoutSessionStatus,
   processPayPalWebhookEvent,
   submitCheckout,

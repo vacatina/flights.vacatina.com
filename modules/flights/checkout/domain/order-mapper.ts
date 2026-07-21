@@ -23,6 +23,11 @@ export function mapPassengersToCreateOrderPassengers(input: {
     }
 
     validatePassengerTypeMatch(formPassenger, offerPassenger.type)
+    validatePassengerBornOnMatchesType({
+      passenger: formPassenger,
+      offer: input.offer,
+      offerType: offerPassenger.type,
+    })
 
     const passenger: CreateOrderPassenger = {
       id: formPassenger.id,
@@ -110,4 +115,98 @@ function validatePassengerTypeMatch(
   }
 
   throw new Error("Passenger type mismatch detected. Please refresh checkout.")
+}
+
+function validatePassengerBornOnMatchesType(input: {
+  passenger: CheckoutPassengerInput
+  offer: Offer
+  offerType: Offer["passengers"][number]["type"]
+}) {
+  const lastDeparture = getLastDepartureDate(input.offer)
+  const bornOn = parseDateOnly(input.passenger.bornOn)
+
+  if (!lastDeparture || !bornOn) {
+    return
+  }
+
+  const age = ageOnDate(bornOn, lastDeparture)
+
+  if (input.offerType === "adult" && age >= 18) {
+    return
+  }
+
+  if (input.offerType === "child" && age >= 2 && age < 18) {
+    return
+  }
+
+  if (input.offerType === "infant_without_seat" && age >= 0 && age < 2) {
+    return
+  }
+
+  throw new Error(
+    "Passenger date of birth does not match the passenger type selected for this fare."
+  )
+}
+
+function getLastDepartureDate(offer: Offer) {
+  const departures: Date[] = []
+
+  for (const slice of offer.slices ?? []) {
+    for (const segment of slice.segments ?? []) {
+      const departingAt = parseDateTime(String(segment.departing_at ?? ""))
+
+      if (departingAt) {
+        departures.push(departingAt)
+      }
+    }
+  }
+
+  if (departures.length === 0) {
+    return null
+  }
+
+  return departures.reduce((latest, current) =>
+    current.getTime() > latest.getTime() ? current : latest
+  )
+}
+
+function parseDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+
+  if (!match) {
+    return null
+  }
+
+  const year = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, monthIndex, day))
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== monthIndex ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+function parseDateTime(value: string) {
+  const date = new Date(value)
+
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function ageOnDate(bornOn: Date, referenceDate: Date) {
+  let age = referenceDate.getUTCFullYear() - bornOn.getUTCFullYear()
+  const monthDelta = referenceDate.getUTCMonth() - bornOn.getUTCMonth()
+  const dayDelta = referenceDate.getUTCDate() - bornOn.getUTCDate()
+
+  if (monthDelta < 0 || (monthDelta === 0 && dayDelta < 0)) {
+    age -= 1
+  }
+
+  return age
 }

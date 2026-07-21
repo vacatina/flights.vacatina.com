@@ -10,7 +10,7 @@ import type {
   FlightOrderRecord,
   FlightOrderRepository,
 } from "@/modules/flights/checkout/server/order-repository"
-import type { PaymentWebhookEventRepository } from "@/modules/flights/checkout/server/payment-webhook-event-repository"
+import type { PaymentOutboxRepository } from "@/modules/payments/server/outbox-repository"
 
 const paypalMocks = vi.hoisted(() => ({
   createPayPalOrder: vi.fn(),
@@ -36,7 +36,7 @@ const mockFns = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}))
 
-vi.mock("@/lib/paypal", () => ({
+vi.mock("@/modules/payments/server/providers/paypal", () => ({
   createPayPalOrder: paypalMocks.createPayPalOrder,
   getPayPalOrder: paypalMocks.getPayPalOrder,
   capturePayPalOrder: paypalMocks.capturePayPalOrder,
@@ -95,6 +95,7 @@ import {
   captureCheckoutPayPalOrder,
   createCheckoutPayPalOrder,
   fetchCheckoutPageData,
+  fulfillAuthorizedCheckoutSession,
   getCheckoutSessionStatus,
   processPayPalWebhookEvent,
   submitCheckout,
@@ -255,9 +256,9 @@ test("createCheckoutPayPalOrder reuses an existing processing PayPal order", asy
   expect(paypalMocks.createPayPalOrder).not.toHaveBeenCalled()
 })
 
-test("captureCheckoutPayPalOrder finalizes checkout on completed capture", async () => {
+test("captureCheckoutPayPalOrder enqueues fulfillment on completed capture", async () => {
   const sessionRepo = createSessionRepository()
-  const orderRepo = createOrderRepository()
+  const outboxRepo = createPaymentOutboxRepository()
   const createOrderSpy = vi.fn(async () => createDuffelOrder())
   const session = await createPayNowSession(sessionRepo)
 
@@ -270,28 +271,30 @@ test("captureCheckoutPayPalOrder finalizes checkout on completed capture", async
     createDeps({
       createOrder: createOrderSpy,
       sessionRepository: sessionRepo.repo,
-      orderRepository: orderRepo.repo,
+      paymentOutboxRepository: outboxRepo.repo,
+      publishFulfillmentTask: outboxRepo.spies.publishFulfillmentTask,
     })
   )
 
-  expect(result.status).toBe("completed")
-  const finalizedSession = await sessionRepo.repo.findById(session.id)
-  expect(finalizedSession?.status).toBe("completed")
-  expect(finalizedSession?.providerPaymentId).toBe("PAYPAL-CAPTURE-1")
-  expect(createOrderSpy).toHaveBeenCalledWith(
+  expect(result.status).toBe("payment_authorized")
+  const authorizedSession = await sessionRepo.repo.findById(session.id)
+  expect(authorizedSession?.status).toBe("payment_authorized")
+  expect(authorizedSession?.providerPaymentId).toBe("PAYPAL-CAPTURE-1")
+  expect(createOrderSpy).not.toHaveBeenCalled()
+  expect(outboxRepo.spies.enqueueUnique).toHaveBeenCalledWith(
     expect.objectContaining({
-      type: "instant",
-      payments: [
-        {
-          type: "balance",
-          amount: "100.00",
-          currency: "USD",
-        },
-      ],
+      taskType: "fulfill_paid_resource",
+      uniqueKey: "fulfill_paid_resource:pat_1",
+      paymentAttemptId: "pat_1",
+      internalOrderType: "flight_checkout",
+      internalOrderId: session.id,
     })
   )
-  expect(mockFns.markPricedQuoteConsumed).toHaveBeenCalledWith("pqt_1")
-  expect(orderRepo.spies.create).toHaveBeenCalledTimes(1)
+  expect(outboxRepo.spies.publishFulfillmentTask).toHaveBeenCalledWith({
+    paymentAttemptId: "pat_1",
+    checkoutSessionId: session.id,
+  })
+  expect(mockFns.markPricedQuoteConsumed).not.toHaveBeenCalled()
 })
 
 test("captureCheckoutPayPalOrder marks mismatched payments for reconciliation", async () => {
@@ -322,22 +325,93 @@ test("captureCheckoutPayPalOrder marks mismatched payments for reconciliation", 
   expect(createOrderSpy).not.toHaveBeenCalled()
 })
 
-test("processPayPalWebhookEvent ignores duplicate completed capture events", async () => {
+test("fulfillAuthorizedCheckoutSession allows only one finalizer to create the Duffel order", async () => {
   const sessionRepo = createSessionRepository()
-  const webhookRepo = createPaymentWebhookEventRepository()
+  const orderRepo = createOrderRepository()
+  const createOrderSpy = vi.fn(async () => createDuffelOrder())
+  const session = await createPayNowSession(sessionRepo)
+  await sessionRepo.repo.update(session.id, {
+    status: "payment_authorized",
+    providerPaymentId: "PAYPAL-CAPTURE-1",
+    paymentConfirmedAt: NOW,
+  })
+  const deps = createDeps({
+    createOrder: createOrderSpy,
+    sessionRepository: sessionRepo.repo,
+    orderRepository: orderRepo.repo,
+  })
+
+  const results = await Promise.allSettled([
+    fulfillAuthorizedCheckoutSession({
+      checkoutSessionId: session.id,
+      paymentProvider: "paypal",
+      providerPaymentId: "PAYPAL-CAPTURE-1",
+      deps,
+    }),
+    fulfillAuthorizedCheckoutSession({
+      checkoutSessionId: session.id,
+      paymentProvider: "paypal",
+      providerPaymentId: "PAYPAL-CAPTURE-1",
+      deps,
+    }),
+  ])
+
+  expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1)
+  expect(results.filter((result) => result.status === "rejected")).toHaveLength(1)
+  expect(createOrderSpy).toHaveBeenCalledTimes(1)
+  const completedSession = await sessionRepo.repo.findById(session.id)
+  expect(completedSession?.status).toBe("completed")
+  expect(sessionRepo.spies.claimFinalization).toHaveBeenCalledTimes(2)
+})
+
+test("fulfillAuthorizedCheckoutSession marks claimed finalization failures for reconciliation", async () => {
+  const sessionRepo = createSessionRepository()
+  const createOrderSpy = vi.fn(async () => {
+    throw new Error("Duffel timeout")
+  })
+  const session = await createPayNowSession(sessionRepo)
+  await sessionRepo.repo.update(session.id, {
+    status: "payment_authorized",
+    providerPaymentId: "PAYPAL-CAPTURE-1",
+    paymentConfirmedAt: NOW,
+  })
+
+  await expect(
+    fulfillAuthorizedCheckoutSession({
+      checkoutSessionId: session.id,
+      paymentProvider: "paypal",
+      providerPaymentId: "PAYPAL-CAPTURE-1",
+      deps: createDeps({
+        createOrder: createOrderSpy,
+        sessionRepository: sessionRepo.repo,
+      }),
+    })
+  ).rejects.toThrow("Duffel timeout")
+
+  const reconciledSession = await sessionRepo.repo.findById(session.id)
+  expect(reconciledSession?.status).toBe("reconciliation_required")
+  expect(reconciledSession?.errorCode).toBe("finalization_failed_after_payment_authorized")
+})
+
+test("processPayPalWebhookEvent uses one fulfillment task for duplicate completed captures", async () => {
+  const sessionRepo = createSessionRepository()
+  const outboxRepo = createPaymentOutboxRepository()
   const createOrderSpy = vi.fn(async () => createDuffelOrder())
   await createPayNowSession(sessionRepo)
   const event = createPayPalWebhookEvent("WH-1")
   const deps = createDeps({
     createOrder: createOrderSpy,
     sessionRepository: sessionRepo.repo,
-    paymentWebhookEventRepository: webhookRepo,
+    paymentOutboxRepository: outboxRepo.repo,
+    publishFulfillmentTask: outboxRepo.spies.publishFulfillmentTask,
   })
 
   await processPayPalWebhookEvent({ event }, deps)
   await processPayPalWebhookEvent({ event }, deps)
 
-  expect(createOrderSpy).toHaveBeenCalledTimes(1)
+  expect(createOrderSpy).not.toHaveBeenCalled()
+  expect(outboxRepo.spies.enqueueUnique).toHaveBeenCalledTimes(2)
+  await expect(outboxRepo.repo.findPending(NOW, 10)).resolves.toHaveLength(1)
 })
 
 test("submitCheckout keeps the hold flow unchanged", async () => {
@@ -427,9 +501,15 @@ function createDeps(
     createOrder: (payload: CreateOrder) => Promise<Order>
     sessionRepository: CheckoutSessionRepository
     orderRepository: FlightOrderRepository
-    paymentWebhookEventRepository: PaymentWebhookEventRepository
+    paymentOutboxRepository: PaymentOutboxRepository
+    publishFulfillmentTask: (input: {
+      paymentAttemptId: string
+      checkoutSessionId: string
+    }) => Promise<unknown>
   }> = {}
 ) {
+  const outbox = createPaymentOutboxRepository()
+
   return {
     now: () => NOW,
     getOfferById: async () => createOffer(),
@@ -437,8 +517,10 @@ function createDeps(
     createOrder: overrides.createOrder ?? (async () => createDuffelOrder()),
     sessionRepository: overrides.sessionRepository ?? createSessionRepository().repo,
     orderRepository: overrides.orderRepository ?? createOrderRepository().repo,
-    paymentWebhookEventRepository:
-      overrides.paymentWebhookEventRepository ?? createPaymentWebhookEventRepository(),
+    paymentOutboxRepository:
+      overrides.paymentOutboxRepository ?? outbox.repo,
+    publishFulfillmentTask:
+      overrides.publishFulfillmentTask ?? outbox.spies.publishFulfillmentTask,
   }
 }
 
@@ -693,6 +775,7 @@ async function createPayNowSession(sessionRepo: ReturnType<typeof createSessionR
     providerStatusMessage: null,
     paymentCurrency: "USD",
     paymentAmount: 120,
+    paymentAttemptId: "pat_1",
     checkoutPayloadSnapshot: createStoredCheckoutSnapshot(),
     status: "processing",
     paymentInitiatedAt: NOW,
@@ -733,6 +816,7 @@ function createSessionRepository() {
         paymentProvider: input.paymentProvider ?? null,
         paymentCurrency: input.paymentCurrency ?? null,
         paymentAmount: input.paymentAmount ?? null,
+        paymentAttemptId: input.paymentAttemptId ?? null,
         checkoutPayloadSnapshot: input.checkoutPayloadSnapshot ?? null,
         duffelOrderId: null,
         paymentInitiatedAt: input.paymentInitiatedAt ?? null,
@@ -758,6 +842,24 @@ function createSessionRepository() {
         updatedAt: NOW,
       }
       sessionsById.set(id, updated)
+      return updated
+    }),
+    claimFinalization: vi.fn(async (input: {
+      checkoutSessionId: string
+      now: Date
+    }) => {
+      const existing = sessionsById.get(input.checkoutSessionId)
+
+      if (!existing || existing.status !== "payment_authorized") {
+        return null
+      }
+
+      const updated: CheckoutSessionRecord = {
+        ...existing,
+        status: "finalizing",
+        updatedAt: input.now,
+      }
+      sessionsById.set(input.checkoutSessionId, updated)
       return updated
     }),
   }
@@ -800,15 +902,74 @@ function createOrderRepository() {
   }
 }
 
-function createPaymentWebhookEventRepository(): PaymentWebhookEventRepository {
-  const processed = new Set<string>()
+function createPaymentOutboxRepository() {
+  type EnqueueInput = Parameters<PaymentOutboxRepository["enqueueUnique"]>[0]
+  const tasksByUniqueKey = new Map<string, Awaited<ReturnType<PaymentOutboxRepository["enqueueUnique"]>>>()
+
+  const spies = {
+    publishFulfillmentTask: vi.fn(async () => ({ published: true as const })),
+    enqueueUnique: vi.fn(async (input: EnqueueInput) => {
+      const existing = tasksByUniqueKey.get(input.uniqueKey)
+
+      if (existing) {
+        return existing
+      }
+
+      const now = NOW
+      const record = {
+        id: input.id,
+        taskType: input.taskType,
+        status: "pending" as const,
+        uniqueKey: input.uniqueKey,
+        paymentAttemptId: input.paymentAttemptId,
+        internalOrderType: input.internalOrderType,
+        internalOrderId: input.internalOrderId,
+        payload: input.payload ?? null,
+        attemptCount: 0,
+        lastError: null,
+        nextAttemptAt: input.nextAttemptAt ?? now,
+        claimedBy: null,
+        claimExpiresAt: null,
+        processingStartedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: null,
+      }
+      tasksByUniqueKey.set(record.uniqueKey, record)
+      return record
+    }),
+    findByUniqueKey: vi.fn(async (uniqueKey: string) => tasksByUniqueKey.get(uniqueKey) ?? null),
+    findPending: vi.fn(async () => Array.from(tasksByUniqueKey.values())),
+    claimPending: vi.fn(async (input: Parameters<PaymentOutboxRepository["claimPending"]>[0]) => {
+      for (const [uniqueKey, task] of tasksByUniqueKey.entries()) {
+        if (
+          task.id === input.id &&
+          (task.status === "pending" ||
+            (task.status === "processing" &&
+              task.claimExpiresAt !== null &&
+              task.claimExpiresAt <= input.now)) &&
+          task.nextAttemptAt <= input.now
+        ) {
+          const claimed = {
+            ...task,
+            status: "processing" as const,
+            claimedBy: input.workerId,
+            claimExpiresAt: input.leaseExpiresAt,
+            processingStartedAt: input.now,
+            updatedAt: input.now,
+          }
+          tasksByUniqueKey.set(uniqueKey, claimed)
+          return claimed
+        }
+      }
+      return null
+    }),
+    markCompleted: vi.fn(async () => true),
+    markFailed: vi.fn(async () => undefined),
+  }
 
   return {
-    async isProcessed(input) {
-      return processed.has(`${input.provider}:${input.eventKey}`)
-    },
-    async record(input) {
-      processed.add(`${input.provider}:${input.eventKey}`)
-    },
+    repo: spies as PaymentOutboxRepository,
+    spies,
   }
 }

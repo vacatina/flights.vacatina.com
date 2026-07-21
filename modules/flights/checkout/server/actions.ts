@@ -334,16 +334,20 @@ async function getCheckoutSubmitter() {
 }
 
 async function getPayPalOrderCreator() {
-  const { createCheckoutPayPalOrder } = await import("@/modules/flights/checkout/server/service")
-  return createCheckoutPayPalOrder
+  const { startPayPalPayment } = await import("@/modules/flights/payments-adapter/service")
+  return startPayPalPayment
 }
 
 async function getPayPalOrderCapturer() {
-  const { captureCheckoutPayPalOrder } = await import("@/modules/flights/checkout/server/service")
-  return captureCheckoutPayPalOrder
+  const { capturePayPalPayment } = await import(
+    "@/modules/flights/payments-adapter/service"
+  )
+  return capturePayPalPayment
 }
 
 async function getCheckoutSessionStatusResolver() {
-  const { getCheckoutSessionStatus } = await import("@/modules/flights/checkout/server/service")
-  return getCheckoutSessionStatus
+  const { getPaymentAttemptStatus } = await import(
+    "@/modules/flights/payments-adapter/service"
+  )
+  return getPaymentAttemptStatus
 }

@@ -1,12 +1,9 @@
 import { NextRequest } from "next/server"
 
-import {
-  verifyPayPalWebhookSignature,
-  type PayPalWebhookEvent,
-} from "@/lib/paypal"
+import type { PayPalWebhookEvent } from "@/modules/payments/server/providers/paypal"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 import { incrementCheckoutMetric } from "@/modules/flights/checkout/server/metrics"
-import { processPayPalWebhookEvent } from "@/modules/flights/checkout/server/service"
+import { verifyAndStorePayPalWebhook } from "@/modules/payments/server/webhooks/paypal"
 
 export const runtime = "nodejs"
 
@@ -24,21 +21,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const verified = await verifyPayPalWebhookSignature({
+    const result = await verifyAndStorePayPalWebhook({
       headers: request.headers,
       event,
     })
 
-    if (!verified) {
+    if (!result.ok) {
       incrementCheckoutMetric("paypal_webhook_invalid_sig_total", {
-        reason: "verification_failed",
+        reason: result.reason,
       })
-      return new Response("Invalid PayPal webhook signature", { status: 400 })
+      return new Response("Invalid PayPal webhook", { status: 400 })
     }
 
-    await processPayPalWebhookEvent({ event })
-
-    logFlightFlow("checkout.paypal", "webhook_processed", {
+    logFlightFlow("checkout.paypal", "webhook_stored", {
       eventId: event.id ?? null,
       eventType: event.event_type ?? null,
     })
