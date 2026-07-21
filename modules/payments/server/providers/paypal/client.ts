@@ -1,7 +1,5 @@
 import "server-only"
 
-import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
-
 export type PayPalEnvironment = "sandbox" | "live"
 
 export interface PayPalConfig {
@@ -51,6 +49,36 @@ interface PayPalPurchaseUnit {
     captures?: PayPalCapture[]
   }
 }
+
+const ZERO_MINOR_UNIT_CURRENCIES = new Set([
+  "BIF",
+  "CLP",
+  "DJF",
+  "GNF",
+  "ISK",
+  "JPY",
+  "KMF",
+  "KRW",
+  "PYG",
+  "RWF",
+  "UGX",
+  "UYI",
+  "VND",
+  "VUV",
+  "XAF",
+  "XOF",
+  "XPF",
+])
+
+const THREE_MINOR_UNIT_CURRENCIES = new Set([
+  "BHD",
+  "IQD",
+  "JOD",
+  "KWD",
+  "LYD",
+  "OMR",
+  "TND",
+])
 
 let cachedConfig: PayPalConfig | null = null
 let cachedAccessToken: { token: string; expiresAt: number } | null = null
@@ -154,12 +182,24 @@ export async function verifyPayPalWebhookSignature(input: {
 
 export function toPayPalAmount(amount: number, currency: string): PayPalAmount {
   const normalizedCurrency = currency.trim().toUpperCase()
-  const digits = currencyMinorUnit(normalizedCurrency)
+  const digits = paypalCurrencyMinorUnit(normalizedCurrency)
 
   return {
     currency_code: normalizedCurrency,
     value: amount.toFixed(digits),
   }
+}
+
+function paypalCurrencyMinorUnit(currency: string) {
+  if (ZERO_MINOR_UNIT_CURRENCIES.has(currency)) {
+    return 0
+  }
+
+  if (THREE_MINOR_UNIT_CURRENCIES.has(currency)) {
+    return 3
+  }
+
+  return 2
 }
 
 export function getPayPalCaptureFromOrder(order: PayPalCaptureOrder): PayPalCapture | null {

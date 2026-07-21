@@ -1,6 +1,7 @@
 import { verifySignatureAppRouter } from "@upstash/qstash/nextjs"
 import { z } from "zod"
 
+import "@/modules/flights/payments-adapter/register"
 import { isPaymentJobRequestAuthorized } from "@/modules/payments/server/job-auth"
 import { processPaymentOutboxByPaymentAttemptId } from "@/modules/payments/server/workers/outbox-worker"
 

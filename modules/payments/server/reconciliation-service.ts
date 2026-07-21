@@ -141,8 +141,8 @@ async function reconcilePaymentAttempt(input: {
     })
     await deps.outboxRepository.enqueueUnique({
       id: createPaymentOutboxId(),
-      taskType: "fulfill_flight_order",
-      uniqueKey: `fulfill_flight_order:${attempt.id}`,
+      taskType: "fulfill_paid_resource",
+      uniqueKey: `fulfill_paid_resource:${attempt.id}`,
       paymentAttemptId: attempt.id,
       internalOrderType: attempt.internalOrderType,
       internalOrderId: attempt.internalOrderId,

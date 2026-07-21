@@ -1060,8 +1060,8 @@ async function processVerifiedPayPalCapture(input: {
 
   const outboxTask = await input.deps.paymentOutboxRepository.enqueueUnique({
     id: createPaymentOutboxId(),
-    taskType: "fulfill_flight_order",
-    uniqueKey: `fulfill_flight_order:${input.session.paymentAttemptId}`,
+    taskType: "fulfill_paid_resource",
+    uniqueKey: `fulfill_paid_resource:${input.session.paymentAttemptId}`,
     paymentAttemptId: input.session.paymentAttemptId,
     internalOrderType: "flight_checkout",
     internalOrderId: input.session.id,

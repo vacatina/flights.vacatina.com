@@ -283,8 +283,8 @@ test("captureCheckoutPayPalOrder enqueues fulfillment on completed capture", asy
   expect(createOrderSpy).not.toHaveBeenCalled()
   expect(outboxRepo.spies.enqueueUnique).toHaveBeenCalledWith(
     expect.objectContaining({
-      taskType: "fulfill_flight_order",
-      uniqueKey: "fulfill_flight_order:pat_1",
+      taskType: "fulfill_paid_resource",
+      uniqueKey: "fulfill_paid_resource:pat_1",
       paymentAttemptId: "pat_1",
       internalOrderType: "flight_checkout",
       internalOrderId: session.id,

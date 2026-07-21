@@ -116,6 +116,7 @@ export const paymentOutboxStatusEnum = pgEnum("payment_outbox_status", [
 
 export const paymentOutboxTaskTypeEnum = pgEnum("payment_outbox_task_type", [
   "fulfill_flight_order",
+  "fulfill_paid_resource",
   "send_receipt",
   "notify_admin",
   "sync_payment_state",

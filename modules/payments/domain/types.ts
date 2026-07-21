@@ -47,6 +47,7 @@ export type PaymentOutboxStatus = "pending" | "processing" | "completed" | "fail
 
 export type PaymentOutboxTaskType =
   | "fulfill_flight_order"
+  | "fulfill_paid_resource"
   | "send_receipt"
   | "notify_admin"
   | "sync_payment_state"

@@ -1,8 +1,11 @@
 import "server-only"
 
 import { logFlightFlowError } from "@/lib/logging/flow-debug"
-import { fulfillAuthorizedCheckoutSession } from "@/modules/flights/checkout/server/service-core"
-import type { PaymentEventType } from "@/modules/payments/domain"
+import type { PaymentEventType, PaymentOutboxTaskType } from "@/modules/payments/domain"
+import {
+  getPaymentAdapter,
+  type PayableResourceAdapter,
+} from "@/modules/payments/server/adapters"
 import {
   defaultPaymentAttemptsRepository,
   type PaymentAttemptRecord,
@@ -23,14 +26,14 @@ interface PaymentOutboxWorkerDeps {
   outboxRepository: PaymentOutboxRepository
   attemptsRepository: PaymentAttemptsRepository
   eventsRepository: PaymentEventsRepository
-  fulfillFlightOrder: typeof fulfillAuthorizedCheckoutSession
+  getAdapter: (resourceType: string) => PayableResourceAdapter | null
 }
 
 const defaultDeps: PaymentOutboxWorkerDeps = {
   outboxRepository: defaultPaymentOutboxRepository,
   attemptsRepository: defaultPaymentAttemptsRepository,
   eventsRepository: defaultPaymentEventsRepository,
-  fulfillFlightOrder: fulfillAuthorizedCheckoutSession,
+  getAdapter: getPaymentAdapter,
 }
 
 export async function processPaymentOutbox(input: {
@@ -62,7 +65,7 @@ export async function processPaymentOutbox(input: {
     }
 
     try {
-      if (claimedTask.taskType !== "fulfill_flight_order") {
+      if (!isFulfillmentTaskType(claimedTask.taskType)) {
         ignored += 1
         await deps.outboxRepository.markCompleted({
           id: claimedTask.id,
@@ -111,9 +114,10 @@ export async function processPaymentOutboxByPaymentAttemptId(input: {
 }) {
   const deps = { ...defaultDeps, ...input.deps }
   const workerId = input.workerId ?? createPaymentWorkerId("outbox-single")
-  const task = await deps.outboxRepository.findByUniqueKey(
-    `fulfill_flight_order:${input.paymentAttemptId}`
-  )
+  const task = await findFulfillmentTaskByPaymentAttemptId({
+    paymentAttemptId: input.paymentAttemptId,
+    outboxRepository: deps.outboxRepository,
+  })
 
   if (!task) {
     throw new Error("Payment fulfillment outbox task not found.")
@@ -148,7 +152,7 @@ export async function processPaymentOutboxByPaymentAttemptId(input: {
   }
 
   try {
-    if (claimedTask.taskType !== "fulfill_flight_order") {
+    if (!isFulfillmentTaskType(claimedTask.taskType)) {
       await deps.outboxRepository.markCompleted({
         id: claimedTask.id,
         workerId,
@@ -225,10 +229,20 @@ async function processFulfillFlightOrderTask(
   })
 
   try {
-    await deps.fulfillFlightOrder({
-      checkoutSessionId: task.internalOrderId,
-      paymentProvider: attempt.provider,
+    const adapter = deps.getAdapter(task.internalOrderType)
+
+    if (!adapter) {
+      throw new Error(
+        `No payment adapter registered for resource type ${task.internalOrderType}.`
+      )
+    }
+
+    await adapter.fulfill({
+      internalOrderId: task.internalOrderId,
+      paymentAttemptId: attempt.id,
+      provider: attempt.provider,
       providerPaymentId: attempt.providerCaptureId,
+      now: new Date(),
     })
   } catch (error) {
     await appendPaymentEventOnce({
@@ -279,6 +293,24 @@ async function appendPaymentEventOnce(input: {
 
 function retryDelayMs(attemptCount: number) {
   return Math.min(60_000 * 2 ** Math.max(attemptCount - 1, 0), 15 * 60_000)
+}
+
+async function findFulfillmentTaskByPaymentAttemptId(input: {
+  paymentAttemptId: string
+  outboxRepository: PaymentOutboxRepository
+}) {
+  return (
+    (await input.outboxRepository.findByUniqueKey(
+      `fulfill_paid_resource:${input.paymentAttemptId}`
+    )) ??
+    (await input.outboxRepository.findByUniqueKey(
+      `fulfill_flight_order:${input.paymentAttemptId}`
+    ))
+  )
+}
+
+function isFulfillmentTaskType(taskType: PaymentOutboxTaskType) {
+  return taskType === "fulfill_paid_resource" || taskType === "fulfill_flight_order"
 }
 
 function outboxLeaseMs() {

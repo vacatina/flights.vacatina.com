@@ -41,7 +41,7 @@ export async function publishPaymentFulfillmentTask(
       body: {
         paymentAttemptId: input.paymentAttemptId,
       },
-      deduplicationId: `fulfill_flight_order-${input.paymentAttemptId}`,
+      deduplicationId: `fulfill_paid_resource-${input.paymentAttemptId}`,
       retries: 5,
       headers: toForwardedHeaders(),
     })

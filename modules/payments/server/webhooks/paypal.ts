@@ -1,8 +1,6 @@
 import "server-only"
 
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
-import { incrementCheckoutMetric } from "@/modules/flights/checkout/server/metrics"
-import { processPayPalWebhookEvent } from "@/modules/flights/checkout/server/service-core"
 import { createPaymentWebhookInboxId } from "@/modules/payments/server/ids"
 import {
   defaultPaymentWebhookInboxRepository,
@@ -19,12 +17,14 @@ import {
 
 interface PayPalWebhookDeps {
   inboxRepository: PaymentWebhookInboxRepository
-  processEvent: typeof processPayPalWebhookEvent
+  processEvent: (input: { event: PayPalWebhookEvent }) => Promise<void>
 }
 
 const defaultDeps: PayPalWebhookDeps = {
   inboxRepository: defaultPaymentWebhookInboxRepository,
-  processEvent: processPayPalWebhookEvent,
+  async processEvent() {
+    throw new Error("No PayPal webhook processor configured.")
+  },
 }
 
 export async function verifyAndStorePayPalWebhook(input: {
@@ -59,7 +59,6 @@ export async function verifyAndStorePayPalWebhook(input: {
     headers: Object.fromEntries(input.headers.entries()),
   })
 
-  incrementCheckoutMetric("paypal_webhook_total")
   logFlightFlow("payments.paypal", "webhook_stored", {
     inboxId: inbox.id,
     providerEventId: inbox.providerEventId,

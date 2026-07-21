@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 
+import "@/modules/flights/payments-adapter/register"
 import { isPaymentJobRequestAuthorized } from "@/modules/payments/server/job-auth"
 import { processPaymentOutbox } from "@/modules/payments/server/workers/outbox-worker"
 

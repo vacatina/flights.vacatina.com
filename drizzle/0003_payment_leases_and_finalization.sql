@@ -1,4 +1,5 @@
 ALTER TYPE "public"."checkout_session_status" ADD VALUE IF NOT EXISTS 'finalizing' AFTER 'payment_authorized';--> statement-breakpoint
+ALTER TYPE "public"."payment_outbox_task_type" ADD VALUE IF NOT EXISTS 'fulfill_paid_resource' AFTER 'fulfill_flight_order';--> statement-breakpoint
 
 ALTER TABLE "payment_outbox" ADD COLUMN IF NOT EXISTS "claimed_by" text;--> statement-breakpoint
 ALTER TABLE "payment_outbox" ADD COLUMN IF NOT EXISTS "claim_expires_at" timestamp with time zone;--> statement-breakpoint
