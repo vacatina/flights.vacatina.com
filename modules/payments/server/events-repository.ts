@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
 
 import { getDbClient, paymentEvents } from "@/lib/db"
 import type {
@@ -112,6 +112,7 @@ export const defaultPaymentEventsRepository: PaymentEventsRepository = {
           paymentEvents.providerEventId,
           paymentEvents.eventType,
         ],
+        where: sql`${paymentEvents.providerEventId} is not null`,
       })
       .returning()
 
