@@ -36,14 +36,16 @@ export default function RootLayout({
   const clerkEnabled = isClerkConfigured()
 
   const appShell = (
-    <ThemeProvider>
+    // <ThemeProvider>
+    <>
       <TopLoader />
       <div id="top" className="min-h-svh">
         <SiteNavbar clerkEnabled={clerkEnabled} />
         {children}
         <SiteFooter />
       </div>
-    </ThemeProvider>
+    </>
+    // </ThemeProvider>
   )
 
   return (
