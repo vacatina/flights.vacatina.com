@@ -3,15 +3,15 @@
   "crons": [
     {
       "path": "/api/jobs/payments/outbox/process",
-      "schedule": "* * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/jobs/payments/webhooks/process",
-      "schedule": "* * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/jobs/payments/reconcile",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
