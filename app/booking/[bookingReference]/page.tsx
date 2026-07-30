@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { getActorContext } from "@/modules/auth/server"
+import { getCancellationStatusForBooking } from "@/modules/flights/cancellations/server"
 import { getBookingDetail } from "@/modules/flights/orders/server"
 import { BookingDetailView } from "@/modules/flights/orders/ui"
 import {
@@ -34,12 +35,19 @@ export default async function BookingDetailPage({
   ])
   const refreshFromDuffel = resolvedSearchParams.refresh === "1"
   let detail: Awaited<ReturnType<typeof getBookingDetail>> | null = null
+  let cancellationStatus: Awaited<
+    ReturnType<typeof getCancellationStatusForBooking>
+  > | null = null
 
   try {
     detail = await getBookingDetail({
       actor,
       reference: resolvedParams.bookingReference,
       refreshFromDuffel,
+    })
+    cancellationStatus = await getCancellationStatusForBooking({
+      actor,
+      bookingReference: resolvedParams.bookingReference,
     })
   } catch (error) {
     logFlightFlowError("BookingDetailPage", "render_error_state", error, {
@@ -82,6 +90,7 @@ export default async function BookingDetailPage({
 
         <BookingDetailView
           detail={detail}
+          cancellationStatus={cancellationStatus}
           refreshHref={`/booking/${encodeURIComponent(detail.bookingReference)}?refresh=1`}
         />
       </div>
