@@ -21,6 +21,7 @@ import {
   type FlightRefundAttemptRow,
   type NewBusinessSettingsRow,
   type NewFlightCancellationEventRow,
+  type NewFlightCancellationQuoteRow,
   type NewFlightRefundAttemptRow,
   type PaymentAttemptRow,
 } from "@/lib/db"
@@ -130,6 +131,21 @@ export interface CancellationRepository {
     message?: string | null
     metadata?: unknown
   }): Promise<FlightCancellationEventRow>
+  createQuote(input: {
+    cancellationRequestId: string
+    duffelOrderCancellationId: string
+    refundAmount: number | null
+    refundCurrency: string | null
+    refundTo: string | null
+    expiresAt: Date | null
+    confirmedAt: Date | null
+    rawPayload?: unknown
+  }): Promise<CancellationQuoteRecord>
+  markQuoteConfirmed(input: {
+    quoteId: string
+    confirmedAt: Date
+    rawPayload?: unknown
+  }): Promise<CancellationQuoteRecord | null>
   createRefundAttempt(input: {
     cancellationRequestId: string
     paymentAttemptId: string | null
@@ -140,6 +156,12 @@ export interface CancellationRepository {
     status: FlightRefundStatus
     rawPayload?: unknown
   }): Promise<RefundAttemptRecord>
+  updateRefundAttempt(input: {
+    refundAttemptId: string
+    providerRefundId?: string | null
+    status?: FlightRefundStatus
+    rawPayload?: unknown
+  }): Promise<RefundAttemptRecord | null>
   getBusinessSettings(): Promise<BusinessSettingsRow>
   updateBusinessSettings(input: {
     businessName: string
@@ -153,6 +175,7 @@ export interface CancellationRepository {
 }
 
 const requestStore = new Map<string, CancellationRequestRecord>()
+const quoteStore = new Map<string, CancellationQuoteRecord>()
 const eventStore = new Map<string, FlightCancellationEventRow>()
 const refundStore = new Map<string, RefundAttemptRecord>()
 let businessSettingsStore: BusinessSettingsRow | null = null
@@ -326,7 +349,9 @@ export const defaultCancellationRepository: CancellationRepository = {
         request,
         order: createOrderFallback(request),
         paymentAttempt: null,
-        quotes: [],
+        quotes: [...quoteStore.values()]
+          .filter((quote) => quote.cancellationRequestId === requestId)
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()),
         refunds: [...refundStore.values()].filter(
           (refund) => refund.cancellationRequestId === requestId
         ),
@@ -406,6 +431,71 @@ export const defaultCancellationRepository: CancellationRepository = {
     const [row] = await db.insert(flightCancellationEvents).values(values).returning()
     return row
   },
+  async createQuote(input) {
+    const db = getDbClient()
+    const now = new Date()
+    const id = createCancellationQuoteId()
+
+    if (!db) {
+      const quote: CancellationQuoteRecord = {
+        id,
+        cancellationRequestId: input.cancellationRequestId,
+        duffelOrderCancellationId: input.duffelOrderCancellationId,
+        refundAmount: input.refundAmount,
+        refundCurrency: input.refundCurrency,
+        refundTo: input.refundTo,
+        expiresAt: input.expiresAt,
+        confirmedAt: input.confirmedAt,
+        rawPayload: input.rawPayload ?? null,
+        createdAt: now,
+      }
+      quoteStore.set(id, quote)
+      return quote
+    }
+
+    const values: NewFlightCancellationQuoteRow = {
+      id,
+      cancellationRequestId: input.cancellationRequestId,
+      duffelOrderCancellationId: input.duffelOrderCancellationId,
+      refundAmount:
+        input.refundAmount === null ? null : toDbNumeric(input.refundAmount),
+      refundCurrency: input.refundCurrency,
+      refundTo: input.refundTo,
+      expiresAt: input.expiresAt,
+      confirmedAt: input.confirmedAt,
+      rawPayload: input.rawPayload ?? null,
+      createdAt: now,
+    }
+    const [row] = await db.insert(flightCancellationQuotes).values(values).returning()
+    return toQuoteRecord(row)
+  },
+  async markQuoteConfirmed(input) {
+    const db = getDbClient()
+
+    if (!db) {
+      const current = quoteStore.get(input.quoteId)
+      if (!current) {
+        return null
+      }
+      const updated: CancellationQuoteRecord = {
+        ...current,
+        confirmedAt: input.confirmedAt,
+        rawPayload: input.rawPayload ?? current.rawPayload,
+      }
+      quoteStore.set(input.quoteId, updated)
+      return updated
+    }
+
+    const [row] = await db
+      .update(flightCancellationQuotes)
+      .set({
+        confirmedAt: input.confirmedAt,
+        rawPayload: input.rawPayload,
+      })
+      .where(eq(flightCancellationQuotes.id, input.quoteId))
+      .returning()
+    return row ? toQuoteRecord(row) : null
+  },
   async createRefundAttempt(input) {
     const db = getDbClient()
     const now = new Date()
@@ -445,6 +535,48 @@ export const defaultCancellationRepository: CancellationRepository = {
     }
     const [row] = await db.insert(flightRefundAttempts).values(values).returning()
     return toRefundRecord(row)
+  },
+  async updateRefundAttempt(input) {
+    const db = getDbClient()
+    const now = new Date()
+
+    if (!db) {
+      const current = refundStore.get(input.refundAttemptId)
+      if (!current) {
+        return null
+      }
+      const updated: RefundAttemptRecord = {
+        ...current,
+        providerRefundId:
+          input.providerRefundId === undefined
+            ? current.providerRefundId
+            : input.providerRefundId,
+        status: input.status ?? current.status,
+        rawPayload:
+          input.rawPayload === undefined ? current.rawPayload : input.rawPayload,
+        updatedAt: now,
+      }
+      refundStore.set(input.refundAttemptId, updated)
+      return updated
+    }
+
+    const patch: Record<string, unknown> = { updatedAt: now }
+    if (input.providerRefundId !== undefined) {
+      patch.providerRefundId = input.providerRefundId
+    }
+    if (input.status !== undefined) {
+      patch.status = input.status
+    }
+    if (input.rawPayload !== undefined) {
+      patch.rawPayload = input.rawPayload
+    }
+
+    const [row] = await db
+      .update(flightRefundAttempts)
+      .set(patch)
+      .where(eq(flightRefundAttempts.id, input.refundAttemptId))
+      .returning()
+    return row ? toRefundRecord(row) : null
   },
   async getBusinessSettings() {
     const db = getDbClient()
@@ -619,12 +751,17 @@ function createCancellationEventId() {
   return `fce_${randomUUID().replaceAll("-", "")}`
 }
 
+function createCancellationQuoteId() {
+  return `fcq_${randomUUID().replaceAll("-", "")}`
+}
+
 function createRefundAttemptId() {
   return `fra_${randomUUID().replaceAll("-", "")}`
 }
 
 export function resetCancellationRepositoryInMemoryStateForTests() {
   requestStore.clear()
+  quoteStore.clear()
   eventStore.clear()
   refundStore.clear()
   businessSettingsStore = null

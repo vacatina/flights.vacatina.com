@@ -188,9 +188,18 @@ export async function getBookingDetail(
     }),
   ])
 
+  const bookingNotifications = notifications.filter(
+    (notification): notification is typeof notification & {
+      eventType: "booking_confirmed" | "hold_created" | "reconciliation_required"
+    } =>
+      notification.eventType === "booking_confirmed" ||
+      notification.eventType === "hold_created" ||
+      notification.eventType === "reconciliation_required"
+  )
+
   const detail = mapFlightOrderToDetailModel(order, {
     checkoutSession,
-    notifications,
+    notifications: bookingNotifications,
   })
 
   if (input.refreshFromDuffel) {

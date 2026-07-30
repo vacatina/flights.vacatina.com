@@ -13,6 +13,7 @@ import {
 import {
   approveCancellation,
   approveRefund,
+  createOrRefreshDuffelCancellationQuote,
   createCancellationRequest,
   getCancellationEligibilityContext,
   getCancellationStatusForBooking,
@@ -108,6 +109,13 @@ export async function approveCancellationFormAction(formData: FormData) {
   const admin = await requireActiveAdmin()
   const requestId = requireFormString(formData, "requestId")
   await approveCancellation({ requestId, admin })
+  revalidateAdminCancellation(requestId)
+}
+
+export async function createDuffelCancellationQuoteFormAction(formData: FormData) {
+  const admin = await requireActiveAdmin()
+  const requestId = requireFormString(formData, "requestId")
+  await createOrRefreshDuffelCancellationQuote({ requestId, admin })
   revalidateAdminCancellation(requestId)
 }
 

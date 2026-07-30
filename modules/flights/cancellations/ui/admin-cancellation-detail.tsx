@@ -4,6 +4,7 @@ import type { AdminCancellationDetailModel } from "@/modules/flights/cancellatio
 import {
   approveCancellationFormAction,
   approveRefundFormAction,
+  createDuffelCancellationQuoteFormAction,
   markManualRefundCompletedFormAction,
   moveManualProcessingFormAction,
   recordCutoffOverrideFormAction,
@@ -173,6 +174,25 @@ export function AdminCancellationDetail({
         </section>
 
         <section className="space-y-4 rounded-lg border border-border p-5">
+          <h2 className="text-lg font-semibold">Duffel cancellation quotes</h2>
+          {detail.quotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No Duffel quote stored yet.</p>
+          ) : null}
+          {detail.quotes.map((quote) => (
+            <div key={quote.id} className="space-y-1 rounded-md border border-border p-3">
+              <p className="text-sm font-medium">{quote.refundLabel}</p>
+              <p className="text-xs text-muted-foreground">
+                {quote.duffelOrderCancellationId} · {quote.refundTo}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Expires {quote.expiresAtLabel}
+                {quote.confirmedAtLabel ? ` · Confirmed ${quote.confirmedAtLabel}` : ""}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        <section className="space-y-4 rounded-lg border border-border p-5">
           <h2 className="text-lg font-semibold">Audit trail</h2>
           <div className="space-y-3">
             {detail.events.length === 0 ? (
@@ -198,6 +218,12 @@ export function AdminCancellationDetail({
       <aside className="space-y-4 border-l border-border pl-6">
         <section className="space-y-3 rounded-lg border border-border p-5">
           <h2 className="text-lg font-semibold">Actions</h2>
+          <ActionForm
+            action={createDuffelCancellationQuoteFormAction}
+            requestId={detail.request.id}
+            label="Create/refresh Duffel quote"
+            variant="outline"
+          />
           <ActionForm
             action={approveCancellationFormAction}
             requestId={detail.request.id}

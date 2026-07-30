@@ -9,7 +9,10 @@ import {
 } from "@/modules/flights/cancellations/server/admin-guard"
 import {
   approveCancellation,
+  approveRefund,
+  createOrRefreshDuffelCancellationQuote,
   createCancellationRequest,
+  getAdminCancellationDetail,
   getCancellationEligibilityContext,
   listAdminCancellationRequests,
   rejectCancellation,
@@ -157,6 +160,182 @@ describe("flight cancellation service", () => {
     expect(approved.status).toBe("refund_pending")
   })
 
+  test("persists Duffel cancellation quotes and notifies active admins", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    const adminRecipients = vi.fn(async () => [
+      { id: "clerk_admin_1", email: "admin@example.com" },
+    ])
+    deps.listAdminAlertRecipients = adminRecipients
+    const request = await createCancellationRequest(
+      {
+        actor,
+        bookingReference: "VAC123",
+        customerReason:
+          "My travel dates changed and I need the entire booking cancelled.",
+      },
+      deps
+    )
+
+    const quoted = await createOrRefreshDuffelCancellationQuote(
+      { requestId: request.id, admin },
+      deps
+    )
+    const detail = await getAdminCancellationDetail(request.id, deps)
+
+    expect(quoted.status).toBe("quote_ready")
+    expect(detail.quotes[0]?.duffelOrderCancellationId).toBe("ore_1")
+    expect(adminRecipients).toHaveBeenCalled()
+    expect(deps.enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientEmail: "admin@example.com",
+      })
+    )
+  })
+
+  test("moves to manual processing when Duffel cancel action is unavailable", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    deps.duffelService.getOrder = vi.fn(async () => ({
+      id: "ord_1",
+      availableActions: ["change"],
+      rawPayload: { id: "ord_1", available_actions: ["change"] } as never,
+    }))
+    const request = await createCancellationRequest(
+      {
+        actor,
+        bookingReference: "VAC123",
+        customerReason:
+          "My travel dates changed and I need the entire booking cancelled.",
+      },
+      deps
+    )
+
+    const updated = await createOrRefreshDuffelCancellationQuote(
+      { requestId: request.id, admin },
+      deps
+    )
+
+    expect(updated.status).toBe("manual_processing")
+  })
+
+  test("keeps request actionable when Duffel confirmation fails", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    deps.duffelService.confirmCancellationQuote = vi.fn(async () => {
+      throw new Error("stale cancellation quote")
+    })
+    const request = await createCancellationRequest(
+      {
+        actor,
+        bookingReference: "VAC123",
+        customerReason:
+          "My travel dates changed and I need the entire booking cancelled.",
+      },
+      deps
+    )
+
+    const updated = await approveCancellation({ requestId: request.id, admin }, deps)
+
+    expect(updated.status).toBe("manual_processing")
+  })
+
+  test("caps PayPal refunds at the captured payment amount", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    const refundProvider = vi.fn(async () => ({
+      id: "paypal_refund_1",
+      status: "COMPLETED",
+    }))
+    deps.refundProvider = refundProvider
+    const request = await deps.cancellationRepository.createRequest({
+      flightOrderId: "flo_paid",
+      bookingReference: "VACPAID",
+      duffelOrderId: "ord_paid",
+      requestedByUserId: actor.appUserId,
+      requestedByGuestId: null,
+      customerReason:
+        "My travel dates changed and I need the entire booking cancelled.",
+      duffelApiAvailable: true,
+      adminFeeType: "none",
+      adminFeeValue: 0,
+      adminFeeAmount: 0,
+      customerRefundAmount: 900,
+      customerRefundCurrency: "USD",
+      customerMessage: null,
+      status: "refund_pending",
+    })
+    deps.cancellationRepository.getDetail = vi.fn(async () => ({
+      request,
+      order: {
+        id: "flo_paid",
+        checkoutSessionId: "chk_paid",
+        duffelOrderId: "ord_paid",
+        partialOfferRequestId: "por_paid",
+        offerId: "off_paid",
+        selectedPartialOffers: [],
+        ownerUserId: actor.appUserId,
+        ownerGuestId: null,
+        ownerOrgId: null,
+        contactEmail: "customer@example.com",
+        contactEmailHash: "hash",
+        paymentMode: "pay_now" as const,
+        settlementType: "balance" as const,
+        netAmount: "800",
+        duffelTotalAmount: "800",
+        duffelTotalCurrency: "USD",
+        paymentAwaiting: false,
+        paymentRequiredBy: null,
+        priceGuaranteeExpiresAt: null,
+        paidAt: new Date("2026-07-30T10:00:00.000Z"),
+        orderSnapshot: {
+          routeLabel: "JFK - LAX",
+        },
+        createdAt: new Date("2026-07-30T10:00:00.000Z"),
+        updatedAt: new Date("2026-07-30T10:00:00.000Z"),
+        bookingReference: "VACPAID",
+        paymentAttemptId: "pay_1",
+        sellAmount: "900",
+        currency: "USD",
+      },
+      paymentAttempt: {
+        id: "pay_1",
+        internalOrderType: "flight_checkout" as const,
+        internalOrderId: "chk_paid",
+        ownerUserId: actor.appUserId,
+        ownerGuestId: null,
+        ownerOrgId: null,
+        provider: "paypal" as const,
+        status: "capture_completed" as const,
+        currency: "USD",
+        amount: "500.0000",
+        providerOrderId: "paypal_order_1",
+        providerCaptureId: "capture_1",
+        providerStatus: "COMPLETED",
+        createIdempotencyKey: "create",
+        captureIdempotencyKey: "capture",
+        clientIdempotencyKey: "client",
+        checkoutPayloadSnapshot: null,
+        lastProviderPayload: null,
+        failureCode: null,
+        failureMessage: null,
+        reconciliationRequiredAt: null,
+        nextReconciliationAt: null,
+        createdAt: new Date("2026-07-30T10:00:00.000Z"),
+        updatedAt: new Date("2026-07-30T10:00:00.000Z"),
+      },
+      quotes: [],
+      refunds: [],
+      events: [],
+    }))
+
+    await approveRefund({ requestId: request.id, admin }, deps)
+
+    expect(refundProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 500,
+        captureId: "capture_1",
+        idempotencyKey: `flight-cancellation-refund:${request.id}`,
+      })
+    )
+  })
+
   test("updates business settings from admin input", async () => {
     const settings = await updateBusinessSettings(
       {
@@ -199,6 +378,64 @@ function createDeps(now: Date): CancellationServiceDeps {
       defaultFeeValue: 0,
     },
     now: () => now,
+    duffelService: {
+      getOrder: vi.fn(async () => ({
+        id: "ord_1",
+        availableActions: ["cancel"],
+        rawPayload: { id: "ord_1", available_actions: ["cancel"] } as never,
+      })),
+      createCancellationQuote: vi.fn(async () => ({
+        id: "ore_1",
+        refundAmount: 500,
+        refundCurrency: "USD",
+        refundTo: "balance",
+        expiresAt: new Date("2026-07-31T11:00:00.000Z"),
+        confirmedAt: null,
+        rawPayload: {
+          id: "ore_1",
+          refund_amount: "500.00",
+          refund_currency: "USD",
+          refund_to: "balance",
+        } as never,
+      })),
+      confirmCancellationQuote: vi.fn(async () => ({
+        id: "ore_1",
+        refundAmount: 500,
+        refundCurrency: "USD",
+        refundTo: "balance",
+        expiresAt: new Date("2026-07-31T11:00:00.000Z"),
+        confirmedAt: now,
+        rawPayload: {
+          id: "ore_1",
+          refund_amount: "500.00",
+          refund_currency: "USD",
+          refund_to: "balance",
+          confirmed_at: now.toISOString(),
+        } as never,
+      })),
+    },
+    refundProvider: vi.fn(async () => ({
+      id: "paypal_refund_1",
+      status: "COMPLETED",
+    })),
+    enqueueNotification: vi.fn(async (input) => ({
+      id: `not_${input.eventType}`,
+      eventType: input.eventType,
+      status: "pending" as const,
+      flightOrderId: input.flightOrderId,
+      checkoutSessionId: input.checkoutSessionId,
+      bookingReference: input.bookingReference,
+      recipientEmail: input.recipientEmail,
+      recipientEmailHash: input.recipientEmailHash,
+      payload: input.payload,
+      attemptCount: 0,
+      lastError: null,
+      sentAt: null,
+      nextAttemptAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    listAdminAlertRecipients: vi.fn(async () => []),
   }
 }
 

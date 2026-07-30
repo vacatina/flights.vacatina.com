@@ -32,6 +32,7 @@ import {
   defaultCancellationRepository,
   type CancellationDetailRecord,
   type CancellationRepository,
+  type CancellationQuoteRecord,
   type CancellationRequestRecord,
 } from "@/modules/flights/cancellations/server/repository"
 import {
@@ -40,6 +41,19 @@ import {
   type CancellationServerConfig,
 } from "@/modules/flights/cancellations/server/config"
 import type { AdminActor } from "@/modules/flights/cancellations/server/admin-guard"
+import {
+  defaultDuffelCancellationService,
+  hasDuffelCancelAction,
+  type DuffelCancellationService,
+} from "@/modules/flights/cancellations/server/duffel"
+import {
+  listActiveAdminAlertRecipients,
+  type AdminAlertRecipient,
+} from "@/modules/flights/cancellations/server/admin-notifications"
+import { refundPayPalCapture } from "@/modules/payments/server/providers/paypal"
+import { enqueueNotification } from "@/modules/notifications/server"
+import { createEmailHash } from "@/modules/flights/orders/server/identity"
+import type { NotificationEventType } from "@/modules/notifications/domain"
 
 export interface CancellationStatusSummary {
   id: string
@@ -113,6 +127,14 @@ export interface AdminCancellationDetailModel {
     currency: string
     providerCaptureId: string | null
   }
+  quotes: Array<{
+    id: string
+    duffelOrderCancellationId: string
+    refundLabel: string
+    refundTo: string
+    expiresAtLabel: string
+    confirmedAtLabel: string | null
+  }>
   passengers: Array<{ id: string; label: string; fullName: string | null }>
   events: Array<{
     id: string
@@ -135,6 +157,16 @@ export interface CancellationServiceDeps {
   checkoutSessionRepository: CheckoutSessionRepository
   config: CancellationServerConfig
   now: () => Date
+  duffelService: DuffelCancellationService
+  refundProvider: (input: {
+    captureId: string
+    amount: number
+    currency: string
+    idempotencyKey: string
+    noteToPayer?: string | null
+  }) => Promise<{ id: string; status?: string; amount?: unknown }>
+  enqueueNotification: typeof enqueueNotification
+  listAdminAlertRecipients: () => Promise<AdminAlertRecipient[]>
 }
 
 const defaultDeps: CancellationServiceDeps = {
@@ -143,6 +175,10 @@ const defaultDeps: CancellationServiceDeps = {
   checkoutSessionRepository: defaultCheckoutSessionRepository,
   config: getCancellationServerConfig(),
   now: () => new Date(),
+  duffelService: defaultDuffelCancellationService,
+  refundProvider: refundPayPalCapture,
+  enqueueNotification,
+  listAdminAlertRecipients: listActiveAdminAlertRecipients,
 }
 
 export async function getCancellationEligibilityContext(
@@ -277,6 +313,13 @@ export async function createCancellationRequest(
       duffelApiAvailable: context.duffelApiAvailable,
     },
   })
+  await enqueueCancellationNotifications({
+    requestId: request.id,
+    eventType: status === "manual_processing"
+      ? "cancellation_manual_review"
+      : "cancellation_request_received",
+    adminAlert: true,
+  }, deps)
 
   return toCancellationStatusSummary(request)
 }
@@ -335,22 +378,260 @@ export async function getAdminCancellationDetail(
   return mapAdminDetail(detail)
 }
 
+export async function createOrRefreshDuffelCancellationQuote(
+  input: { requestId: string; admin: AdminActor },
+  deps: CancellationServiceDeps = defaultDeps
+) {
+  const detail = await requireCancellationDetail(input.requestId, deps)
+  const order = await deps.duffelService.getOrder(detail.request.duffelOrderId)
+  const duffelApiAvailable = hasDuffelCancelAction(order)
+
+  await deps.cancellationRepository.updateRequest(input.requestId, {
+    duffelApiAvailable,
+  })
+
+  if (!duffelApiAvailable) {
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "manual_processing",
+        patch: {
+          duffelApiAvailable: false,
+          customerMessage:
+            "This booking requires manual cancellation support because airline API cancellation is unavailable.",
+        },
+        eventType: "manual_processing_started",
+        eventMessage: "Duffel order does not expose API cancellation.",
+        actorType: "admin",
+        actorId: input.admin.appUserId,
+        notificationType: "cancellation_manual_review",
+        adminAlert: true,
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  }
+
+  try {
+    await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "quote_pending",
+        patch: { duffelApiAvailable: true },
+        eventType: "duffel_quote_requested",
+        eventMessage: "Admin requested a Duffel cancellation quote.",
+        actorType: "admin",
+        actorId: input.admin.appUserId,
+        notificationType: "cancellation_manual_review",
+      },
+      deps
+    )
+    const quote = await deps.duffelService.createCancellationQuote(
+      detail.request.duffelOrderId
+    )
+    await deps.cancellationRepository.createQuote({
+      cancellationRequestId: input.requestId,
+      duffelOrderCancellationId: quote.id,
+      refundAmount: quote.refundAmount,
+      refundCurrency: quote.refundCurrency,
+      refundTo: quote.refundTo,
+      expiresAt: quote.expiresAt,
+      confirmedAt: quote.confirmedAt,
+      rawPayload: quote.rawPayload,
+    })
+    const currency = quote.refundCurrency ?? detail.order.currency
+    const feeAmount = calculateCancellationFee({
+      feeType: detail.request.adminFeeType,
+      feeValue: detail.request.adminFeeValue,
+      baseAmount: quote.refundAmount ?? 0,
+      currency,
+    })
+    const customerRefundAmount = capCustomerRefundAmount({
+      airlineRefundAmount: quote.refundAmount ?? 0,
+      feeAmount,
+      capturedPaymentAmount: resolveCapturedPaymentAmount(
+        toFlightOrderRecord(detail.order),
+        detail.paymentAttempt
+      ),
+      currency,
+    })
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "quote_ready",
+        patch: {
+          adminFeeAmount: feeAmount,
+          customerRefundAmount,
+          customerRefundCurrency: currency,
+          customerMessage:
+            detail.request.customerMessage ??
+            "Your airline cancellation quote is ready for admin review.",
+        },
+        eventType: "duffel_quote_created",
+        eventMessage: "Duffel cancellation quote created.",
+        actorType: "admin",
+        actorId: input.admin.appUserId,
+        notificationType: "cancellation_quote_ready",
+        adminAlert: true,
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  } catch (error) {
+    await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "admin_review_required",
+        patch: {
+          customerMessage:
+            "Your cancellation request needs manual admin review before we can confirm next steps.",
+        },
+        eventType: "duffel_quote_failed",
+        eventMessage: error instanceof Error ? error.message : "Duffel quote failed.",
+        actorType: "system",
+        actorId: null,
+        notificationType: "cancellation_issue",
+        adminAlert: true,
+        metadata: { phase: "duffel_quote" },
+      },
+      deps
+    )
+    throw error
+  }
+}
+
 export async function approveCancellation(
   input: { requestId: string; admin: AdminActor },
   deps: CancellationServiceDeps = defaultDeps
 ) {
   const detail = await requireCancellationDetail(input.requestId, deps)
-  assertTransition(detail.request.status, "refund_pending")
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    status: "refund_pending",
-    cancellationApprovedBy: input.admin.appUserId,
-    cancellationApprovedAt: deps.now(),
-    customerMessage:
-      detail.request.customerMessage ??
-      "Your cancellation has been approved. Refund review is now pending.",
-  })
-  await addAdminEvent(deps, input, "cancellation_approved", "Admin approved cancellation.")
-  return requireUpdated(updated)
+  const approvedAt = deps.now()
+
+  if (detail.request.duffelApiAvailable === false) {
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "manual_processing",
+        patch: {
+          cancellationApprovedBy: input.admin.appUserId,
+          cancellationApprovedAt: approvedAt,
+          customerMessage:
+            detail.request.customerMessage ??
+            "Your cancellation has been approved and is being handled manually by support.",
+        },
+        eventType: "cancellation_approved_manual",
+        eventMessage: "Admin approved cancellation for manual processing.",
+        actorType: "admin",
+        actorId: input.admin.appUserId,
+        notificationType: "cancellation_approved",
+        adminAlert: true,
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  }
+
+  const currentDetail =
+    detail.quotes.length > 0
+      ? detail
+      : await createOrRefreshDuffelCancellationQuote(input, deps).then(() =>
+          requireCancellationDetail(input.requestId, deps)
+        )
+  if (currentDetail.request.duffelApiAvailable === false) {
+    return toCancellationStatusSummary(currentDetail.request)
+  }
+  const latestQuote = currentDetail.quotes[0]
+
+  if (!latestQuote) {
+    throw new Error("A Duffel cancellation quote is required before approval.")
+  }
+
+  await transitionRequestStatus(
+    {
+      requestId: input.requestId,
+      status: "duffel_confirming",
+      patch: {
+        cancellationApprovedBy: input.admin.appUserId,
+        cancellationApprovedAt: approvedAt,
+        customerMessage:
+          detail.request.customerMessage ??
+          "Your cancellation has been approved and is being confirmed with the airline.",
+      },
+      eventType: "duffel_cancellation_confirming",
+      eventMessage: "Admin approved cancellation; confirming latest Duffel quote.",
+      actorType: "admin",
+      actorId: input.admin.appUserId,
+      notificationType: "cancellation_approved",
+      adminAlert: true,
+    },
+    deps
+  )
+
+  try {
+    const confirmed = await deps.duffelService.confirmCancellationQuote(
+      latestQuote.duffelOrderCancellationId
+    )
+    await deps.cancellationRepository.markQuoteConfirmed({
+      quoteId: latestQuote.id,
+      confirmedAt: confirmed.confirmedAt ?? deps.now(),
+      rawPayload: confirmed.rawPayload,
+    })
+    await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "duffel_cancelled",
+        patch: {
+          customerMessage:
+            "Your flight cancellation has been confirmed with the airline. Refund review is next.",
+        },
+        eventType: "duffel_cancellation_confirmed",
+        eventMessage: "Duffel cancellation quote confirmed.",
+        actorType: "system",
+        actorId: null,
+        notificationType: "cancellation_completed",
+        adminAlert: true,
+      },
+      deps
+    )
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "refund_pending",
+        patch: {
+          customerMessage:
+            "Your flight cancellation is complete and your refund is awaiting review.",
+        },
+        eventType: "refund_review_pending",
+        eventMessage: "Cancellation is ready for refund review.",
+        actorType: "system",
+        actorId: null,
+        notificationType: "cancellation_approved",
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  } catch (error) {
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "manual_processing",
+        patch: {
+          customerMessage:
+            "Your cancellation was approved, but airline confirmation needs manual support.",
+        },
+        eventType: "duffel_confirm_failed",
+        eventMessage:
+          error instanceof Error ? error.message : "Duffel confirmation failed.",
+        actorType: "system",
+        actorId: null,
+        notificationType: "cancellation_issue",
+        adminAlert: true,
+        metadata: { phase: "duffel_confirm" },
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  }
 }
 
 export async function rejectCancellation(
@@ -364,13 +645,24 @@ export async function rejectCancellation(
 
   const detail = await requireCancellationDetail(input.requestId, deps)
   assertTransition(detail.request.status, "rejected")
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    status: "rejected",
-    adminRejectionReason: reason,
-    rejectedAt: deps.now(),
-    customerMessage: reason,
-  })
-  await addAdminEvent(deps, input, "cancellation_rejected", reason)
+  const updated = await transitionRequestStatus(
+    {
+      requestId: input.requestId,
+      status: "rejected",
+      patch: {
+        adminRejectionReason: reason,
+        rejectedAt: deps.now(),
+        customerMessage: reason,
+      },
+      eventType: "cancellation_rejected",
+      eventMessage: reason,
+      actorType: "admin",
+      actorId: input.admin.appUserId,
+      notificationType: "cancellation_rejected",
+      adminAlert: true,
+    },
+    deps
+  )
   return requireUpdated(updated)
 }
 
@@ -380,17 +672,23 @@ export async function moveCancellationToManualProcessing(
 ) {
   const detail = await requireCancellationDetail(input.requestId, deps)
   assertTransition(detail.request.status, "manual_processing")
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    status: "manual_processing",
-    customerMessage:
-      input.message?.trim() ||
-      "Your cancellation request is being handled manually by support.",
-  })
-  await addAdminEvent(
-    deps,
-    input,
-    "manual_processing_started",
-    "Admin moved request to manual processing."
+  const updated = await transitionRequestStatus(
+    {
+      requestId: input.requestId,
+      status: "manual_processing",
+      patch: {
+        customerMessage:
+          input.message?.trim() ||
+          "Your cancellation request is being handled manually by support.",
+      },
+      eventType: "manual_processing_started",
+      eventMessage: "Admin moved request to manual processing.",
+      actorType: "admin",
+      actorId: input.admin.appUserId,
+      notificationType: "cancellation_manual_review",
+      adminAlert: true,
+    },
+    deps
   )
   return requireUpdated(updated)
 }
@@ -403,6 +701,7 @@ export async function approveRefund(
   assertTransition(detail.request.status, "refund_pending")
   const amount = detail.request.customerRefundAmount ?? 0
   const currency = detail.request.customerRefundCurrency ?? detail.order.currency
+  const captureId = detail.paymentAttempt?.providerCaptureId
   const cappedAmount = capCustomerRefundAmount({
     airlineRefundAmount: amount,
     feeAmount: 0,
@@ -412,7 +711,25 @@ export async function approveRefund(
     ),
     currency,
   })
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
+  const initialStatus = captureId ? "processing" : "approved"
+  const refundAttempt = await deps.cancellationRepository.createRefundAttempt({
+    cancellationRequestId: input.requestId,
+    paymentAttemptId: detail.order.paymentAttemptId,
+    provider: "paypal",
+    providerCaptureId: captureId ?? null,
+    amount: cappedAmount,
+    currency,
+    status: initialStatus,
+    rawPayload: {
+      idempotencyKey: createRefundIdempotencyKey(input.requestId),
+      cappedAtCapturedPaymentAmount: true,
+      capturedPaymentAmount: resolveCapturedPaymentAmount(
+        toFlightOrderRecord(detail.order),
+        detail.paymentAttempt
+      ),
+    },
+  })
+  await deps.cancellationRepository.updateRequest(input.requestId, {
     status: "refund_pending",
     customerRefundAmount: cappedAmount,
     customerRefundCurrency: currency,
@@ -420,23 +737,82 @@ export async function approveRefund(
     refundApprovedAt: deps.now(),
     customerMessage:
       detail.request.customerMessage ??
-      "Your refund has been approved and is awaiting manual completion.",
-  })
-  await deps.cancellationRepository.createRefundAttempt({
-    cancellationRequestId: input.requestId,
-    paymentAttemptId: detail.order.paymentAttemptId,
-    provider: "paypal",
-    providerCaptureId: detail.paymentAttempt?.providerCaptureId ?? null,
-    amount: cappedAmount,
-    currency,
-    status: "approved",
-    rawPayload: {
-      internalOnly: true,
-      reason: "Phase 2 does not call PayPal refunds.",
-    },
+      (captureId
+        ? "Your refund has been approved and is being sent to your original payment method."
+        : "Your refund has been approved and is awaiting manual completion."),
   })
   await addAdminEvent(deps, input, "refund_approved", "Admin approved refund.")
-  return requireUpdated(updated)
+
+  if (!captureId) {
+    const updated = await requireCancellationDetail(input.requestId, deps)
+    await enqueueCancellationNotifications({
+      requestId: input.requestId,
+      eventType: "cancellation_issue",
+      adminAlert: true,
+    }, deps)
+    return toCancellationStatusSummary(updated.request)
+  }
+
+  try {
+    const providerRefund = await deps.refundProvider({
+      captureId,
+      amount: cappedAmount,
+      currency,
+      idempotencyKey: createRefundIdempotencyKey(input.requestId),
+      noteToPayer: `Refund for flight cancellation ${detail.order.bookingReference}`,
+    })
+    await deps.cancellationRepository.updateRefundAttempt({
+      refundAttemptId: refundAttempt.id,
+      providerRefundId: providerRefund.id,
+      status: toRefundAttemptStatus(providerRefund.status),
+      rawPayload: providerRefund,
+    })
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "completed",
+        patch: {
+          customerMessage:
+            "Your cancellation and refund have been completed.",
+        },
+        eventType: "paypal_refund_completed",
+        eventMessage: "PayPal refund completed.",
+        actorType: "system",
+        actorId: null,
+        notificationType: "cancellation_refund_completed",
+        adminAlert: true,
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  } catch (error) {
+    await deps.cancellationRepository.updateRefundAttempt({
+      refundAttemptId: refundAttempt.id,
+      status: "failed",
+      rawPayload: {
+        error: error instanceof Error ? error.message : "PayPal refund failed.",
+      },
+    })
+    const updated = await transitionRequestStatus(
+      {
+        requestId: input.requestId,
+        status: "manual_processing",
+        patch: {
+          customerMessage:
+            "Your refund needs manual support because the payment provider refund could not be completed automatically.",
+        },
+        eventType: "paypal_refund_failed",
+        eventMessage:
+          error instanceof Error ? error.message : "PayPal refund failed.",
+        actorType: "system",
+        actorId: null,
+        notificationType: "cancellation_issue",
+        adminAlert: true,
+      },
+      deps
+    )
+    return requireUpdated(updated)
+  }
 }
 
 export async function markManualRefundCompleted(
@@ -447,12 +823,24 @@ export async function markManualRefundCompleted(
   assertTransition(detail.request.status, "refund_completed")
   const amount = detail.request.customerRefundAmount ?? 0
   const currency = detail.request.customerRefundCurrency ?? detail.order.currency
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    status: "completed",
-    customerMessage:
-      detail.request.customerMessage ??
-      "Your cancellation and refund have been completed.",
-  })
+  const updated = await transitionRequestStatus(
+    {
+      requestId: input.requestId,
+      status: "completed",
+      patch: {
+        customerMessage:
+          detail.request.customerMessage ??
+          "Your cancellation and refund have been completed.",
+      },
+      eventType: "manual_refund_completed",
+      eventMessage: "Admin marked refund completed manually.",
+      actorType: "admin",
+      actorId: input.admin.appUserId,
+      notificationType: "cancellation_refund_completed",
+      adminAlert: true,
+    },
+    deps
+  )
   await deps.cancellationRepository.createRefundAttempt({
     cancellationRequestId: input.requestId,
     paymentAttemptId: detail.order.paymentAttemptId,
@@ -466,12 +854,6 @@ export async function markManualRefundCompleted(
       reason: "Refund marked completed manually.",
     },
   })
-  await addAdminEvent(
-    deps,
-    input,
-    "manual_refund_completed",
-    "Admin marked refund completed manually."
-  )
   return requireUpdated(updated)
 }
 
@@ -685,6 +1067,17 @@ function mapAdminDetail(detail: CancellationDetailRecord): AdminCancellationDeta
       currency: paymentCurrency,
       providerCaptureId: detail.paymentAttempt?.providerCaptureId ?? null,
     },
+    quotes: detail.quotes.map((quote) => ({
+      id: quote.id,
+      duffelOrderCancellationId: quote.duffelOrderCancellationId,
+      refundLabel:
+        quote.refundAmount === null || !quote.refundCurrency
+          ? "Refund unavailable"
+          : formatMoney(quote.refundAmount, quote.refundCurrency),
+      refundTo: quote.refundTo ?? "Not provided",
+      expiresAtLabel: quote.expiresAt ? formatDateTime(quote.expiresAt) : "No expiry",
+      confirmedAtLabel: quote.confirmedAt ? formatDateTime(quote.confirmedAt) : null,
+    })),
     passengers: snapshot.passengers.map((passenger) => ({
       id: passenger.id,
       label: passenger.label,
@@ -738,11 +1131,147 @@ async function addAdminEvent(
   })
 }
 
+async function transitionRequestStatus(
+  input: {
+    requestId: string
+    status: FlightCancellationStatus
+    patch?: Omit<Parameters<CancellationRepository["updateRequest"]>[1], "status">
+    eventType: string
+    eventMessage: string
+    actorType: "admin" | "system" | "customer" | "guest"
+    actorId: string | null
+    notificationType: NotificationEventType
+    adminAlert?: boolean
+    metadata?: unknown
+  },
+  deps: CancellationServiceDeps
+) {
+  const existing = await deps.cancellationRepository.findRequestById(input.requestId)
+  if (!existing) {
+    return null
+  }
+  assertTransition(existing.status, input.status)
+
+  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
+    ...input.patch,
+    status: input.status,
+  })
+  await deps.cancellationRepository.addEvent({
+    cancellationRequestId: input.requestId,
+    actorType: input.actorType,
+    actorId: input.actorId,
+    eventType: input.eventType,
+    message: input.eventMessage,
+    metadata: input.metadata,
+  })
+  await enqueueCancellationNotifications(
+    {
+      requestId: input.requestId,
+      eventType: input.notificationType,
+      adminAlert: input.adminAlert ?? false,
+    },
+    deps
+  )
+  return updated
+}
+
+async function enqueueCancellationNotifications(
+  input: {
+    requestId: string
+    eventType: NotificationEventType
+    adminAlert?: boolean
+  },
+  deps: CancellationServiceDeps
+) {
+  const detail = await deps.cancellationRepository.getDetail(input.requestId)
+  if (!detail) {
+    return
+  }
+
+  const payload = await buildCancellationNotificationPayload(detail, deps)
+  await deps.enqueueNotification({
+    eventType: input.eventType,
+    flightOrderId: detail.order.id,
+    checkoutSessionId: detail.order.checkoutSessionId,
+    bookingReference: detail.order.bookingReference,
+    recipientEmail: detail.order.contactEmail,
+    recipientEmailHash: detail.order.contactEmailHash,
+    payload: {
+      ...payload,
+      recipientRole: "customer",
+    },
+  })
+
+  if (!input.adminAlert) {
+    return
+  }
+
+  await deps.cancellationRepository.addEvent({
+    cancellationRequestId: input.requestId,
+    actorType: "system",
+    actorId: null,
+    eventType: "admin_alert_created",
+    message: `Admin alert queued for ${payload.statusLabel}.`,
+    metadata: { notificationEventType: input.eventType },
+  })
+
+  const recipients = await deps.listAdminAlertRecipients()
+  await Promise.all(
+    recipients.map((recipient) =>
+      deps.enqueueNotification({
+        eventType: input.eventType,
+        flightOrderId: detail.order.id,
+        checkoutSessionId: detail.order.checkoutSessionId,
+        bookingReference: detail.order.bookingReference,
+        recipientEmail: recipient.email,
+        recipientEmailHash: createEmailHash(recipient.email),
+        payload: {
+          ...payload,
+          customerMessage: `Admin alert: ${payload.customerMessage ?? payload.statusLabel}`,
+          recipientRole: "admin",
+        },
+      })
+    )
+  )
+}
+
+async function buildCancellationNotificationPayload(
+  detail: CancellationDetailRecord,
+  deps: CancellationServiceDeps
+) {
+  const snapshot = normalizeSnapshot(detail.order.orderSnapshot)
+  const settings = await deps.cancellationRepository.getBusinessSettings()
+
+  return {
+    bookingReference: detail.order.bookingReference,
+    routeLabel: snapshot.routeLabel,
+    amountLabel: formatNullableMoney(
+      detail.request.customerRefundAmount,
+      detail.request.customerRefundCurrency ?? detail.order.currency
+    ),
+    statusLabel: toStatusLabel(detail.request.status),
+    customerMessage: detail.request.customerMessage,
+    businessName: settings.businessName,
+    supportEmail: settings.supportEmail,
+    supportPhone: settings.supportPhone,
+    supportWhatsapp: settings.supportWhatsapp,
+    businessAddress: settings.address,
+  }
+}
+
 function requireUpdated(updated: CancellationRequestRecord | null) {
   if (!updated) {
     throw new Error("Cancellation request not found.")
   }
   return toCancellationStatusSummary(updated)
+}
+
+function createRefundIdempotencyKey(requestId: string) {
+  return `flight-cancellation-refund:${requestId}`
+}
+
+function toRefundAttemptStatus(status: string | undefined): "completed" | "processing" {
+  return status?.toUpperCase() === "COMPLETED" ? "completed" : "processing"
 }
 
 function isDeparted(snapshot: ReturnType<typeof normalizeSnapshot>, now: Date) {

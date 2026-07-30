@@ -83,6 +83,7 @@ const allowedStatusTransitions: Record<
     "failed",
   ],
   quote_ready: [
+    "quote_pending",
     "admin_review_required",
     "duffel_confirming",
     "manual_processing",

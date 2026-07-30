@@ -56,6 +56,14 @@ export const notificationEventTypeEnum = pgEnum("notification_event_type", [
   "booking_confirmed",
   "hold_created",
   "reconciliation_required",
+  "cancellation_request_received",
+  "cancellation_manual_review",
+  "cancellation_quote_ready",
+  "cancellation_approved",
+  "cancellation_rejected",
+  "cancellation_completed",
+  "cancellation_refund_completed",
+  "cancellation_issue",
 ])
 
 export const flightCancellationStatusEnum = pgEnum(
