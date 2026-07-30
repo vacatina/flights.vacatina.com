@@ -5,6 +5,7 @@ import type { CreateOrder, Offer, Order, SeatMap } from "@duffel/api/types"
 import { z } from "zod"
 
 import type { ActorContext } from "@/modules/auth/types"
+import { serializeMoney, type SerializedMoney } from "@/modules/currency/domain"
 import { toNumeric } from "@/lib/shared/number"
 import {
   capturePayPalOrder,
@@ -112,6 +113,7 @@ interface CheckoutSubmissionSuccess {
   bookingReference: string
   paymentMode: "pay_now" | "hold"
   totalSellAmountLabel: string
+  totalSellMoney: SerializedMoney
   paymentRequiredByLabel: string | null
 }
 
@@ -467,6 +469,10 @@ export async function createCheckoutPayPalOrder(
           existingSession.paymentAmount,
           existingSession.paymentCurrency ?? existingSession.currency
         ),
+        chargeMoney: serializeMoney(
+          existingSession.paymentAmount,
+          existingSession.paymentCurrency ?? existingSession.currency
+        ),
         status: "processing",
       }
     }
@@ -552,6 +558,10 @@ export async function createCheckoutPayPalOrder(
     chargeAmountLabel:
       paymentPreview.chargeAmountLabel ??
       formatCurrencyAmount(0, paymentPreview.chargeCurrency),
+    chargeMoney: serializeMoney(
+      paymentPreview.chargeAmount ?? 0,
+      paymentPreview.chargeCurrency
+    ),
     status: "processing",
   }
 }
@@ -654,6 +664,10 @@ export async function submitCheckout(
           bookingReference: existingOrder.bookingReference,
           paymentMode: existingOrder.paymentMode,
           totalSellAmountLabel: formatCurrencyAmount(
+            existingOrder.sellAmount,
+            existingOrder.currency
+          ),
+          totalSellMoney: serializeMoney(
             existingOrder.sellAmount,
             existingOrder.currency
           ),
@@ -814,6 +828,10 @@ export async function submitCheckout(
       bookingReference: flightOrder.bookingReference,
       paymentMode: "hold",
       totalSellAmountLabel: formatCurrencyAmount(prepared.sellTotal, prepared.quote.currency),
+      totalSellMoney: serializeMoney(
+        prepared.sellTotal,
+        prepared.quote.currency
+      ),
       paymentRequiredByLabel: flightOrder.paymentRequiredBy
         ? format(flightOrder.paymentRequiredBy, "dd/MM/yyyy, HH:mm")
         : null,
@@ -865,6 +883,12 @@ export async function getCheckoutSessionStatus(
           : order
             ? formatCurrencyAmount(order.sellAmount, order.currency)
             : null,
+      totalChargeMoney:
+        session.paymentAmount !== null && session.paymentCurrency
+          ? serializeMoney(session.paymentAmount, session.paymentCurrency)
+          : order
+            ? serializeMoney(order.sellAmount, order.currency)
+            : null,
     }
   }
 
@@ -880,6 +904,10 @@ export async function getCheckoutSessionStatus(
     totalChargeAmountLabel:
       session.paymentAmount !== null && session.paymentCurrency
         ? formatCurrencyAmount(session.paymentAmount, session.paymentCurrency)
+        : null,
+    totalChargeMoney:
+      session.paymentAmount !== null && session.paymentCurrency
+        ? serializeMoney(session.paymentAmount, session.paymentCurrency)
         : null,
   }
 }
@@ -1589,6 +1617,7 @@ function buildPayPalPaymentPreview(input: {
       chargeAmount,
       chargeCurrency: sourceCurrency,
       chargeAmountLabel: formatCurrencyAmount(chargeAmount, sourceCurrency),
+      chargeMoney: serializeMoney(chargeAmount, sourceCurrency),
     }
   } catch (error) {
     return {
@@ -1600,6 +1629,7 @@ function buildPayPalPaymentPreview(input: {
       chargeAmount: null,
       chargeCurrency: input.sourceCurrency.trim().toUpperCase() || "USD",
       chargeAmountLabel: null,
+      chargeMoney: null,
     }
   }
 }

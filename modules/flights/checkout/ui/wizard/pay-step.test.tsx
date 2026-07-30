@@ -199,7 +199,7 @@ describe("CheckoutPayStep", () => {
       />
     )
 
-    expect(screen.getByText("US$135.00")).toBeTruthy()
+    expect(screen.getByText("$135.00")).toBeTruthy()
   })
 
   test("configures PayPal React SDK v6 from checkout payment data", () => {
@@ -559,6 +559,7 @@ function createCheckoutData(overrides?: Partial<CheckoutPageData>): CheckoutPage
       currency: "USD",
       fareNetAmount: 90,
       fareSellAmount: 100,
+      fareSellMoney: { amount: "10000", currency: "USD", scale: 2 },
       fareSellAmountLabel: "USD 100.00",
       expiresAtIso: "2026-04-25T10:00:00.000Z",
       expiresAtLabel: "25 Apr 2026, 15:30",
@@ -596,6 +597,7 @@ function createCheckoutData(overrides?: Partial<CheckoutPageData>): CheckoutPage
       chargeAmount: 120,
       chargeCurrency: "USD",
       chargeAmountLabel: "USD 120.00",
+      chargeMoney: { amount: "12000", currency: "USD", scale: 2 },
     },
     ...overrides,
   }

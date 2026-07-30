@@ -173,6 +173,7 @@ function createCheckoutData(): CheckoutPageData {
       currency: "USD",
       fareNetAmount: 100,
       fareSellAmount: 123,
+      fareSellMoney: { amount: "12300", currency: "USD", scale: 2 },
       fareSellAmountLabel: "US$123.00",
       expiresAtIso: "2026-04-25T10:00:00.000Z",
       expiresAtLabel: "25 Apr 2026, 15:30",
@@ -210,6 +211,7 @@ function createCheckoutData(): CheckoutPageData {
       chargeAmount: 123,
       chargeCurrency: "USD",
       chargeAmountLabel: "USD 123.00",
+      chargeMoney: { amount: "12300", currency: "USD", scale: 2 },
     },
   }
 }

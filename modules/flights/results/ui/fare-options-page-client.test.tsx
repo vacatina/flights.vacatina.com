@@ -111,7 +111,7 @@ test("FareOptionsPageClient syncs local filter drafts after server-state navigat
 test("FareOptionsPageClient coalesces take-off slider URL updates", () => {
   render(<FareOptionsPageClient data={createFareOptionsData()} />)
 
-  const sliderThumbs = screen.getAllByRole("slider")
+  const sliderThumbs = screen.getAllByRole("slider", { hidden: true })
   const takeoffStartThumb = sliderThumbs[0]
 
   takeoffStartThumb.focus()
@@ -208,6 +208,7 @@ function createFareOptionsData(
         totalAmountLabel: "USD352.85",
         totalAmountValue: 352.85,
         totalCurrency: "USD",
+        totalMoney: { amount: "35285", currency: "USD", scale: 2 },
         takeoffMinutes: 789,
         landingMinutes: 997,
         timeline: [

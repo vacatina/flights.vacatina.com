@@ -90,9 +90,10 @@ test("ReviewPageClient navigates to checkout when summary is complete", async ()
         },
         summary: {
           soldByLabel: "Sold by Qatar Airways",
-          conditions: ["No data on changes"],
+          conditions: [createConditionLine("changes", "No data on changes")],
           co2Label: "From 581kg CO2",
           totalAmountLabel: "US$915.60",
+          totalMoney: { amount: "91560", currency: "USD", scale: 2 },
           checkoutEnabled: true,
           helperText: "Selected fare options for all flights",
           finalOfferId: "off_1",
@@ -129,9 +130,10 @@ test("ReviewPageClient blocks checkout when search session is expired", () => {
         },
         summary: {
           soldByLabel: "Sold by Qatar Airways",
-          conditions: ["No data on changes"],
+          conditions: [createConditionLine("changes", "No data on changes")],
           co2Label: "From 581kg CO2",
           totalAmountLabel: "US$915.60",
+          totalMoney: { amount: "91560", currency: "USD", scale: 2 },
           checkoutEnabled: true,
           helperText: "Selected fare options for all flights",
           finalOfferId: "off_1",
@@ -186,12 +188,16 @@ test("ReviewPageClient auto-scrolls to next leg after fare selection", async () 
               {
                 id: "changes",
                 label: "No data on changes",
+                money: null,
+                prefix: null,
+                suffix: null,
                 kind: "change",
               },
             ],
             priceFromLabel: "US$943.60",
             priceFromValue: 943.6,
             currency: "USD",
+            priceFromMoney: { amount: "91560", currency: "USD", scale: 2 },
             isSelected: false,
             isSelectable: true,
           },
@@ -253,12 +259,16 @@ function createReviewData(overrides?: Partial<ReviewPageData>): ReviewPageData {
               {
                 id: "changes",
                 label: "No data on changes",
+                money: null,
+                prefix: null,
+                suffix: null,
                 kind: "change",
               },
             ],
             priceFromLabel: "US$915.60",
             priceFromValue: 915.6,
             currency: "USD",
+            priceFromMoney: { amount: "91560", currency: "USD", scale: 2 },
             isSelected: false,
             isSelectable: true,
           },
@@ -290,13 +300,32 @@ function createReviewData(overrides?: Partial<ReviewPageData>): ReviewPageData {
     ],
     summary: {
       soldByLabel: "Sold by Qatar Airways",
-      conditions: ["No data on changes", "No data on refunds"],
+      conditions: [
+        createConditionLine("changes", "No data on changes"),
+        createConditionLine("refunds", "No data on refunds", "refund"),
+      ],
       co2Label: "From 581kg CO2",
       totalAmountLabel: "US$915.60",
+      totalMoney: { amount: "91560", currency: "USD", scale: 2 },
       checkoutEnabled: false,
       helperText: "Select fare options for all flights",
       finalOfferId: null,
     },
     ...overrides,
   }
+}
+
+function createConditionLine(
+  id: string,
+  label: string,
+  kind: "change" | "refund" = "change"
+) {
+  return {
+    id,
+    label,
+    money: null,
+    prefix: null,
+    suffix: null,
+    kind,
+  } as const
 }

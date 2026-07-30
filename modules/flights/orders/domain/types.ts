@@ -1,4 +1,5 @@
 import type { Offer, Order } from "@duffel/api/types"
+import type { SerializedMoney } from "@/modules/currency/domain"
 
 export type BookingNotificationEventType =
   | "booking_confirmed"
@@ -53,8 +54,11 @@ export interface FlightOrderSnapshotPassenger {
 
 export interface FlightOrderSnapshotBillingSummary {
   fareAmountLabel: string | null
+  fareMoney?: SerializedMoney | null
   taxesAmountLabel: string | null
+  taxesMoney?: SerializedMoney | null
   totalAmountLabel: string
+  totalMoney?: SerializedMoney | null
 }
 
 export interface FlightOrderSnapshotTicketDocument {
@@ -67,6 +71,7 @@ export interface FlightOrderSnapshotBookedService {
   id: string
   type: string
   totalAmountLabel: string
+  totalMoney?: SerializedMoney | null
   passengerIds: string[]
   segmentIds: string[]
 }
@@ -78,11 +83,13 @@ export interface FlightOrderSnapshotMetadataEntry {
 
 export interface FlightOrderSnapshotConditionsSummary {
   changes: string
+  changesMoney?: SerializedMoney | null
   refunds: string
+  refundsMoney?: SerializedMoney | null
 }
 
 export interface FlightOrderSnapshot extends Record<string, unknown> {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   journeyTypeLabel: string
   routeLabel: string
   passengerCount: number
@@ -90,6 +97,7 @@ export interface FlightOrderSnapshot extends Record<string, unknown> {
   currency: string
   sellAmount: number
   sellAmountLabel: string
+  sellMoney?: SerializedMoney | null
   createdAtIso: string
   airlineBookingReference: string | null
   availableActions: string[]
@@ -158,6 +166,7 @@ export interface BookingListItem {
   paymentMode: "pay_now" | "hold"
   statusLabel: string
   sellAmountLabel: string
+  sellMoney: SerializedMoney
 }
 
 export interface BookingDetailModel {
@@ -179,6 +188,7 @@ export interface BookingDetailModel {
   providerStatusMessage: string | null
   paymentCurrency: string | null
   paymentAmountLabel: string | null
+  paymentMoney: SerializedMoney | null
   checkoutErrorMessage: string | null
   notifications: BookingDetailNotificationItem[]
   snapshot: FlightOrderSnapshot

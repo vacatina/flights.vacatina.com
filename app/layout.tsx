@@ -1,14 +1,21 @@
 import { Google_Sans_Flex as Figtree, Geist_Mono } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
+import { cookies } from "next/headers"
+import { after } from "next/server"
 
 import "./globals.css"
 import { SiteFooter } from "@/components/navigation/site-footer"
 import { SiteNavbar } from "@/components/navigation/site-navbar"
-import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 import { isClerkConfigured } from "@/modules/auth/server/config"
 import type { Metadata } from "next"
 import { TopLoader } from "@/components/ui/top-loader"
+import {
+  DISPLAY_CURRENCY_COOKIE_NAME,
+  parseDisplayCurrency,
+} from "@/modules/currency/domain"
+import { getDisplayFxSnapshot } from "@/modules/currency/server"
+import { CurrencyProvider } from "@/modules/currency/ui"
 
 const figtreeHeading = Figtree({
   subsets: ["latin"],
@@ -28,24 +35,32 @@ export const metadata: Metadata = {
     "Search, compare, and book international flights with flexible fare options and streamlined checkout.",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   const clerkEnabled = isClerkConfigured()
+  const cookieStore = await cookies()
+  const initialCurrency = parseDisplayCurrency(
+    cookieStore.get(DISPLAY_CURRENCY_COOKIE_NAME)?.value
+  )
+  const initialFxSnapshot = await getDisplayFxSnapshot({
+    scheduleRefresh: (task) => after(task),
+  })
 
   const appShell = (
-    // <ThemeProvider>
-    <>
+    <CurrencyProvider
+      initialCurrency={initialCurrency}
+      initialFxSnapshot={initialFxSnapshot}
+    >
       <TopLoader />
       <div id="top" className="min-h-svh">
         <SiteNavbar clerkEnabled={clerkEnabled} />
         {children}
         <SiteFooter />
       </div>
-    </>
-    // </ThemeProvider>
+    </CurrencyProvider>
   )
 
   return (

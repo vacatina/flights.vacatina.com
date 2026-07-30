@@ -16,6 +16,7 @@ import {
   type ActionResult,
 } from "@/modules/flights/search/server/types"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
+import type { SerializedMoney } from "@/modules/currency/domain"
 
 interface SubmitCheckoutActionDeps {
   getActorContext?: () => Promise<ActorContext>
@@ -29,6 +30,7 @@ interface SubmitCheckoutActionDeps {
     bookingReference: string
     paymentMode: "pay_now" | "hold"
     totalSellAmountLabel: string
+    totalSellMoney: SerializedMoney
     paymentRequiredByLabel: string | null
   }>
 }
@@ -65,6 +67,7 @@ type SubmitCheckoutSuccess = {
   bookingReference: string
   paymentMode: "pay_now" | "hold"
   totalSellAmountLabel: string
+  totalSellMoney: SerializedMoney
   paymentRequiredByLabel: string | null
 }
 

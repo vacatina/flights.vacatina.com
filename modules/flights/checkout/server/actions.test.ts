@@ -52,6 +52,7 @@ test("executeSubmitCheckoutAction returns success for hold payload", async () =>
         bookingReference: "BK-TESTREF001",
         paymentMode: "hold",
         totalSellAmountLabel: "US$100.00",
+        totalSellMoney: { amount: "10000", currency: "USD", scale: 2 },
         paymentRequiredByLabel: null,
       }
     },
@@ -81,6 +82,7 @@ test("executeCreatePayPalOrderAction returns success for pay_now payload", async
           chargeAmount: 1000,
           chargeCurrency: "USD",
           chargeAmountLabel: "USD 1000.00",
+          chargeMoney: { amount: "100000", currency: "USD", scale: 2 },
           status: "processing",
         }
       },
@@ -112,6 +114,11 @@ test("executeCapturePayPalOrderAction returns success for valid input", async ()
           duffelOrderId: "ord_1",
           bookingReference: "BK-TESTREF001",
           totalChargeAmountLabel: "USD 1000.00",
+          totalChargeMoney: {
+            amount: "100000",
+            currency: "USD",
+            scale: 2,
+          },
         }
       },
     }
@@ -141,6 +148,11 @@ test("executeGetCheckoutSessionStatusAction returns success for valid input", as
           duffelOrderId: null,
           bookingReference: null,
           totalChargeAmountLabel: "USD 1000.00",
+          totalChargeMoney: {
+            amount: "100000",
+            currency: "USD",
+            scale: 2,
+          },
         }
       },
     }

@@ -4,6 +4,7 @@ import type { FlightOrderRecord } from "@/modules/flights/checkout/server/order-
 
 import {
   buildFlightOrderSnapshot,
+  mapFlightOrderToDetailModel,
   mapFlightOrderToListItem,
 } from "@/modules/flights/orders/domain"
 
@@ -68,6 +69,31 @@ test("buildFlightOrderSnapshot keeps outbound/inbound labels for mirrored return
   expect(snapshot.legs.map((leg) => leg.title)).toEqual(["Outbound", "Inbound"])
 })
 
+test("buildFlightOrderSnapshot stores version 2 raw money values", () => {
+  const snapshot = buildFlightOrderSnapshot({
+    offer: createOffer({
+      slices: [
+        createSlice({
+          id: "sli_1",
+          originIata: "CMB",
+          destinationIata: "DXB",
+        }),
+      ],
+    }),
+    paymentMode: "pay_now",
+    currency: "USD",
+    sellAmount: 915.6,
+  })
+
+  expect(snapshot.schemaVersion).toBe(2)
+  expect(snapshot.sellMoney).toEqual({
+    amount: "91560",
+    currency: "USD",
+    scale: 2,
+  })
+  expect(snapshot.billingSummary.totalMoney).toEqual(snapshot.sellMoney)
+})
+
 test("mapFlightOrderToListItem includes enriched booking list fields", () => {
   const offer = createOffer({
     slices: [
@@ -119,6 +145,34 @@ test("mapFlightOrderToListItem maps payment pending status code", () => {
   expect(item.statusCode).toBe("payment_pending")
   expect(item.departureDateLabel).toBeNull()
   expect(item.returnDateLabel).toBeNull()
+})
+
+test("mapFlightOrderToDetailModel recovers a version 1 total from authoritative columns", () => {
+  const order = createFlightOrderRecord({
+    paymentMode: "pay_now",
+    paymentAwaiting: false,
+    orderSnapshot: {
+      schemaVersion: 1,
+      currency: "USD",
+      sellAmount: 915.6,
+      sellAmountLabel: "US$915.60",
+      billingSummary: {
+        fareAmountLabel: "US$800.00",
+        taxesAmountLabel: "US$115.60",
+        totalAmountLabel: "US$915.60",
+      },
+    },
+  })
+
+  const detail = mapFlightOrderToDetailModel(order)
+
+  expect(detail.snapshot.schemaVersion).toBe(1)
+  expect(detail.snapshot.billingSummary.fareMoney).toBeNull()
+  expect(detail.snapshot.billingSummary.totalMoney).toEqual({
+    amount: "91560",
+    currency: "USD",
+    scale: 2,
+  })
 })
 
 function createOffer(input: { slices: Offer["slices"] }) {

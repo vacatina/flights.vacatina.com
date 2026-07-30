@@ -1,3 +1,5 @@
+import type { SerializedMoney } from "@/modules/currency/domain"
+
 export interface ReviewUrlState {
   selected: string[]
   fare: string[]
@@ -21,6 +23,9 @@ export interface ReviewLegHeaderViewModel {
 export interface ReviewFareOptionLine {
   id: string
   label: string
+  money: SerializedMoney | null
+  prefix: string | null
+  suffix: string | null
   kind: "change" | "refund" | "hold" | "carry_on" | "checked"
 }
 
@@ -33,6 +38,7 @@ export interface ReviewFareOptionViewModel {
   priceFromLabel: string
   priceFromValue: number
   currency: string
+  priceFromMoney: SerializedMoney
   isSelected: boolean
   isSelectable: boolean
 }
@@ -49,9 +55,10 @@ export interface ReviewLegSectionViewModel {
 
 export interface ReviewSummaryViewModel {
   soldByLabel: string
-  conditions: string[]
+  conditions: ReviewFareOptionLine[]
   co2Label: string
   totalAmountLabel: string | null
+  totalMoney: SerializedMoney | null
   checkoutEnabled: boolean
   helperText: string
   finalOfferId: string | null

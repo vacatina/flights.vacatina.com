@@ -15,6 +15,7 @@ import {
   type FareOptionsPageData,
   type ResultsUrlState,
 } from "@/modules/flights/results/domain"
+import { serializeMoney } from "@/modules/currency/domain"
 import {
   logDuffelError,
   mapDuffelErrorMessage,
@@ -373,6 +374,7 @@ function applyPricingToOfferCard(
     totalAmountValue: pricing.sellAmount,
     totalCurrency: pricing.currency,
     totalAmountLabel: formatCurrencyAmount(pricing.sellAmount, pricing.currency),
+    totalMoney: serializeMoney(pricing.sellAmount, pricing.currency),
   }
 }
 

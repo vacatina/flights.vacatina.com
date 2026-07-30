@@ -9,6 +9,7 @@ import { useState, useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { CurrencySelector } from "@/modules/currency/ui"
 
 type SiteNavbarProps = {
   clerkEnabled: boolean
@@ -101,13 +102,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
         </nav>
 
         <div className="ml-auto hidden items-center gap-4 xl:flex">
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-[14px] leading-none font-medium tracking-[0.01em]"
-          >
-            INR
-            <ChevronDownIcon className="size-4" aria-hidden="true" />
-          </button>
+          <CurrencySelector className="text-[14px] leading-none tracking-[0.01em]" />
 
           <div
             className="h-8 w-px bg-primary-foreground/20"
@@ -178,13 +173,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
             aria-hidden="true"
           />
 
-          <button
-            type="button"
-            className="mb-4 flex items-center gap-2 px-3 text-[16px] font-medium"
-          >
-            INR
-            <ChevronDownIcon className="size-4" aria-hidden="true" />
-          </button>
+          <CurrencySelector className="mb-4 px-3 text-[16px]" />
 
           <div className="flex flex-col gap-3">
             <AuthButtons clerkEnabled={clerkEnabled} mobile />

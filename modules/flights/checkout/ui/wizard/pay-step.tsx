@@ -20,6 +20,12 @@ import { Spinner } from "@/components/ui/spinner"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import type { CheckoutPageData } from "@/modules/flights/checkout/domain"
 import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
+import {
+  DecimalMoney,
+  FxEstimateDisclosure,
+  Money,
+  OriginalMoney,
+} from "@/modules/currency/ui"
 
 interface CheckoutPayStepProps {
   data: CheckoutPageData
@@ -74,26 +80,51 @@ export function CheckoutPayStep({
           <CardContent className="space-y-3 p-4 md:p-5">
             <div className="flex items-center justify-between text-sm">
               <span>Fare</span>
-              <span>{data.quote.fareSellAmountLabel}</span>
+              <Money
+                money={data.quote.fareSellMoney}
+                fallbackLabel={data.quote.fareSellAmountLabel}
+              />
             </div>
             <div className="flex items-center justify-between text-sm">
               <span>Extras</span>
-              <span>{formatPreviewCurrency(ancillaryPreviewTotal, data.quote.currency)}</span>
+              <DecimalMoney
+                value={ancillaryPreviewTotal}
+                currency={data.quote.currency}
+              />
             </div>
             <Separator />
             <div className="flex items-center justify-between text-lg font-semibold md:text-base">
               <span>Total</span>
-              <span>
-                {paymentMode === "pay_now"
-                  ? formatPreviewCurrency(totalPreview, data.payment.chargeCurrency)
-                  : formatPreviewCurrency(totalPreview, data.quote.currency)}
-              </span>
+              <DecimalMoney
+                value={totalPreview}
+                currency={
+                  paymentMode === "pay_now"
+                    ? data.payment.chargeCurrency
+                    : data.quote.currency
+                }
+              />
             </div>
+            {paymentMode === "pay_now" && data.payment.chargeMoney ? (
+              <p className="text-sm text-muted-foreground">
+                You&apos;ll be charged{" "}
+                <OriginalMoney
+                  money={data.payment.chargeMoney}
+                  className="font-medium text-foreground"
+                />
+                .
+              </p>
+            ) : null}
             <p className="text-sm text-muted-foreground">
               {paymentMode === "pay_now"
                 ? "Confirm the trip total before opening PayPal. Payment is captured only after approval."
                 : "Final amount is revalidated on confirm before order creation."}
             </p>
+            <FxEstimateDisclosure
+              sourceCurrencies={[
+                data.quote.currency,
+                data.payment.chargeCurrency,
+              ]}
+            />
           </CardContent>
         </Card>
 
@@ -478,17 +509,4 @@ function PayPalV6PaymentControls({
 
 function formatPayPalEligibilityAmount(amount: number) {
   return amount.toFixed(2)
-}
-
-function formatPreviewCurrency(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: currency === "JPY" ? 0 : 2,
-      maximumFractionDigits: currency === "JPY" ? 0 : 2,
-    }).format(amount)
-  } catch {
-    return `${currency}${amount.toFixed(currency === "JPY" ? 0 : 2)}`
-  }
 }

@@ -348,6 +348,38 @@ export const pricedQuotes = pgTable(
   })
 )
 
+export const fxRateSnapshots = pgTable(
+  "fx_rate_snapshots",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    baseCurrency: text("base_currency").notNull(),
+    rates: jsonb("rates")
+      .$type<Record<string, { amount: string; scale: number }>>()
+      .notNull(),
+    providerUpdatedAt: timestamp("provider_updated_at", {
+      withTimezone: true,
+    }).notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+    freshUntil: timestamp("fresh_until", { withTimezone: true }).notNull(),
+    staleUntil: timestamp("stale_until", { withTimezone: true }).notNull(),
+    refreshLeaseUntil: timestamp("refresh_lease_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    providerBaseUniqueIdx: uniqueIndex(
+      "fx_rate_snapshots_provider_base_unique_idx"
+    ).on(table.provider, table.baseCurrency),
+    freshnessIdx: index("fx_rate_snapshots_freshness_idx").on(
+      table.freshUntil,
+      table.staleUntil
+    ),
+  })
+)
+
 export const paymentAttempts = pgTable(
   "payment_attempts",
   {

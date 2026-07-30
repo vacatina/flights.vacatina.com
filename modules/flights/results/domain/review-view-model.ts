@@ -6,6 +6,10 @@ import {
   parseISO,
 } from "date-fns"
 import type { Offer, OfferRequest } from "@duffel/api/types"
+import {
+  formatSerializedMoney,
+  serializeMoney,
+} from "@/modules/currency/domain"
 
 import {
   createLegBreadcrumbs,
@@ -149,6 +153,7 @@ export function buildReviewPageModel({
       priceFromLabel: formatCurrencyAmount(group.minAmount, group.currency),
       priceFromValue: group.minAmount,
       currency: group.currency,
+      priceFromMoney: serializeMoney(group.minAmount, group.currency),
       isSelected: group.key === selectedKey,
       isSelectable: true,
     }))
@@ -407,13 +412,13 @@ function createFareLines(offer: Offer, legIndex: number): ReviewFareOptionLine[]
 
   lines.push({
     id: "changes",
-    label: formatChangeCondition(offer.conditions.change_before_departure),
+    ...createChangeConditionLine(offer.conditions.change_before_departure),
     kind: "change",
   })
 
   lines.push({
     id: "refunds",
-    label: formatRefundCondition(offer.conditions.refund_before_departure),
+    ...createRefundConditionLine(offer.conditions.refund_before_departure),
     kind: "refund",
   })
 
@@ -423,6 +428,9 @@ function createFareLines(offer: Offer, legIndex: number): ReviewFareOptionLine[]
     lines.push({
       id: "hold",
       label: holdLine,
+      money: null,
+      prefix: null,
+      suffix: null,
       kind: "hold",
     })
   }
@@ -431,6 +439,9 @@ function createFareLines(offer: Offer, legIndex: number): ReviewFareOptionLine[]
     lines.push({
       id: "carry-on",
       label: "Includes carry-on bags",
+      money: null,
+      prefix: null,
+      suffix: null,
       kind: "carry_on",
     })
   }
@@ -439,6 +450,9 @@ function createFareLines(offer: Offer, legIndex: number): ReviewFareOptionLine[]
     lines.push({
       id: "checked",
       label: "Includes checked bags",
+      money: null,
+      prefix: null,
+      suffix: null,
       kind: "checked",
     })
   }
@@ -456,58 +470,82 @@ function hasBaggage(slice: Offer["slices"][number], baggageType: "carry_on" | "c
   })
 }
 
-function formatChangeCondition(
+function createChangeConditionLine(
   condition: Offer["conditions"]["change_before_departure"]
 ) {
   if (!condition) {
-    return "No data on changes"
+    return createTextLine("No data on changes")
   }
 
   if (!condition.allowed) {
-    return "Changes not allowed"
+    return createTextLine("Changes not allowed")
   }
 
-  const penalty = toPenaltyLabel(condition.penalty_amount, condition.penalty_currency)
+  const penalty = toPenaltyMoney(
+    condition.penalty_amount,
+    condition.penalty_currency
+  )
 
   if (!penalty) {
-    return "Changes allowed"
+    return createTextLine("Changes allowed")
   }
 
-  return `Changes allowed with ${penalty} fee`
+  return {
+    label: `Changes allowed with ${formatSerializedMoney(penalty)} fee`,
+    money: penalty,
+    prefix: "Changes allowed with ",
+    suffix: " fee",
+  }
 }
 
-function formatRefundCondition(
+function createRefundConditionLine(
   condition: Offer["conditions"]["refund_before_departure"]
 ) {
   if (!condition) {
-    return "No data on refunds"
+    return createTextLine("No data on refunds")
   }
 
   if (!condition.allowed) {
-    return "Refunds not allowed"
+    return createTextLine("Refunds not allowed")
   }
 
-  const penalty = toPenaltyLabel(condition.penalty_amount, condition.penalty_currency)
+  const penalty = toPenaltyMoney(
+    condition.penalty_amount,
+    condition.penalty_currency
+  )
 
   if (!penalty) {
-    return "Refunds allowed"
+    return createTextLine("Refunds allowed")
   }
 
-  return `Refunds allowed with ${penalty} fee`
+  return {
+    label: `Refunds allowed with ${formatSerializedMoney(penalty)} fee`,
+    money: penalty,
+    prefix: "Refunds allowed with ",
+    suffix: " fee",
+  }
 }
 
-function toPenaltyLabel(amount: string | null, currency: string | null) {
+function toPenaltyMoney(amount: string | null, currency: string | null) {
   if (!amount || !currency) {
     return null
   }
 
-  const numericAmount = Number(amount)
-
-  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+  try {
+    const money = serializeMoney(amount, currency)
+    return BigInt(money.amount) > 0n ? money : null
+  } catch {
     return null
   }
+}
 
-  return formatCurrencyAmount(numericAmount, currency)
+function createTextLine(label: string) {
+  return {
+    label,
+    money: null,
+    prefix: null,
+    suffix: null,
+  }
 }
 
 function formatHoldLine(offer: Offer) {
@@ -553,6 +591,7 @@ function createSummaryViewModel(
       conditions: [],
       co2Label: "CO2 data unavailable",
       totalAmountLabel: null,
+      totalMoney: null,
       checkoutEnabled: false,
       helperText: "No fare options available right now.",
       finalOfferId: null,
@@ -572,6 +611,10 @@ function createSummaryViewModel(
       toOfferAmount(summaryOffer, offerPricingByOfferId),
       summaryOffer.total_currency
     ),
+    totalMoney: serializeMoney(
+      toOfferAmount(summaryOffer, offerPricingByOfferId),
+      summaryOffer.total_currency
+    ),
     checkoutEnabled,
     helperText: checkoutEnabled
       ? "Selected fare options for all flights"
@@ -581,9 +624,7 @@ function createSummaryViewModel(
 }
 
 function createSummaryConditions(offer: Offer) {
-  const firstLegLines = createFareLines(offer, 0)
-
-  return firstLegLines.map((line) => line.label)
+  return createFareLines(offer, 0)
 }
 
 function pickCheapestOffer(

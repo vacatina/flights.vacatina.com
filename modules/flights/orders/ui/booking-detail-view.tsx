@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import type { ReactNode } from "react"
 import {
   BaggageClaimIcon,
   BriefcaseIcon,
@@ -20,6 +21,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import {
+  FxEstimateDisclosure,
+  Money,
+} from "@/modules/currency/ui"
 
 interface BookingDetailViewProps {
   detail: BookingDetailModel
@@ -276,7 +281,14 @@ export function BookingDetailView({
                       </p>
                     </div>
                     <p className="font-semibold text-foreground">
-                      {service.totalAmountLabel}
+                      {service.totalMoney ? (
+                        <Money
+                          money={service.totalMoney}
+                          fallbackLabel={service.totalAmountLabel}
+                        />
+                      ) : (
+                        service.totalAmountLabel
+                      )}
                     </p>
                   </div>
                 ))}
@@ -408,22 +420,60 @@ export function BookingDetailView({
               <BillingRow
                 label="Fare"
                 value={
-                  detail.snapshot.billingSummary.fareAmountLabel ??
-                  detail.snapshot.sellAmountLabel
+                  detail.snapshot.billingSummary.fareMoney ? (
+                    <Money
+                      money={detail.snapshot.billingSummary.fareMoney}
+                      fallbackLabel={
+                        detail.snapshot.billingSummary.fareAmountLabel
+                      }
+                    />
+                  ) : (
+                    detail.snapshot.billingSummary.fareAmountLabel ??
+                    detail.snapshot.sellAmountLabel
+                  )
                 }
                 highlighted
               />
               <BillingRow
                 label="Fare taxes"
                 value={
-                  detail.snapshot.billingSummary.taxesAmountLabel ?? "Included"
+                  detail.snapshot.billingSummary.taxesMoney ? (
+                    <Money
+                      money={detail.snapshot.billingSummary.taxesMoney}
+                      fallbackLabel={
+                        detail.snapshot.billingSummary.taxesAmountLabel
+                      }
+                    />
+                  ) : (
+                    detail.snapshot.billingSummary.taxesAmountLabel ??
+                    "Included"
+                  )
                 }
               />
               <div className="h-px bg-border" />
               <BillingRow
                 label={`Total (${detail.snapshot.currency})`}
-                value={detail.snapshot.billingSummary.totalAmountLabel}
+                value={
+                  detail.snapshot.billingSummary.totalMoney ? (
+                    <Money
+                      money={detail.snapshot.billingSummary.totalMoney}
+                      fallbackLabel={
+                        detail.snapshot.billingSummary.totalAmountLabel
+                      }
+                    />
+                  ) : (
+                    detail.snapshot.billingSummary.totalAmountLabel
+                  )
+                }
                 highlighted
+              />
+              <FxEstimateDisclosure
+                sourceCurrencies={[
+                  detail.snapshot.currency,
+                  ...(detail.paymentCurrency
+                    ? [detail.paymentCurrency]
+                    : []),
+                ]}
               />
             </div>
           </div>
@@ -494,10 +544,26 @@ export function BookingDetailView({
               Fare conditions
             </p>
             <p className="text-base text-muted-foreground">
-              {detail.snapshot.conditions.changes}
+              {detail.snapshot.conditions.changesMoney ? (
+                <>
+                  Changes allowed with{" "}
+                  <Money money={detail.snapshot.conditions.changesMoney} />{" "}
+                  fee
+                </>
+              ) : (
+                detail.snapshot.conditions.changes
+              )}
             </p>
             <p className="text-base text-muted-foreground">
-              {detail.snapshot.conditions.refunds}
+              {detail.snapshot.conditions.refundsMoney ? (
+                <>
+                  Refunds allowed with{" "}
+                  <Money money={detail.snapshot.conditions.refundsMoney} />{" "}
+                  fee
+                </>
+              ) : (
+                detail.snapshot.conditions.refunds
+              )}
             </p>
           </div>
 
@@ -551,7 +617,17 @@ export function BookingDetailView({
               <p>Provider status message: {detail.providerStatusMessage}</p>
             ) : null}
             {detail.paymentAmountLabel ? (
-              <p>Charged amount: {detail.paymentAmountLabel}</p>
+              <p>
+                Charged amount:{" "}
+                {detail.paymentMoney ? (
+                  <Money
+                    money={detail.paymentMoney}
+                    fallbackLabel={detail.paymentAmountLabel}
+                  />
+                ) : (
+                  detail.paymentAmountLabel
+                )}
+              </p>
             ) : null}
             {detail.paymentCurrency ? (
               <p>Charge currency: {detail.paymentCurrency}</p>
@@ -656,7 +732,7 @@ function BillingRow({
   highlighted = false,
 }: {
   label: string
-  value: string
+  value: ReactNode
   highlighted?: boolean
 }) {
   return (

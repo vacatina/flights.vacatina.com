@@ -6,6 +6,7 @@ import { AlertTriangleIcon, CheckCircle2Icon, Loader2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CheckoutPayNowResolution } from "@/modules/flights/checkout/ui/hooks/use-checkout-flow"
+import { Money } from "@/modules/currency/ui"
 
 interface CheckoutPaymentStatusViewProps {
   status: "processing" | "success" | "failed" | "reconciliation"
@@ -67,7 +68,16 @@ export function CheckoutPaymentStatusView({
           ) : null}
           <p>
             Total charged:{" "}
-            <strong>{resolution?.totalChargeAmountLabel ?? "Amount unavailable"}</strong>
+            <strong>
+              {resolution?.totalChargeMoney ? (
+                <Money
+                  money={resolution.totalChargeMoney}
+                  fallbackLabel={resolution.totalChargeAmountLabel}
+                />
+              ) : (
+                "Amount unavailable"
+              )}
+            </strong>
           </p>
           {sessionId ? <p>Checkout session: {sessionId}</p> : null}
           <div className="flex flex-wrap gap-2 pt-1">

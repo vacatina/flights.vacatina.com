@@ -17,6 +17,7 @@ import type {
   CheckoutTripSummaryViewModel,
   CheckoutUrlState,
 } from "@/modules/flights/checkout/domain/types"
+import { serializeMoney } from "@/modules/currency/domain"
 
 interface BuildCheckoutPageModelInput {
   partialOfferRequestId: string
@@ -123,6 +124,7 @@ export function buildCheckoutPageModel({
       chargeAmount: null,
       chargeCurrency: quote.currency,
       chargeAmountLabel: null,
+      chargeMoney: null,
     },
   }
 }
@@ -193,6 +195,7 @@ function toQuoteViewModel(input: {
     fareNetAmount: input.netAmount,
     fareSellAmount: input.sellAmount,
     fareSellAmountLabel: formatCurrencyAmount(input.sellAmount, input.currency),
+    fareSellMoney: serializeMoney(input.sellAmount, input.currency),
     expiresAtIso: input.expiresAt.toISOString(),
     expiresAtLabel: format(input.expiresAt, "dd/MM/yyyy, HH:mm"),
   }

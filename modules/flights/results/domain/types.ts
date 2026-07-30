@@ -51,6 +51,7 @@ export interface OfferCardViewModel {
   totalAmountLabel: string
   totalAmountValue: number
   totalCurrency: string
+  totalMoney: SerializedMoney
   takeoffMinutes: number
   landingMinutes: number
   timeline: OfferCardTimelineEvent[]
@@ -84,3 +85,4 @@ export interface FareOptionsPageData {
   after: string | null
   state: ResultsUrlState
 }
+import type { SerializedMoney } from "@/modules/currency/domain"

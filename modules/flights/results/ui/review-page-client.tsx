@@ -30,6 +30,7 @@ import {
 } from "@/modules/flights/results/ui/offer-session-timer"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
+import { FxEstimateDisclosure, Money } from "@/modules/currency/ui"
 
 const REVIEW_FOCUS_LEG_QUERY_PARAM = "focusLeg"
 
@@ -256,6 +257,16 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
           expiresAtIso={data.offerExpiresAtIso}
           expiresAtLabel={data.offerExpiresAtLabel}
         />
+        <FxEstimateDisclosure
+          sourceCurrencies={[
+            ...(data.summary.totalMoney
+              ? [data.summary.totalMoney.currency]
+              : []),
+            ...data.legs.flatMap((leg) =>
+              leg.options.map((option) => option.currency)
+            ),
+          ]}
+        />
 
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_290px]">
           <div className="space-y-10">
@@ -391,7 +402,17 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                                       line.kind === "checked") && (
                                       <BriefcaseIcon className="mt-0.5 size-4" />
                                     )}
-                                    <span>{line.label}</span>
+                                    <span>
+                                      {line.money ? (
+                                        <>
+                                          {line.prefix}
+                                          <Money money={line.money} />
+                                          {line.suffix}
+                                        </>
+                                      ) : (
+                                        line.label
+                                      )}
+                                    </span>
                                   </li>
                                 ))}
                               </ul>
@@ -402,7 +423,10 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                                 total amount from
                               </p>
                               <p className="text-2xl font-semibold tracking-tight md:text-3xl">
-                                {option.priceFromLabel}
+                                <Money
+                                  money={option.priceFromMoney}
+                                  fallbackLabel={option.priceFromLabel}
+                                />
                               </p>
                             </div>
                           </Card>
@@ -427,7 +451,17 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
                 <ul className="space-y-2 text-sm text-muted-foreground md:text-base">
                   {data.summary.conditions.map((condition) => (
-                    <li key={condition}>{condition}</li>
+                    <li key={condition.id}>
+                      {condition.money ? (
+                        <>
+                          {condition.prefix}
+                          <Money money={condition.money} />
+                          {condition.suffix}
+                        </>
+                      ) : (
+                        condition.label
+                      )}
+                    </li>
                   ))}
                   <li>{data.summary.co2Label}</li>
                 </ul>
@@ -437,7 +471,14 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground md:text-base">total amount</p>
                   <p className="text-2xl font-semibold tracking-tight md:text-3xl">
-                    {data.summary.totalAmountLabel ?? "--"}
+                    {data.summary.totalMoney ? (
+                      <Money
+                        money={data.summary.totalMoney}
+                        fallbackLabel={data.summary.totalAmountLabel}
+                      />
+                    ) : (
+                      "--"
+                    )}
                   </p>
                 </div>
 

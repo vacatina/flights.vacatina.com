@@ -19,6 +19,7 @@ import type {
   ResultsSearchSummary,
 } from "@/modules/flights/results/domain/types"
 import type { CabinClass, Offer, OfferRequest } from "@duffel/api/types"
+import { serializeMoney } from "@/modules/currency/domain"
 
 type OfferLike = Pick<Offer, "id" | "owner" | "slices" | "total_amount" | "total_currency">
 
@@ -91,6 +92,7 @@ export function normalizeOfferForLeg(
     totalAmountLabel: `${offer.total_currency}${Number(offer.total_amount).toFixed(2)}`,
     totalAmountValue: Number(offer.total_amount),
     totalCurrency: offer.total_currency,
+    totalMoney: serializeMoney(offer.total_amount, offer.total_currency),
     takeoffMinutes: clockTimeToMinutes(departureTimeLabel),
     landingMinutes: clockTimeToMinutes(arrivalTimeLabel),
     timeline: createTimeline(slice.segments, ownerName),

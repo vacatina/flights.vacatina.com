@@ -23,6 +23,11 @@ import type {
   FlightOrderSnapshotTimelineEvent,
 } from "@/modules/flights/orders/domain/types"
 import type { FlightOrderRecord } from "@/modules/flights/checkout/server/order-repository"
+import {
+  formatSerializedMoney,
+  serializeMoney,
+  type SerializedMoney,
+} from "@/modules/currency/domain"
 
 interface BookingDetailMapContext {
   checkoutSession: {
@@ -65,7 +70,7 @@ export function buildFlightOrderSnapshot(
   const sellAmountLabel = formatCurrencyAmount(input.sellAmount, input.currency)
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     journeyTypeLabel: getJourneyTypeLabelFromSlices(journeySlices),
     routeLabel: buildJourneyRouteSummary(journeySlices),
     passengerCount: input.offer.passengers.length,
@@ -73,6 +78,7 @@ export function buildFlightOrderSnapshot(
     currency: input.currency,
     sellAmount: input.sellAmount,
     sellAmountLabel,
+    sellMoney: serializeMoney(input.sellAmount, input.currency),
     createdAtIso: (input.now ?? new Date()).toISOString(),
     airlineBookingReference: input.order?.booking_reference ?? null,
     availableActions: Array.isArray(input.order?.available_actions)
@@ -141,6 +147,7 @@ export function buildFlightOrderSnapshot(
     billingSummary: createBillingSummary({
       offer: input.offer,
       currency: input.currency,
+      totalAmount: input.sellAmount,
       totalAmountLabel: sellAmountLabel,
     }),
   }
@@ -170,6 +177,7 @@ export function mapFlightOrderToListItem(order: FlightOrderRecord): BookingListI
     paymentMode: order.paymentMode,
     statusLabel: toStatusLabel(order),
     sellAmountLabel: formatCurrencyAmount(order.sellAmount, order.currency),
+    sellMoney: serializeMoney(order.sellAmount, order.currency),
   }
 }
 
@@ -177,7 +185,17 @@ export function mapFlightOrderToDetailModel(
   order: FlightOrderRecord,
   context?: BookingDetailMapContext
 ): BookingDetailModel {
-  const snapshot = normalizeSnapshot(order.orderSnapshot)
+  const normalizedSnapshot = normalizeSnapshot(order.orderSnapshot)
+  const authoritativeTotal = serializeMoney(order.sellAmount, order.currency)
+  const snapshot: FlightOrderSnapshot = {
+    ...normalizedSnapshot,
+    sellMoney: normalizedSnapshot.sellMoney ?? authoritativeTotal,
+    billingSummary: {
+      ...normalizedSnapshot.billingSummary,
+      totalMoney:
+        normalizedSnapshot.billingSummary.totalMoney ?? authoritativeTotal,
+    },
+  }
   const checkoutSession = context?.checkoutSession ?? null
   const notifications = normalizeDetailNotifications(context?.notifications ?? [])
 
@@ -212,6 +230,15 @@ export function mapFlightOrderToDetailModel(
             checkoutSession.paymentCurrency
           )
         : null,
+    paymentMoney:
+      checkoutSession?.paymentAmount !== null &&
+      checkoutSession?.paymentAmount !== undefined &&
+      checkoutSession.paymentCurrency
+        ? serializeMoney(
+            checkoutSession.paymentAmount,
+            checkoutSession.paymentCurrency
+          )
+        : null,
     checkoutErrorMessage: checkoutSession?.errorMessage ?? null,
     notifications,
     snapshot,
@@ -228,7 +255,7 @@ export function normalizeSnapshot(snapshot: unknown): FlightOrderSnapshot {
   const sellAmountLabel = raw.sellAmountLabel ?? "USD0.00"
 
   return {
-    schemaVersion: 1,
+    schemaVersion: raw.schemaVersion === 2 ? 2 : 1,
     journeyTypeLabel: raw.journeyTypeLabel ?? "Trip",
     routeLabel: raw.routeLabel ?? "Route unavailable",
     passengerCount:
@@ -239,6 +266,7 @@ export function normalizeSnapshot(snapshot: unknown): FlightOrderSnapshot {
     currency: raw.currency ?? "USD",
     sellAmount,
     sellAmountLabel,
+    sellMoney: normalizeSerializedMoney(raw.sellMoney),
     createdAtIso: raw.createdAtIso ?? new Date(0).toISOString(),
     airlineBookingReference:
       typeof raw.airlineBookingReference === "string" && raw.airlineBookingReference.trim()
@@ -446,6 +474,7 @@ function createSnapshotPassengers(input: {
 function createBillingSummary(input: {
   offer: BuildFlightOrderSnapshotInput["offer"]
   currency: string
+  totalAmount: number
   totalAmountLabel: string
 }) {
   const fareAmount = parseMoney(input.offer.base_amount)
@@ -454,9 +483,14 @@ function createBillingSummary(input: {
   return {
     fareAmountLabel:
       fareAmount === null ? null : formatCurrencyAmount(fareAmount, input.currency),
+    fareMoney:
+      fareAmount === null ? null : serializeMoney(fareAmount, input.currency),
     taxesAmountLabel:
       taxesAmount === null ? null : formatCurrencyAmount(taxesAmount, input.currency),
+    taxesMoney:
+      taxesAmount === null ? null : serializeMoney(taxesAmount, input.currency),
     totalAmountLabel: input.totalAmountLabel,
+    totalMoney: serializeMoney(input.totalAmount, input.currency),
   }
 }
 
@@ -495,6 +529,10 @@ function createBookedServices(
         parseMoney(service.total_amount) ?? 0,
         service.total_currency
       ),
+      totalMoney: serializeMoney(
+        service.total_amount ?? "0",
+        service.total_currency
+      ),
       passengerIds: Array.isArray(service.passenger_ids) ? [...service.passenger_ids] : [],
       segmentIds: Array.isArray(service.segment_ids) ? [...service.segment_ids] : [],
     }))
@@ -518,13 +556,24 @@ function createMetadataEntries(
 function createConditionsSummary(
   order: BuildFlightOrderSnapshotInput["order"]
 ): FlightOrderSnapshotConditionsSummary {
+  const changes = createConditionSummaryLine(
+    order?.conditions?.change_before_departure,
+    "change"
+  )
+  const refunds = createConditionSummaryLine(
+    order?.conditions?.refund_before_departure,
+    "refund"
+  )
+
   return {
-    changes: formatConditionSummaryLine(order?.conditions?.change_before_departure, "change"),
-    refunds: formatConditionSummaryLine(order?.conditions?.refund_before_departure, "refund"),
+    changes: changes.label,
+    changesMoney: changes.money,
+    refunds: refunds.label,
+    refundsMoney: refunds.money,
   }
 }
 
-function formatConditionSummaryLine(
+function createConditionSummaryLine(
   condition: unknown,
   type: "change" | "refund"
 ) {
@@ -533,7 +582,7 @@ function formatConditionSummaryLine(
   const deniedText = type === "change" ? "Changes not allowed" : "Refunds not allowed"
 
   if (!condition || typeof condition !== "object") {
-    return noDataText
+    return { label: noDataText, money: null }
   }
 
   const typed = condition as {
@@ -543,25 +592,31 @@ function formatConditionSummaryLine(
   }
 
   if (typed.allowed === false) {
-    return deniedText
+    return { label: deniedText, money: null }
   }
 
   if (typed.allowed !== true) {
-    return noDataText
+    return { label: noDataText, money: null }
   }
 
-  const penaltyAmount = parseMoney(typed.penalty_amount)
   const penaltyCurrency = typed.penalty_currency?.trim().toUpperCase()
 
-  if (
-    penaltyAmount !== null &&
-    penaltyCurrency &&
-    penaltyAmount > 0
-  ) {
-    return `${allowedText} with ${formatCurrencyAmount(penaltyAmount, penaltyCurrency)} fee`
+  if (typed.penalty_amount && penaltyCurrency) {
+    try {
+      const money = serializeMoney(typed.penalty_amount, penaltyCurrency)
+
+      if (BigInt(money.amount) > 0n) {
+        return {
+          label: `${allowedText} with ${formatSerializedMoney(money)} fee`,
+          money,
+        }
+      }
+    } catch {
+      // Preserve the source condition text when a supplier penalty is malformed.
+    }
   }
 
-  return allowedText
+  return { label: allowedText, money: null }
 }
 
 function normalizeLegs(rawLegs: unknown): FlightOrderSnapshot["legs"] {
@@ -626,16 +681,22 @@ function normalizeBillingSummary(
   if (!rawBillingSummary || typeof rawBillingSummary !== "object" || Array.isArray(rawBillingSummary)) {
     return {
       fareAmountLabel: null,
+      fareMoney: null,
       taxesAmountLabel: null,
+      taxesMoney: null,
       totalAmountLabel: defaultTotalAmountLabel,
+      totalMoney: null,
     }
   }
 
   const typed = rawBillingSummary as Partial<FlightOrderSnapshot["billingSummary"]>
   return {
     fareAmountLabel: typed.fareAmountLabel ?? null,
+    fareMoney: normalizeSerializedMoney(typed.fareMoney),
     taxesAmountLabel: typed.taxesAmountLabel ?? null,
+    taxesMoney: normalizeSerializedMoney(typed.taxesMoney),
     totalAmountLabel: typed.totalAmountLabel ?? defaultTotalAmountLabel,
+    totalMoney: normalizeSerializedMoney(typed.totalMoney),
   }
 }
 
@@ -685,9 +746,37 @@ function normalizeBookedServices(value: unknown): FlightOrderSnapshotBookedServi
         typeof item.totalAmountLabel === "string" && item.totalAmountLabel.trim().length > 0
           ? item.totalAmountLabel
           : "Amount unavailable",
+      totalMoney: normalizeSerializedMoney(item.totalMoney),
       passengerIds: normalizeStringArray(item.passengerIds),
       segmentIds: normalizeStringArray(item.segmentIds),
     }))
+}
+
+function normalizeSerializedMoney(value: unknown): SerializedMoney | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  const money = value as Partial<SerializedMoney>
+
+  if (
+    typeof money.amount !== "string" ||
+    !/^-?\d+$/.test(money.amount) ||
+    typeof money.currency !== "string" ||
+    !/^[A-Za-z]{3}$/.test(money.currency) ||
+    typeof money.scale !== "number" ||
+    !Number.isInteger(money.scale) ||
+    money.scale < 0 ||
+    money.scale > 18
+  ) {
+    return null
+  }
+
+  return {
+    amount: money.amount,
+    currency: money.currency.toUpperCase(),
+    scale: money.scale,
+  }
 }
 
 function normalizeMetadataEntries(value: unknown): FlightOrderSnapshotMetadataEntry[] {
@@ -721,10 +810,12 @@ function normalizeConditionsSummary(value: unknown): FlightOrderSnapshotConditio
       typeof typed.changes === "string" && typed.changes.trim().length > 0
         ? typed.changes
         : "No data on changes",
+    changesMoney: normalizeSerializedMoney(typed.changesMoney),
     refunds:
       typeof typed.refunds === "string" && typed.refunds.trim().length > 0
         ? typed.refunds
         : "No data on refunds",
+    refundsMoney: normalizeSerializedMoney(typed.refundsMoney),
   }
 }
 

@@ -70,6 +70,7 @@ import {
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { cn } from "@/lib/utils"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
+import { FxEstimateDisclosure, Money } from "@/modules/currency/ui"
 
 const SORT_OPTIONS = [
   { value: "least_expensive", label: "Least expensive" },
@@ -374,6 +375,9 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
           expiresAtIso={data.offerExpiresAtIso}
           expiresAtLabel={data.offerExpiresAtLabel}
         />
+        <FxEstimateDisclosure
+          sourceCurrencies={offers.map((offer) => offer.totalMoney.currency)}
+        />
 
         <div className="lg:hidden">
           <Dialog open={isFilterDialogOpen} onOpenChange={setFilterDialogOpen}>
@@ -599,7 +603,10 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                               offer.isExpired ? "text-muted-foreground" : ""
                             )}
                           >
-                            {offer.totalAmountLabel}
+                            <Money
+                              money={offer.totalMoney}
+                              fallbackLabel={offer.totalAmountLabel}
+                            />
                           </span>
                         </p>
                       </div>

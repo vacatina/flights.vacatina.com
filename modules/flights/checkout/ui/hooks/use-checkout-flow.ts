@@ -15,11 +15,13 @@ import {
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
+import type { SerializedMoney } from "@/modules/currency/domain"
 
 interface CheckoutSubmitSuccessState {
   duffelOrderId: string
   bookingReference: string | null
   totalSellAmountLabel: string
+  totalSellMoney: SerializedMoney | null
   paymentRequiredByLabel: string | null
   paymentMode: "pay_now" | "hold"
 }
@@ -30,6 +32,7 @@ export interface CheckoutPayNowResolution {
   duffelOrderId: string | null
   bookingReference: string | null
   totalChargeAmountLabel: string | null
+  totalChargeMoney: SerializedMoney | null
   message: string | null
 }
 
@@ -81,6 +84,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         duffelOrderId: result.data.duffelOrderId,
         bookingReference: result.data.bookingReference,
         totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+        totalChargeMoney: result.data.totalChargeMoney,
         message: null,
       }
     }
@@ -92,6 +96,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         duffelOrderId: result.data.duffelOrderId,
         bookingReference: result.data.bookingReference,
         totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+        totalChargeMoney: result.data.totalChargeMoney,
         message: result.data.message,
       }
     }
@@ -103,6 +108,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         duffelOrderId: result.data.duffelOrderId,
         bookingReference: result.data.bookingReference,
         totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+        totalChargeMoney: result.data.totalChargeMoney,
         message: result.data.message,
       }
     }
@@ -113,6 +119,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
       duffelOrderId: result.data.duffelOrderId,
       bookingReference: result.data.bookingReference,
       totalChargeAmountLabel: result.data.totalChargeAmountLabel,
+      totalChargeMoney: result.data.totalChargeMoney,
       message: result.data.message,
     }
   }, [])
@@ -158,6 +165,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
             bookingReference: resolution.bookingReference,
             totalSellAmountLabel:
               resolution.totalChargeAmountLabel ?? data.quote.fareSellAmountLabel,
+            totalSellMoney: resolution.totalChargeMoney,
             paymentRequiredByLabel: null,
             paymentMode: "pay_now",
           }
@@ -248,6 +256,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
           duffelOrderId: result.data.duffelOrderId,
           bookingReference: result.data.bookingReference,
           totalSellAmountLabel: result.data.totalSellAmountLabel,
+          totalSellMoney: result.data.totalSellMoney,
           paymentRequiredByLabel: result.data.paymentRequiredByLabel,
           paymentMode: result.data.paymentMode,
         }
@@ -343,6 +352,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
         bookingReference: resolution.bookingReference,
         totalSellAmountLabel:
           resolution.totalChargeAmountLabel ?? data.quote.fareSellAmountLabel,
+        totalSellMoney: resolution.totalChargeMoney,
         paymentRequiredByLabel: null,
         paymentMode: "pay_now",
       }
@@ -470,6 +480,7 @@ function toPayNowResolution(
       duffelOrderId: result.duffelOrderId,
       bookingReference: result.bookingReference,
       totalChargeAmountLabel: result.totalChargeAmountLabel,
+      totalChargeMoney: result.totalChargeMoney,
       message: null,
     }
   }
@@ -481,6 +492,7 @@ function toPayNowResolution(
       duffelOrderId: result.duffelOrderId,
       bookingReference: result.bookingReference,
       totalChargeAmountLabel: result.totalChargeAmountLabel,
+      totalChargeMoney: result.totalChargeMoney,
       message: result.message,
     }
   }
@@ -492,6 +504,7 @@ function toPayNowResolution(
       duffelOrderId: result.duffelOrderId,
       bookingReference: result.bookingReference,
       totalChargeAmountLabel: result.totalChargeAmountLabel,
+      totalChargeMoney: result.totalChargeMoney,
       message: result.message,
     }
   }
@@ -502,6 +515,7 @@ function toPayNowResolution(
     duffelOrderId: result.duffelOrderId,
     bookingReference: result.bookingReference,
     totalChargeAmountLabel: result.totalChargeAmountLabel,
+    totalChargeMoney: result.totalChargeMoney,
     message: result.message,
   }
 }

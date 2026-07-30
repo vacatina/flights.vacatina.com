@@ -1,7 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
@@ -48,6 +55,7 @@ import {
   CheckoutWizardShell,
 } from "@/modules/flights/checkout/ui/wizard"
 import { cn } from "@/lib/utils"
+import { DecimalMoney, FxEstimateDisclosure, Money } from "@/modules/currency/ui"
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const E164_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/
@@ -598,7 +606,17 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
                   Duffel order ID: <strong>{submitSuccess.duffelOrderId}</strong>
                 </p>
                 <p>
-                  Total charged: <strong>{submitSuccess.totalSellAmountLabel}</strong>
+                  Total charged:{" "}
+                  <strong>
+                    {submitSuccess.totalSellMoney ? (
+                      <Money
+                        money={submitSuccess.totalSellMoney}
+                        fallbackLabel={submitSuccess.totalSellAmountLabel}
+                      />
+                    ) : (
+                      submitSuccess.totalSellAmountLabel
+                    )}
+                  </strong>
                 </p>
                 {submitSuccess.paymentRequiredByLabel ? (
                   <p>
@@ -857,21 +875,41 @@ function CheckoutSummaryRail(input: {
         </div>
 
         <div className="space-y-2 text-sm">
-          <SummaryLine label="Fare" value={input.data.quote.fareSellAmountLabel} />
+          <SummaryLine
+            label="Fare"
+            value={
+              <Money
+                money={input.data.quote.fareSellMoney}
+                fallbackLabel={input.data.quote.fareSellAmountLabel}
+              />
+            }
+          />
           <SummaryLine
             label="Extras"
-            value={formatSummaryCurrency(input.ancillaryPreviewTotal, input.data.quote.currency)}
+            value={
+              <DecimalMoney
+                value={input.ancillaryPreviewTotal}
+                currency={input.data.quote.currency}
+              />
+            }
           />
           <div className="my-3 h-px bg-[#eceee8]" />
           <SummaryLine
             label="Total"
-            value={formatSummaryCurrency(
-              input.totalPreview,
-              input.paymentMode === "pay_now"
-                ? input.data.payment.chargeCurrency
-                : input.data.quote.currency
-            )}
+            value={
+              <DecimalMoney
+                value={input.totalPreview}
+                currency={
+                  input.paymentMode === "pay_now"
+                    ? input.data.payment.chargeCurrency
+                    : input.data.quote.currency
+                }
+              />
+            }
             strong
+          />
+          <FxEstimateDisclosure
+            sourceCurrencies={[input.data.quote.currency]}
           />
         </div>
 
@@ -953,7 +991,7 @@ function CheckoutMobileSummary(input: {
         <div>
           <p className="text-xs text-muted-foreground">Total due</p>
           <p className="text-base font-semibold">
-            {formatSummaryCurrency(input.totalPreview, currency)}
+            <DecimalMoney value={input.totalPreview} currency={currency} />
           </p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
@@ -969,7 +1007,11 @@ function CheckoutMobileSummary(input: {
   )
 }
 
-function SummaryLine(input: { label: string; value: string; strong?: boolean }) {
+function SummaryLine(input: {
+  label: string
+  value: ReactNode
+  strong?: boolean
+}) {
   return (
     <div
       className={cn(
@@ -997,19 +1039,6 @@ function StatusRow(input: { complete: boolean; label: string }) {
       <span>{input.label}</span>
     </div>
   )
-}
-
-function formatSummaryCurrency(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: currency === "JPY" ? 0 : 2,
-      maximumFractionDigits: currency === "JPY" ? 0 : 2,
-    }).format(amount)
-  } catch {
-    return `${currency} ${amount.toFixed(currency === "JPY" ? 0 : 2)}`
-  }
 }
 
 function useQuoteCountdown(expiresAtIso: string) {

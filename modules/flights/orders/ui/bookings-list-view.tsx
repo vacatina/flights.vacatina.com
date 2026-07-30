@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table"
 import { ChevronRightIcon, PlaneTakeoffIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { FxEstimateDisclosure, Money } from "@/modules/currency/ui"
 
 interface BookingsListViewProps {
   items: BookingListItem[]
@@ -150,7 +151,10 @@ export function BookingsListView(input: BookingsListViewProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       <span className="text-base font-semibold tabular-nums text-foreground">
-                        {item.sellAmountLabel}
+                        <Money
+                          money={item.sellMoney}
+                          fallbackLabel={item.sellAmountLabel}
+                        />
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -183,7 +187,10 @@ export function BookingsListView(input: BookingsListViewProps) {
                       <p className="text-sm text-muted-foreground">{item.journeyTypeLabel}</p>
                     </div>
                     <p className="text-base font-semibold tabular-nums text-foreground">
-                      {item.sellAmountLabel}
+                      <Money
+                        money={item.sellMoney}
+                        fallbackLabel={item.sellAmountLabel}
+                      />
                     </p>
                   </div>
 
@@ -231,6 +238,11 @@ export function BookingsListView(input: BookingsListViewProps) {
               </Card>
             ))}
           </div>
+          <FxEstimateDisclosure
+            sourceCurrencies={input.items.map(
+              (item) => item.sellMoney.currency
+            )}
+          />
         </>
       )}
 

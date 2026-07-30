@@ -1,4 +1,5 @@
 import type { CreateOrderService, Offer, SeatMap } from "@duffel/api/types"
+import type { SerializedMoney } from "@/modules/currency/domain"
 
 export type CheckoutPaymentMode = "pay_now" | "hold"
 export type CheckoutWizardStep = "traveler" | "extras" | "pay"
@@ -117,6 +118,7 @@ export interface CheckoutQuoteViewModel {
   fareNetAmount: number
   fareSellAmount: number
   fareSellAmountLabel: string
+  fareSellMoney: SerializedMoney
   expiresAtIso: string
   expiresAtLabel: string
 }
@@ -159,6 +161,7 @@ export interface CheckoutPageData {
     chargeAmount: number | null
     chargeCurrency: string
     chargeAmountLabel: string | null
+    chargeMoney: SerializedMoney | null
   }
 }
 
@@ -186,6 +189,7 @@ export interface CheckoutSubmissionResult {
   bookingReference: string
   paymentMode: CheckoutPaymentMode
   totalSellAmountLabel: string
+  totalSellMoney: SerializedMoney
   paymentRequiredByLabel: string | null
 }
 
@@ -195,6 +199,7 @@ export interface CheckoutPaymentStartResult {
   chargeAmount: number
   chargeCurrency: string
   chargeAmountLabel: string
+  chargeMoney: SerializedMoney
   status: "processing"
 }
 
@@ -211,4 +216,5 @@ export interface CheckoutSessionStatusResult {
   duffelOrderId: string | null
   bookingReference: string | null
   totalChargeAmountLabel: string | null
+  totalChargeMoney: SerializedMoney | null
 }

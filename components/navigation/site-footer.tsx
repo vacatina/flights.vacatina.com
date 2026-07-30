@@ -11,9 +11,9 @@ import Image from "next/image"
 import Link from "next/link"
 
 import { contactData } from "@/lib/shared/contact-data"
+import { CurrencySelector } from "@/modules/currency/ui"
 
 const languageLabel = "English (US)"
-const currencyLabel = "USD"
 
 const socialItems = [
   {
@@ -134,9 +134,7 @@ export function SiteFooter() {
                 {languageLabel}
               </Link>
               <span>$</span>
-              <Link href="#" className="underline underline-offset-3">
-                {currencyLabel}
-              </Link>
+              <CurrencySelector variant="footer" />
             </div>
           </div>
         </div>

@@ -189,7 +189,8 @@ test("fetchCheckoutPageData builds PayPal payment preview from sell amount", asy
     unavailableReason: null,
     chargeAmount: 120,
     chargeCurrency: "USD",
-    chargeAmountLabel: "USD 120.00",
+      chargeAmountLabel: "USD 120.00",
+      chargeMoney: { amount: "12000", currency: "USD", scale: 2 },
   })
 })
 
@@ -600,6 +601,7 @@ function createCheckoutPageModel() {
       currency: "USD",
       fareNetAmount: 100,
       fareSellAmount: 120,
+      fareSellMoney: { amount: "12000", currency: "USD", scale: 2 },
       fareSellAmountLabel: "USD 120.00",
       expiresAtIso: "2026-04-13T11:00:00.000Z",
       expiresAtLabel: "13/04/2026, 11:00",
