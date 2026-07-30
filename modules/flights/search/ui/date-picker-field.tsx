@@ -30,6 +30,8 @@ export function DatePickerField({
   triggerClassName,
 }: DatePickerFieldProps) {
   const { field, fieldState } = useController({ control, name })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
   const selectedDate = field.value ? new Date(`${field.value}T00:00:00`) : undefined
 
@@ -63,6 +65,7 @@ export function DatePickerField({
           <Calendar
             mode="single"
             selected={selectedDate}
+            disabled={{ before: today }}
             onSelect={(date) => {
               if (!date) {
                 return
