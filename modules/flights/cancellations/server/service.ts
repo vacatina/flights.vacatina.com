@@ -32,7 +32,6 @@ import {
   defaultCancellationRepository,
   type CancellationDetailRecord,
   type CancellationRepository,
-  type CancellationQuoteRecord,
   type CancellationRequestRecord,
 } from "@/modules/flights/cancellations/server/repository"
 import {

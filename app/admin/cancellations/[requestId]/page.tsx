@@ -1,8 +1,12 @@
 import {
+  listAdminCancellationRequests,
   getAdminCancellationDetail,
   requireActiveAdmin,
 } from "@/modules/flights/cancellations/server"
-import { AdminCancellationDetail } from "@/modules/flights/cancellations/ui"
+import {
+  AdminCancellationDetail,
+  AdminPanelShell,
+} from "@/modules/flights/cancellations/ui"
 
 interface AdminCancellationDetailPageProps {
   params: Promise<{ requestId: string }>
@@ -11,15 +15,22 @@ interface AdminCancellationDetailPageProps {
 export default async function AdminCancellationDetailPage({
   params,
 }: AdminCancellationDetailPageProps) {
-  await requireActiveAdmin()
+  const admin = await requireActiveAdmin()
   const { requestId } = await params
-  const detail = await getAdminCancellationDetail(requestId)
+  const [detail, items] = await Promise.all([
+    getAdminCancellationDetail(requestId),
+    listAdminCancellationRequests(),
+  ])
 
   return (
-    <main className="min-h-svh bg-background py-6 md:py-8">
-      <div className="mx-auto w-full max-w-7xl px-4 md:px-6 xl:px-8">
-        <AdminCancellationDetail detail={detail} />
-      </div>
-    </main>
+    <AdminPanelShell
+      active="cancellations"
+      title={detail.booking.reference}
+      description={`${detail.booking.routeLabel} cancellation detail.`}
+      adminEmail={admin.email}
+      queueItems={items}
+    >
+      <AdminCancellationDetail detail={detail} />
+    </AdminPanelShell>
   )
 }

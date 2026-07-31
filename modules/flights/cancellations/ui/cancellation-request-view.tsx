@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { PendingSubmitButton } from "@/modules/flights/cancellations/ui/pending-submit-button"
 
 interface CancellationRequestViewProps {
   context: CancellationEligibilityContext
@@ -172,9 +173,12 @@ export function CancellationRequestView({
               </p>
             ) : null}
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={!context.canSubmit}>
+              <PendingSubmitButton
+                disabled={!context.canSubmit}
+                pendingLabel="Submitting..."
+              >
                 Submit request
-              </Button>
+              </PendingSubmitButton>
               <Button
                 type="button"
                 variant="outline"

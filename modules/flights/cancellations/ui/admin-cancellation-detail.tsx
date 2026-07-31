@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { PendingSubmitButton } from "@/modules/flights/cancellations/ui/pending-submit-button"
 
 interface AdminCancellationDetailProps {
   detail: AdminCancellationDetailModel
@@ -28,9 +29,9 @@ export function AdminCancellationDetail({
   detail,
 }: AdminCancellationDetailProps) {
   return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_390px]">
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-border bg-background p-5 shadow-sm">
           <div className="space-y-2">
             <Button variant="ghost" render={<Link href="/admin/cancellations" />}>
               Back
@@ -65,7 +66,7 @@ export function AdminCancellationDetail({
           ]}
         />
 
-        <section className="space-y-3 rounded-lg border border-border p-5">
+        <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Customer request</h2>
           <p className="text-sm text-muted-foreground">
             {detail.request.customerReason}
@@ -77,7 +78,7 @@ export function AdminCancellationDetail({
           ) : null}
         </section>
 
-        <section className="space-y-3 rounded-lg border border-border p-5">
+        <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Fare conditions</h2>
           {detail.booking.fareConditions.map((condition) => (
             <p key={condition} className="text-sm text-muted-foreground">
@@ -86,7 +87,7 @@ export function AdminCancellationDetail({
           ))}
         </section>
 
-        <section className="space-y-4 rounded-lg border border-border p-5">
+        <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Fee and refund</h2>
           <form action={updateCancellationFeeRefundFormAction} className="grid gap-4 md:grid-cols-4">
             <input type="hidden" name="requestId" value={detail.request.id} />
@@ -123,7 +124,9 @@ export function AdminCancellationDetail({
               }
             />
             <div className="md:col-span-4">
-              <Button type="submit">Update fee/refund</Button>
+              <PendingSubmitButton pendingLabel="Updating...">
+                Update fee/refund
+              </PendingSubmitButton>
             </div>
           </form>
           <InfoGrid
@@ -144,7 +147,7 @@ export function AdminCancellationDetail({
           />
         </section>
 
-        <section className="space-y-4 rounded-lg border border-border p-5">
+        <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Customer message</h2>
           <form action={updateCustomerMessageFormAction} className="space-y-3">
             <input type="hidden" name="requestId" value={detail.request.id} />
@@ -153,11 +156,13 @@ export function AdminCancellationDetail({
               defaultValue={detail.request.customerMessage ?? ""}
               className="min-h-28"
             />
-            <Button type="submit">Save message</Button>
+            <PendingSubmitButton pendingLabel="Saving...">
+              Save message
+            </PendingSubmitButton>
           </form>
         </section>
 
-        <section className="space-y-4 rounded-lg border border-border p-5">
+        <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Timing override</h2>
           {detail.request.cutoffOverrideReason ? (
             <p className="text-sm text-muted-foreground">
@@ -167,13 +172,13 @@ export function AdminCancellationDetail({
           <form action={recordCutoffOverrideFormAction} className="space-y-3">
             <input type="hidden" name="requestId" value={detail.request.id} />
             <Input name="reason" placeholder="Reason for timing override" />
-            <Button type="submit" variant="outline">
+            <PendingSubmitButton variant="outline" pendingLabel="Recording...">
               Record override
-            </Button>
+            </PendingSubmitButton>
           </form>
         </section>
 
-        <section className="space-y-4 rounded-lg border border-border p-5">
+        <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Duffel cancellation quotes</h2>
           {detail.quotes.length === 0 ? (
             <p className="text-sm text-muted-foreground">No Duffel quote stored yet.</p>
@@ -192,7 +197,7 @@ export function AdminCancellationDetail({
           ))}
         </section>
 
-        <section className="space-y-4 rounded-lg border border-border p-5">
+        <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Audit trail</h2>
           <div className="space-y-3">
             {detail.events.length === 0 ? (
@@ -215,8 +220,8 @@ export function AdminCancellationDetail({
         </section>
       </section>
 
-      <aside className="space-y-4 border-l border-border pl-6">
-        <section className="space-y-3 rounded-lg border border-border p-5">
+      <aside className="space-y-4">
+        <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Actions</h2>
           <ActionForm
             action={createDuffelCancellationQuoteFormAction}
@@ -256,13 +261,17 @@ export function AdminCancellationDetail({
               required
               className="min-h-24"
             />
-            <Button type="submit" variant="destructive" className="w-full">
+            <PendingSubmitButton
+              variant="destructive"
+              className="w-full"
+              pendingLabel="Rejecting..."
+            >
               Reject request
-            </Button>
+            </PendingSubmitButton>
           </form>
         </section>
 
-        <section className="space-y-3 rounded-lg border border-border p-5">
+        <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Refund attempts</h2>
           {detail.refunds.length === 0 ? (
             <p className="text-sm text-muted-foreground">No refund records yet.</p>
@@ -295,9 +304,13 @@ function ActionForm({
   return (
     <form action={action}>
       <input type="hidden" name="requestId" value={requestId} />
-      <Button type="submit" variant={variant} className="w-full">
+      <PendingSubmitButton
+        variant={variant}
+        className="w-full"
+        pendingLabel="Working..."
+      >
         {label}
-      </Button>
+      </PendingSubmitButton>
     </form>
   )
 }
@@ -321,7 +334,7 @@ function Field({
 
 function InfoGrid({ items }: { items: Array<[string, string]> }) {
   return (
-    <div className="grid gap-4 rounded-lg border border-border p-5 md:grid-cols-2">
+    <div className="grid gap-4 rounded-lg border border-border bg-background p-5 shadow-sm md:grid-cols-2">
       {items.map(([label, value]) => (
         <div key={label} className="space-y-1">
           <p className="text-xs tracking-wide text-muted-foreground uppercase">

@@ -2,13 +2,10 @@ import { Google_Sans_Flex as Figtree, Geist_Mono } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 
 import "./globals.css"
-import { SiteFooter } from "@/components/navigation/site-footer"
-import { SiteNavbar } from "@/components/navigation/site-navbar"
-import { ThemeProvider } from "@/components/theme-provider"
+import { AppShell } from "@/components/navigation/app-shell"
 import { cn } from "@/lib/utils"
 import { isClerkConfigured } from "@/modules/auth/server/config"
 import type { Metadata } from "next"
-import { TopLoader } from "@/components/ui/top-loader"
 
 const figtreeHeading = Figtree({
   subsets: ["latin"],
@@ -35,18 +32,7 @@ export default function RootLayout({
 }>) {
   const clerkEnabled = isClerkConfigured()
 
-  const appShell = (
-    // <ThemeProvider>
-    <>
-      <TopLoader />
-      <div id="top" className="min-h-svh">
-        <SiteNavbar clerkEnabled={clerkEnabled} />
-        {children}
-        <SiteFooter />
-      </div>
-    </>
-    // </ThemeProvider>
-  )
+  const appShell = <AppShell clerkEnabled={clerkEnabled}>{children}</AppShell>
 
   return (
     <html
