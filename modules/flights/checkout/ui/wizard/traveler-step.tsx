@@ -1,8 +1,10 @@
 "use client"
 
 import Image from "next/image"
-import { AlertCircleIcon, BriefcaseIcon, CheckCircle2Icon, PlaneTakeoffIcon } from "lucide-react"
+import { AlertCircleIcon, BriefcaseIcon, CheckCircle2Icon, PlaneTakeoffIcon, CalendarIcon } from "lucide-react"
 import type { UseFormReturn } from "react-hook-form"
+import { getData, getName } from "country-list"
+import { format } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import type { CheckoutPageData } from "@/modules/flights/checkout/domain"
@@ -116,8 +120,8 @@ export function CheckoutTravelerStep({
                       <p className="text-sm text-muted-foreground">{event.meta.join(" · ")}</p>
                     ) : null}
                     {event.id.endsWith("-arrive") &&
-                    flight.layovers.length > 0 &&
-                    index / 2 < flight.layovers.length ? (
+                      flight.layovers.length > 0 &&
+                      index / 2 < flight.layovers.length ? (
                       <p className="inline-flex rounded-full bg-muted px-3 py-1 text-sm">
                         {flight.layovers[Math.floor(index / 2)]?.label}
                       </p>
@@ -145,7 +149,7 @@ export function CheckoutTravelerStep({
             onClick={() => form.setValue("paymentMode", "pay_now")}
             className={cn(
               "rounded-2xl border px-4 py-4 text-left",
-              paymentMode === "pay_now" ? "border-[#1f6f54] bg-[#eef8f3]" : "bg-card",
+              paymentMode === "pay_now" ? "border-primary bg-primary/5" : "bg-card",
               !data.payment.payNowEnabled && "cursor-not-allowed opacity-60"
             )}
           >
@@ -160,7 +164,7 @@ export function CheckoutTravelerStep({
             onClick={() => form.setValue("paymentMode", "hold")}
             className={cn(
               "rounded-2xl border px-4 py-4 text-left",
-              paymentMode === "hold" ? "border-[#17201d] bg-[#f2f3ee]" : "bg-card",
+              paymentMode === "hold" ? "border-foreground bg-muted/40" : "bg-card",
               !data.paymentRequirements.canHold && "cursor-not-allowed opacity-60"
             )}
           >
@@ -217,8 +221,7 @@ export function CheckoutTravelerStep({
               placeholder="+94771234567"
               aria-invalid={Boolean(errors.contact?.phoneNumber)}
               {...form.register("contact.phoneNumber")}
-            />
-            <FieldDescription>Use international format, for example +94771234567.</FieldDescription>
+            />  
             <FieldError errors={[errors.contact?.phoneNumber]} />
           </Field>
         </div>
@@ -234,8 +237,8 @@ export function CheckoutTravelerStep({
         />
         <div className="space-y-5">
           {(passengers ?? []).map((passenger, index) => (
-            <Card key={passenger.id} className="rounded-lg border-[#d7d8ce]">
-              <CardHeader className="border-b border-[#eceee8] pb-4">
+            <Card key={passenger.id} className="rounded-xl border-border">
+              <CardHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="text-lg">
                     {data.passengerDefaults[index]?.label ?? `Passenger ${index + 1}`}
@@ -250,7 +253,7 @@ export function CheckoutTravelerStep({
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-[1fr_2fr_2fr]">
                   <Field>
                     <FieldLabel>Title <RequiredMark /></FieldLabel>
                     <Select
@@ -267,7 +270,15 @@ export function CheckoutTravelerStep({
                       }}
                     >
                       <SelectTrigger aria-invalid={Boolean(errors.passengers?.[index]?.title)}>
-                        <SelectValue />
+                        <SelectValue>
+                          {(value: string | null) =>
+                            value === "mr" ? "Mr." :
+                            value === "mrs" ? "Mrs." :
+                            value === "ms" ? "Ms." :
+                            value === "miss" ? "Miss." :
+                            value === "dr" ? "Dr." : value
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="mr">Mr.</SelectItem>
@@ -302,11 +313,39 @@ export function CheckoutTravelerStep({
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field data-invalid={Boolean(errors.passengers?.[index]?.bornOn)}>
                     <FieldLabel>Date of birth <RequiredMark /></FieldLabel>
-                    <Input
-                      type="date"
-                      aria-invalid={Boolean(errors.passengers?.[index]?.bornOn)}
-                      {...form.register(`passengers.${index}.bornOn`)}
-                    />
+                    <Popover>
+                      <PopoverTrigger
+                        className="w-full"
+                        render={
+                          <button
+                            type="button"
+                            className={cn(
+                              "flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 font-normal",
+                              !passenger.bornOn && "text-muted-foreground",
+                              Boolean(errors.passengers?.[index]?.bornOn) && "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
+                            )}
+                          >
+                            <span>{passenger.bornOn ? format(new Date(`${passenger.bornOn}T00:00:00`), "yyyy-MM-dd") : "yyyy-mm-dd"}</span>
+                            <CalendarIcon className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
+                          </button>
+                        }
+                      />
+                      <PopoverContent align="start" className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          defaultMonth={passenger.bornOn ? new Date(`${passenger.bornOn}T00:00:00`) : new Date()}
+                          selected={passenger.bornOn ? new Date(`${passenger.bornOn}T00:00:00`) : undefined}
+                          disabled={{ after: new Date() }}
+                          onSelect={(date) => {
+                            if (!date) return
+                            form.setValue(`passengers.${index}.bornOn`, format(date, "yyyy-MM-dd"), {
+                              shouldValidate: true,
+                              shouldDirty: true
+                            })
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FieldError errors={[errors.passengers?.[index]?.bornOn]} />
                   </Field>
                   <Field>
@@ -325,7 +364,12 @@ export function CheckoutTravelerStep({
                       }}
                     >
                       <SelectTrigger aria-invalid={Boolean(errors.passengers?.[index]?.gender)}>
-                        <SelectValue />
+                        <SelectValue>
+                          {(value: string | null) =>
+                            value === "m" ? "Male" :
+                            value === "f" ? "Female" : value
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="m">Male</SelectItem>
@@ -336,9 +380,9 @@ export function CheckoutTravelerStep({
                   </Field>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-[#e2e4dc] bg-[#f8f9f5] p-4">
+                <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-4">
                   <p className="text-sm font-medium">Identity document</p>
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-2">
                     <Field>
                       <FieldLabel>
                         Type {data.identityDocumentsRequired ? <RequiredMark /> : null}
@@ -357,12 +401,14 @@ export function CheckoutTravelerStep({
                         }}
                       >
                         <SelectTrigger aria-invalid={Boolean(errors.passengers?.[index]?.identityType)}>
-                          <SelectValue />
+                          <SelectValue className="capitalize">
+                            {(value: string | null) => value?.replace(/_/g, " ")}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {data.supportedIdentityDocumentTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
+                            <SelectItem key={type} value={type} className="capitalize">
+                              {type.replace(/_/g, " ")}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -383,27 +429,75 @@ export function CheckoutTravelerStep({
                       <FieldLabel>
                         Issuing country {data.identityDocumentsRequired ? <RequiredMark /> : null}
                       </FieldLabel>
-                      <Input
-                        placeholder="US"
-                        maxLength={2}
-                        aria-invalid={Boolean(errors.passengers?.[index]?.identityCountryCode)}
-                        {...form.register(`passengers.${index}.identityCountryCode`, {
-                          setValueAs: (value) =>
-                            typeof value === "string" ? value.trim().toUpperCase() : value,
-                        })}
-                      />
-                      <FieldDescription>Use the 2-letter country code.</FieldDescription>
+                      <Select
+                        value={passenger.identityCountryCode}
+                        onValueChange={(value) => {
+                          if (!value) {
+                            return
+                          }
+                          form.setValue(
+                            `passengers.${index}.identityCountryCode`,
+                            value,
+                            { shouldDirty: true, shouldValidate: true }
+                          )
+                        }}
+                      >
+                        <SelectTrigger aria-invalid={Boolean(errors.passengers?.[index]?.identityCountryCode)}>
+                          <SelectValue>
+                            {(value: string | null) =>
+                              value ? getName(value) || value : "Select country"
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[...getData()]
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((country) => (
+                              <SelectItem key={country.code} value={country.code}>
+                                {country.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                       <FieldError errors={[errors.passengers?.[index]?.identityCountryCode]} />
                     </Field>
                     <Field data-invalid={Boolean(errors.passengers?.[index]?.identityExpiresOn)}>
                       <FieldLabel>
                         Expiry date {data.identityDocumentsRequired ? <RequiredMark /> : null}
                       </FieldLabel>
-                      <Input
-                        type="date"
-                        aria-invalid={Boolean(errors.passengers?.[index]?.identityExpiresOn)}
-                        {...form.register(`passengers.${index}.identityExpiresOn`)}
-                      />
+                      <Popover>
+                        <PopoverTrigger
+                          className="w-full"
+                          render={
+                            <button
+                              type="button"
+                              className={cn(
+                                "flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 font-normal",
+                                !passenger.identityExpiresOn && "text-muted-foreground",
+                                Boolean(errors.passengers?.[index]?.identityExpiresOn) && "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
+                              )}
+                            >
+                              <span>{passenger.identityExpiresOn ? format(new Date(`${passenger.identityExpiresOn}T00:00:00`), "yyyy-MM-dd") : "yyyy-mm-dd"}</span>
+                              <CalendarIcon className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
+                            </button>
+                          }
+                        />
+                        <PopoverContent align="start" className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            defaultMonth={passenger.identityExpiresOn ? new Date(`${passenger.identityExpiresOn}T00:00:00`) : new Date()}
+                            selected={passenger.identityExpiresOn ? new Date(`${passenger.identityExpiresOn}T00:00:00`) : undefined}
+                            disabled={{ before: new Date() }}
+                            onSelect={(date) => {
+                              if (!date) return
+                              form.setValue(`passengers.${index}.identityExpiresOn`, format(date, "yyyy-MM-dd"), {
+                                shouldValidate: true,
+                                shouldDirty: true
+                              })
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
                       <FieldError errors={[errors.passengers?.[index]?.identityExpiresOn]} />
                     </Field>
                   </div>
@@ -457,7 +551,7 @@ function StepIntro(input: {
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold uppercase text-[#6c746f]">{input.eyebrow}</p>
+      <p className="text-xs font-semibold uppercase text-muted-foreground">{input.eyebrow}</p>
       <h2 className="text-2xl font-semibold tracking-tight md:text-xl">{input.title}</h2>
       <p className="max-w-2xl text-sm text-muted-foreground">{input.description}</p>
     </div>
@@ -527,7 +621,7 @@ function isPassengerComplete(input: {
 
   return Boolean(
     input.passenger.identityNumber.trim() &&
-      input.passenger.identityCountryCode.trim() &&
-      input.passenger.identityExpiresOn.trim()
+    input.passenger.identityCountryCode.trim() &&
+    input.passenger.identityExpiresOn.trim()
   )
 }

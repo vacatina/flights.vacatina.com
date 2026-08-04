@@ -13,6 +13,13 @@ import {
 } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
+import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion"
 import {
   Field,
   FieldError,
@@ -64,6 +71,7 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
   const router = useRouter()
   const [isSubmitting, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [expandedFlightIndex, setExpandedFlightIndex] = useState<string>("0")
   const defaultValues = useMemo(() => createDefaultFlightSearchValues(), [])
   const resolvedInitialValues = useMemo(
     () => cloneFlightSearchFormValues(initialValues ?? defaultValues),
@@ -273,54 +281,50 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
   const fieldLabelClassName =
     "text-[13px] font-medium uppercase tracking-[0.08em] text-muted-foreground"
   const textFieldClassName =
-    "h-[78px] rounded-[12px] border-input bg-background px-6 text-[18px] font-medium text-foreground placeholder:text-muted-foreground"
+    "h-14 rounded-xl border-input bg-background px-4 text-base font-medium text-foreground placeholder:text-muted-foreground"
   const dateFieldClassName =
-    "h-[78px] rounded-[12px] border-input bg-background px-6 text-[17px] font-medium text-foreground hover:bg-background"
+    "h-14 rounded-xl border-input bg-background px-4 text-[15px] font-medium text-foreground hover:bg-background"
 
   return (
     <form
-      className="flex w-full flex-col gap-8 rounded-[12px] border border-border bg-background p-4 shadow-xl md:gap-9 md:p-8"
+      className="flex w-full h-fit max-h-[80vh] md:max-h-full flex-col gap-8 overflow-y-auto rounded-[12px] border border-border bg-background p-4 shadow-xl transition-all duration-300 ease-in-out md:gap-9 md:p-8"
       onSubmit={onSubmit}
     >
       <FieldGroup className="gap-8">
-        <ToggleGroup
-          value={[journeyType]}
-          onValueChange={(nextValues) => {
-            const nextJourneyType = nextValues[0] as JourneyType | undefined
+        {/* Top Controls Bar */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <ToggleGroup
+            value={[journeyType]}
+            onValueChange={(nextValues) => {
+              const nextJourneyType = nextValues[0] as JourneyType | undefined
 
-            if (!nextJourneyType || nextJourneyType === journeyType) {
-              return
-            }
+              if (!nextJourneyType || nextJourneyType === journeyType) {
+                return
+              }
 
-            updateJourneyType(nextJourneyType)
-          }}
-          className={cn(
-            "grid w-full gap-0 rounded-[12px] bg-muted p-1",
-            JOURNEY_OPTIONS.length === 3 ? "grid-cols-3" : "grid-cols-2"
-          )}
-        >
-          {JOURNEY_OPTIONS.map((option) => (
-            <ToggleGroupItem
-              key={option}
-              value={option}
-              variant="default"
-              className="h-14 rounded-[10px] border border-transparent text-[15px] font-medium text-foreground transition-colors hover:bg-transparent aria-pressed:border-border aria-pressed:bg-background aria-pressed:text-primary aria-pressed:shadow-sm"
-            >
-              {JOURNEY_TAB_LABELS[option]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+              updateJourneyType(nextJourneyType)
+            }}
+            className={cn(
+              "grid w-full gap-0 rounded-[12px] bg-muted p-1 md:w-[400px]",
+              JOURNEY_OPTIONS.length === 3 ? "grid-cols-3" : "grid-cols-2"
+            )}
+          >
+            {JOURNEY_OPTIONS.map((option) => (
+              <ToggleGroupItem
+                key={option}
+                value={option}
+                variant="default"
+                className="h-10 rounded-[10px] border border-transparent text-[14px] font-medium text-foreground transition-colors hover:bg-transparent aria-pressed:border-border aria-pressed:bg-background aria-pressed:text-primary aria-pressed:shadow-sm"
+              >
+                {JOURNEY_TAB_LABELS[option]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
 
         {!isMultiCityJourney && (
-          <div className="flex flex-col gap-7">
-            <div
-              className={cn(
-                "grid items-start gap-6",
-                journeyType === "one_way"
-                  ? "xl:grid-cols-[minmax(0,1fr)_80px_minmax(0,1fr)_minmax(0,1fr)]"
-                  : "xl:grid-cols-[minmax(0,1fr)_80px_minmax(0,1fr)]"
-              )}
-            >
+          <div className="flex flex-col gap-4">
+            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.2fr)_68px_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
               <PlaceAutocompleteField
                 control={control}
                 name="slices.0.origin"
@@ -331,11 +335,11 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
                 inputClassName={textFieldClassName}
               />
 
-              <div className="hidden xl:flex xl:justify-center xl:pt-9">
+              <div className="hidden xl:flex xl:justify-center xl:pt-8">
                 <button
                   type="button"
                   onClick={swapOutboundPlaces}
-                  className="inline-flex size-[68px] items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                  className="inline-flex size-[56px] items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                   aria-label="Swap origin and destination"
                 >
                   <ArrowLeftRightIcon className="size-8" />
@@ -352,26 +356,29 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
                 inputClassName={textFieldClassName}
               />
 
-              {journeyType === "one_way" && (
-                <DatePickerField
-                  control={control}
-                  name="slices.0.departureDate"
-                  label="DEPART"
-                  labelClassName={fieldLabelClassName}
-                  triggerClassName={dateFieldClassName}
-                />
-              )}
-            </div>
+              <DatePickerField
+                control={control}
+                name="slices.0.departureDate"
+                label="DEPART"
+                labelClassName={fieldLabelClassName}
+                triggerClassName={dateFieldClassName}
+              />
 
-            {journeyType === "return" && (
-              <div className="grid gap-6 xl:grid-cols-2">
-                <DatePickerField
-                  control={control}
-                  name="slices.0.departureDate"
-                  label="DEPART"
-                  labelClassName={fieldLabelClassName}
-                  triggerClassName={dateFieldClassName}
-                />
+              {journeyType === "one_way" ? (
+                <div className="flex flex-col gap-2">
+                  <span className={cn(fieldLabelClassName, "opacity-50")}>RETURN</span>
+                  <button
+                    type="button"
+                    onClick={() => updateJourneyType("return")}
+                    className={cn(
+                      dateFieldClassName,
+                      "flex items-center justify-start border border-dashed text-muted-foreground transition-colors hover:bg-muted"
+                    )}
+                  >
+                    Add return
+                  </button>
+                </div>
+              ) : (
                 <DatePickerField
                   control={control}
                   name="slices.1.departureDate"
@@ -379,68 +386,100 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
                   labelClassName={fieldLabelClassName}
                   triggerClassName={dateFieldClassName}
                 />
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
         {isMultiCityJourney && (
           <div className="flex flex-col gap-6">
-            {fields.map((sliceField, index) => (
-              <div
-                key={sliceField.id}
-                className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_84px] xl:items-start"
-              >
-                <PlaceAutocompleteField
-                  control={control}
-                  name={`slices.${index}.origin`}
-                  label={`FROM ${index + 1}`}
-                  placeholder={`Select origin ${index + 1}`}
-                  helperText="Airport code, city, or country"
-                  labelClassName={fieldLabelClassName}
-                  inputClassName={textFieldClassName}
-                />
-                <PlaceAutocompleteField
-                  control={control}
-                  name={`slices.${index}.destination`}
-                  label={`TO ${index + 1}`}
-                  placeholder={`Select destination ${index + 1}`}
-                  helperText="Airport code, city, or country"
-                  labelClassName={fieldLabelClassName}
-                  inputClassName={textFieldClassName}
-                />
-                <DatePickerField
-                  control={control}
-                  name={`slices.${index}.departureDate`}
-                  label={`DEPART ${index + 1}`}
-                  labelClassName={fieldLabelClassName}
-                  triggerClassName={dateFieldClassName}
-                />
-                <button
-                  type="button"
-                  className="hidden size-[68px] items-center justify-center rounded-full border border-input bg-card transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45 xl:mt-9 xl:inline-flex"
-                  disabled={fields.length <= 2}
-                  onClick={() => remove(index)}
-                  aria-label={`Remove flight ${index + 1}`}
-                >
-                  <XIcon className="size-7 text-destructive" />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-11 w-fit items-center rounded-lg border border-input px-4 text-sm font-medium text-destructive transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45 xl:hidden"
-                  disabled={fields.length <= 2}
-                  onClick={() => remove(index)}
-                >
-                  Remove flight {index + 1}
-                </button>
-              </div>
-            ))}
+            <Accordion type="single" value={expandedFlightIndex} onValueChange={setExpandedFlightIndex} className="w-full space-y-4">
+              {fields.map((sliceField, index) => {
+                const origin = getValues(`slices.${index}.origin`)
+                const dest = getValues(`slices.${index}.destination`)
+                const date = getValues(`slices.${index}.departureDate`)
+                
+                return (
+                  <AccordionItem key={sliceField.id} value={String(index)} className="rounded-xl border border-border/60 bg-card px-2 shadow-sm">
+                    <div className="flex w-full items-center justify-between pr-2">
+                      <AccordionTrigger className="hover:no-underline py-4 px-2 flex-1">
+                        <div className="flex items-center gap-4 text-left">
+                          <span className="text-[15px] font-semibold text-primary">Flight {index + 1}</span>
+                          {(origin || dest || date) && (
+                            <span className="text-[14px] text-muted-foreground font-medium">
+                              {[
+                                origin?.iataCode,
+                                origin && dest ? "to" : null,
+                                dest?.iataCode,
+                                date ? `• ${date}` : null
+                              ].filter(Boolean).join(" ")}
+                            </span>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      {fields.length > 2 && (
+                        <button
+                          type="button"
+                          className="ml-4 rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            remove(index)
+                            if (expandedFlightIndex === String(index)) {
+                              setExpandedFlightIndex(String(Math.max(0, index - 1)))
+                            }
+                          }}
+                          aria-label={`Remove flight ${index + 1}`}
+                        >
+                          <XIcon className="size-5" />
+                        </button>
+                      )}
+                    </div>
+                    <AccordionContent className="pt-2 pb-6 px-2 overflow-visible">
+                      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+                        <PlaceAutocompleteField
+                          control={control}
+                          name={`slices.${index}.origin`}
+                          label="FROM"
+                          placeholder="Select origin"
+                          helperText="Airport code, city, or country"
+                          labelClassName={fieldLabelClassName}
+                          inputClassName={textFieldClassName}
+                        />
+                        <PlaceAutocompleteField
+                          control={control}
+                          name={`slices.${index}.destination`}
+                          label="TO"
+                          placeholder="Select destination"
+                          helperText="Airport code, city, or country"
+                          labelClassName={fieldLabelClassName}
+                          inputClassName={textFieldClassName}
+                        />
+                        <DatePickerField
+                          control={control}
+                          name={`slices.${index}.departureDate`}
+                          label="DEPART"
+                          labelClassName={fieldLabelClassName}
+                          triggerClassName={dateFieldClassName}
+                        />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )
+              })}
+            </Accordion>
 
             {canAddMultiCitySlice && (
               <button
                 type="button"
                 className="inline-flex h-16 w-fit items-center gap-3 rounded-[10px] bg-muted px-7 text-[15px] font-medium text-primary transition-colors hover:bg-muted/80"
-                onClick={() => append(createEmptySlice())}
+                onClick={() => {
+                  const lastSlice = fields[fields.length - 1]
+                  append({
+                    ...createEmptySlice(),
+                    origin: lastSlice?.destination ?? null,
+                  })
+                  setExpandedFlightIndex(String(fields.length))
+                }}
               >
                 <PlusIcon className="size-5" />
                 Add Another Flight
@@ -468,8 +507,8 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
                     field.onChange(nextValue as CabinClass)
                   }
                 >
-                  <SelectTrigger className="h-16! w-full rounded-[10px] border-input bg-background px-5 text-[17px] font-normal text-foreground">
-                    <SelectValue />
+                  <SelectTrigger size="lg" className="w-full rounded-[10px] border-input bg-background px-4 text-[15px] font-normal text-foreground">
+                    <SelectValue>{CABIN_CLASS_LABELS[field.value]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent align="start" className="rounded-[10px]">
                     <SelectGroup>
@@ -488,54 +527,16 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
             )}
           />
 
-          <Button
+          <LoadingButton
             type="submit"
-            disabled={isSubmitting}
-            className="h-16 w-full rounded-[10px] text-[16px] font-medium"
+            isLoading={isSubmitting}
+            isError={serverError !== null || Object.keys(form.formState.errors).length > 0}
+            className="h-14 w-full rounded-[10px] text-[16px] font-medium"
           >
-            {isSubmitting ? "Checking..." : "Search Flights"}
-          </Button>
+            Search Flights
+          </LoadingButton>
         </div>
 
-        {childrenCount > 0 && (
-          <FieldGroup className="gap-4">
-            <FieldLabel>Children ages</FieldLabel>
-            <div className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: childrenCount }).map((_, index) => (
-                <Controller
-                  key={index}
-                  control={control}
-                  name={`passengers.childrenAges.${index}`}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel>Child {index + 1}</FieldLabel>
-                      <Select
-                        value={String(field.value ?? 11)}
-                        onValueChange={(nextValue) =>
-                          field.onChange(Number(nextValue))
-                        }
-                      >
-                        <SelectTrigger className="h-12 w-full rounded-xl px-5 text-base font-normal md:text-base">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent align="start" className="rounded-xl">
-                          <SelectGroup>
-                            {CHILD_AGE_OPTIONS.map((age) => (
-                              <SelectItem key={age} value={String(age)}>
-                                {age} years old
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <FieldError>{fieldState.error?.message}</FieldError>
-                    </Field>
-                  )}
-                />
-              ))}
-            </div>
-          </FieldGroup>
-        )}
       </FieldGroup>
 
       {serverError && (

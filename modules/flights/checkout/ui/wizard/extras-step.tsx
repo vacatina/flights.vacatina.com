@@ -38,7 +38,7 @@ export function CheckoutExtrasStep({
     <div className="space-y-7">
       <section className="space-y-4">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase text-[#6c746f]">Extras</p>
+          <p className="text-xs font-semibold uppercase text-muted-foreground">Extras</p>
           <h2 className="text-2xl font-semibold tracking-tight md:text-xl">
             Add seats and baggage
           </h2>
@@ -46,7 +46,7 @@ export function CheckoutExtrasStep({
             Select optional services for this itinerary. Extras are reviewed again before payment.
           </p>
         </div>
-        <Card className="rounded-lg border-[#d7d8ce]">
+        <Card className="rounded-xl border-border bg-card">
           <CardContent className="space-y-4 p-4 md:p-5">
             <div className="flex items-start gap-3">
               <BriefcaseIcon className="mt-0.5 size-5" />

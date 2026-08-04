@@ -550,7 +550,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
     : null
 
   return (
-    <main className="min-h-svh bg-[#f6f7f4] py-5 text-[#17201d] md:py-8">
+    <main className="min-h-svh bg-background py-5 text-foreground md:py-8">
       <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
         <div className="space-y-5">
           <Breadcrumb>
@@ -571,25 +571,25 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
             </BreadcrumbList>
           </Breadcrumb>
 
-          <div className="border-y border-[#d7d8ce] py-4">
+          <div className="border-y border-border py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-[#6c746f]">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
                   Secure flight checkout
                 </p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">
                   {data.tripSummary.routeLabel}
                 </h1>
-                <p className="mt-1 text-sm text-[#66706b]">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {data.tripSummary.dateRangeLabel} · {data.tripSummary.passengersLabel} ·{" "}
                   {data.tripSummary.cabinLabel}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
-                <span className="rounded-md border border-[#cfd4cc] bg-white px-3 py-1">
+                <span className="rounded-md border border-border bg-card px-3 py-1">
                   {data.tripSummary.journeyTypeLabel}
                 </span>
-                <span className="rounded-md border border-[#cfd4cc] bg-white px-3 py-1">
+                <span className="rounded-md border border-border bg-card px-3 py-1">
                   {paymentMode === "hold" ? "Hold booking" : "Pay now"}
                 </span>
               </div>
@@ -793,29 +793,30 @@ function ExpiredFareRecovery(input: {
   quoteExpiresAtLabel: string
 }) {
   return (
-    <section className="rounded-lg border border-destructive/30 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
-            <AlertCircleIcon className="size-5" />
+    <Card className="rounded-xl border-border">
+      <CardContent className="flex flex-col gap-5 px-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive dark:bg-destructive/20">
+            <AlertCircleIcon className="size-6" />
           </div>
           <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase text-destructive">Fare expired</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Fare expired</p>
             <h2 className="text-xl font-semibold tracking-tight">
-              Refresh this fare before payment
+              Quote no longer valid
             </h2>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              This quote expired at {input.quoteExpiresAtLabel}. Return to review to recheck the
-              airline price, then continue checkout with a fresh quote.
+              This quote expired at {input.quoteExpiresAtLabel}. Airline prices and availability frequently change, so you will need to start a new search.
             </p>
           </div>
         </div>
-        <Button className="h-10 px-4" render={<Link href={input.reviewHref} />}>
+        {/* The refresh button is commented out/removed because expired PartialOfferRequests cannot be refreshed.
+            We route the user back to the homepage to start a new search instead. */}
+        <Button className="h-10 shrink-0 px-4" render={<a href="/" />}>
           <RefreshCcwIcon data-icon="inline-start" />
-          Refresh pricing
+          Start new search
         </Button>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -851,24 +852,24 @@ function CheckoutSummaryRail(input: {
 
   return (
     <aside className="hidden lg:block">
-      <div className="sticky top-6 space-y-4 rounded-lg border border-[#d7d8ce] bg-white p-5 shadow-sm">
+      <div className="sticky top-6 space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase text-[#6c746f]">Trip summary</p>
+          <p className="text-xs font-semibold uppercase text-muted-foreground">Trip summary</p>
           <h2 className="text-lg font-semibold">{input.data.tripSummary.routeLabel}</h2>
-          <p className="text-sm text-[#66706b]">{input.data.tripSummary.dateRangeLabel}</p>
+          <p className="text-sm text-muted-foreground">{input.data.tripSummary.dateRangeLabel}</p>
         </div>
 
-        <div className="space-y-3 border-y border-[#eceee8] py-4">
+        <div className="space-y-3 border-y border-border py-4">
           {input.data.selectedFlights.slice(0, 3).map((flight) => (
             <div key={flight.legIndex} className="grid grid-cols-[72px_1fr] gap-3 text-sm">
-              <span className="font-medium text-[#47524d]">{flight.legTitle}</span>
+              <span className="font-medium text-muted-foreground">{flight.legTitle}</span>
               <span>
                 {flight.routeLabel} · {flight.departureTimeLabel}
               </span>
             </div>
           ))}
           {input.data.selectedFlights.length > 3 ? (
-            <p className="text-sm text-[#66706b]">
+            <p className="text-sm text-muted-foreground">
               +{input.data.selectedFlights.length - 3} more legs
             </p>
           ) : null}
@@ -893,7 +894,7 @@ function CheckoutSummaryRail(input: {
               />
             }
           />
-          <div className="my-3 h-px bg-[#eceee8]" />
+          <div className="my-3 h-px bg-border" />
           <SummaryLine
             label="Total"
             value={
@@ -913,7 +914,7 @@ function CheckoutSummaryRail(input: {
           />
         </div>
 
-        <div className="space-y-2 rounded-md bg-[#f6f7f4] p-3 text-sm">
+        <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
           <StatusRow
             complete={input.travelerComplete}
             label={input.travelerComplete ? "Traveler details complete" : "Traveler details needed"}
@@ -928,7 +929,7 @@ function CheckoutSummaryRail(input: {
                   : "Ready for PayPal"
             }
           />
-          <div className="flex items-center gap-2 pt-1 text-[#66706b]">
+          <div className="flex items-center gap-2 pt-1 text-muted-foreground">
             <ShieldCheckIcon className="size-4" />
             <span>{paymentLabel} · secured checkout</span>
           </div>
@@ -941,7 +942,7 @@ function CheckoutSummaryRail(input: {
               ? "border-destructive/30 bg-destructive/5 text-destructive"
               : input.quoteExpiringSoon
                 ? "border-amber-300 bg-amber-50 text-amber-900"
-                : "border-[#d7d8ce] text-[#66706b]"
+                : "border-border text-muted-foreground"
           )}
         >
           <Clock3Icon className="mt-0.5 size-4" />
@@ -953,7 +954,7 @@ function CheckoutSummaryRail(input: {
         </div>
 
         {input.data.tripSummary.offerExpiresAtLabel ? (
-          <div className="flex gap-2 rounded-md border border-[#d7d8ce] p-3 text-sm text-[#66706b]">
+          <div className="flex gap-2 rounded-md border border-border p-3 text-sm text-muted-foreground">
             <Clock3Icon className="mt-0.5 size-4" />
             <span>Offer expires {input.data.tripSummary.offerExpiresAtLabel}</span>
           </div>
@@ -979,7 +980,7 @@ function CheckoutMobileSummary(input: {
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 border-t bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden",
+        "fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden",
         input.quoteExpired
           ? "border-destructive/30"
           : input.quoteExpiringSoon

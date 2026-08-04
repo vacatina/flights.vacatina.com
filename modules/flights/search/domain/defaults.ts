@@ -53,7 +53,11 @@ export function ensureSlicesForJourneyType(
   const clamped = safeSlices.slice(0, MAX_MULTI_CITY_SLICES)
 
   while (clamped.length < MIN_MULTI_CITY_SLICES) {
-    clamped.push(createEmptySlice())
+    const lastSlice = clamped[clamped.length - 1]
+    clamped.push({
+      ...createEmptySlice(),
+      origin: lastSlice?.destination ?? null
+    })
   }
 
   return clamped

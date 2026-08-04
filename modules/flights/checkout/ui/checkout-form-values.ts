@@ -15,7 +15,7 @@ export interface CheckoutFormValues {
     familyName: string
     bornOn: string
     gender: "m" | "f"
-    identityType: "passport" | "tax_id"
+    identityType: "passport" | "tax_id" | "known_traveler_number" | "passenger_redress_number"
     identityNumber: string
     identityCountryCode: string
     identityExpiresOn: string
@@ -37,7 +37,7 @@ export function createCheckoutFormSchema(input: {
   identityDocumentsRequired: boolean
 }) {
   const identitySchema = z.object({
-    identityType: z.enum(["passport", "tax_id"]),
+    identityType: z.enum(["passport", "tax_id", "known_traveler_number", "passenger_redress_number"]),
     identityNumber: input.identityDocumentsRequired
       ? z.string().trim().min(1, "Enter the document number").max(50)
       : z.string().trim().max(50),
