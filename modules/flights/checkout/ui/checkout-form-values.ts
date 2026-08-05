@@ -32,6 +32,86 @@ export interface CheckoutFormValues {
 
 const E164_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/
 const COUNTRY_CODE_PATTERN = /^[A-Za-z]{2}$/
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+export function formatDateInputValue(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8)
+
+  if (digits.length <= 4) {
+    return digits
+  }
+
+  if (digits.length <= 6) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`
+  }
+
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
+}
+
+export function isValidDateOnly(value: string) {
+  const trimmed = value.trim()
+
+  if (!DATE_ONLY_PATTERN.test(trimmed)) {
+    return false
+  }
+
+  const [year, month, day] = trimmed.split("-").map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function isTodayOrPastDateOnly(value: string) {
+  if (!isValidDateOnly(value)) {
+    return false
+  }
+
+  const [year, month, day] = value.trim().split("-").map(Number)
+  const date = Date.UTC(year, month - 1, day)
+  const now = new Date()
+  const today = Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  )
+
+  return date <= today
+}
+
+function dateOnlySchema(input: {
+  requiredMessage: string
+  invalidMessage: string
+  futureMessage?: string
+}) {
+  return z.string().trim().superRefine((value, ctx) => {
+    if (!value) {
+      ctx.addIssue({
+        code: "custom",
+        message: input.requiredMessage,
+      })
+      return
+    }
+
+    if (!isValidDateOnly(value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: input.invalidMessage,
+      })
+      return
+    }
+
+    if (input.futureMessage && !isTodayOrPastDateOnly(value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: input.futureMessage,
+      })
+    }
+  })
+}
 
 export function createCheckoutFormSchema(input: {
   identityDocumentsRequired: boolean
@@ -54,12 +134,15 @@ export function createCheckoutFormSchema(input: {
             "Use a 2-letter country code"
           ),
     identityExpiresOn: input.identityDocumentsRequired
-      ? z.iso.date("Enter the document expiry date")
+      ? dateOnlySchema({
+          requiredMessage: "Enter the document expiry date",
+          invalidMessage: "Use a valid expiry date in YYYY-MM-DD format",
+        })
       : z
           .string()
           .trim()
-          .refine((value) => value.length === 0 || z.iso.date().safeParse(value).success, {
-            message: "Enter a valid expiry date",
+          .refine((value) => value.length === 0 || isValidDateOnly(value), {
+            message: "Use a valid expiry date in YYYY-MM-DD format",
           }),
   })
 
@@ -89,7 +172,11 @@ export function createCheckoutFormSchema(input: {
               .trim()
               .min(1, "Enter the family name")
               .max(20, "Family name must be 20 characters or fewer"),
-            bornOn: z.iso.date("Enter the date of birth"),
+            bornOn: dateOnlySchema({
+              requiredMessage: "Enter the date of birth",
+              invalidMessage: "Use a valid date of birth in YYYY-MM-DD format",
+              futureMessage: "Date of birth cannot be in the future",
+            }),
             gender: z.enum(["m", "f"]),
           })
           .and(identitySchema)

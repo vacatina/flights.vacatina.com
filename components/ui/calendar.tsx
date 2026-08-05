@@ -27,6 +27,9 @@ function Calendar({
 }) {
   const defaultClassNames = getDefaultClassNames()
 
+  const startMonth = props.startMonth ?? (captionLayout !== "label" ? new Date(1900, 0) : undefined)
+  const endMonth = props.endMonth ?? (captionLayout !== "label" ? new Date(new Date().getFullYear() + 30, 11) : undefined)
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -37,6 +40,8 @@ function Calendar({
         className
       )}
       captionLayout={captionLayout}
+      startMonth={startMonth}
+      endMonth={endMonth}
       locale={locale}
       formatters={{
         formatMonthDropdown: (date) =>
@@ -51,7 +56,7 @@ function Calendar({
         ),
         month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
         nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1 z-10 pointer-events-none [&>button]:pointer-events-auto",
           defaultClassNames.nav
         ),
         button_previous: cn(
@@ -69,7 +74,7 @@ function Calendar({
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          "flex h-(--cell-size) items-center justify-center gap-1 text-sm font-medium z-0",
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
@@ -77,14 +82,14 @@ function Calendar({
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
-          "absolute inset-0 bg-popover opacity-0",
+          "absolute inset-0 bg-popover opacity-0 cursor-pointer w-full h-full z-10",
           defaultClassNames.dropdown
         ),
         caption_label: cn(
           "font-medium select-none",
           captionLayout === "label"
             ? "text-sm"
-            : "flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
+            : "flex items-center gap-1 rounded-(--cell-radius) text-sm px-2 py-1 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
           defaultClassNames.caption_label
         ),
         table: "w-full border-collapse",

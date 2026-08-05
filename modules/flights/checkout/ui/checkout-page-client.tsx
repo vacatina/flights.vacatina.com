@@ -40,6 +40,7 @@ import {
 import { CheckoutPaymentStatusView } from "@/modules/flights/checkout/ui/checkout-payment-status-view"
 import {
   createCheckoutFormSchema,
+  isValidDateOnly,
   type CheckoutFormValues,
 } from "@/modules/flights/checkout/ui/checkout-form-values"
 import { useCheckoutDraftPersistence } from "@/modules/flights/checkout/ui/hooks/use-checkout-draft-persistence"
@@ -1130,7 +1131,7 @@ function validateTravelerStep(input: {
       return false
     }
 
-    if (!isIsoDate(passenger.bornOn)) {
+    if (!isValidDateOnly(passenger.bornOn)) {
       return false
     }
 
@@ -1138,7 +1139,7 @@ function validateTravelerStep(input: {
       if (
         !passenger.identityNumber.trim() ||
         !COUNTRY_CODE_PATTERN.test(passenger.identityCountryCode.trim()) ||
-        !isIsoDate(passenger.identityExpiresOn)
+        !isValidDateOnly(passenger.identityExpiresOn)
       ) {
         return false
       }
@@ -1146,10 +1147,6 @@ function validateTravelerStep(input: {
   }
 
   return true
-}
-
-function isIsoDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
 function buildRedirectPath(pathname: string | null, search: string) {

@@ -287,7 +287,7 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
 
   return (
     <form
-      className="flex w-full h-fit max-h-[80vh] md:max-h-full flex-col gap-8 overflow-y-auto rounded-[12px] border border-border bg-background p-4 shadow-xl transition-all duration-300 ease-in-out md:gap-9 md:p-8"
+      className="flex w-full flex-col gap-8 rounded-[12px] border border-border bg-background p-4 shadow-xl transition-all duration-300 ease-in-out md:gap-9 md:p-8"
       onSubmit={onSubmit}
     >
       <FieldGroup className="gap-8">

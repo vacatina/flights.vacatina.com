@@ -28,7 +28,10 @@ import { Calendar } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import type { CheckoutPageData } from "@/modules/flights/checkout/domain"
-import type { CheckoutFormValues } from "@/modules/flights/checkout/ui/checkout-form-values"
+import {
+  formatDateInputValue,
+  type CheckoutFormValues,
+} from "@/modules/flights/checkout/ui/checkout-form-values"
 
 interface CheckoutTravelerStepProps {
   data: CheckoutPageData
@@ -40,6 +43,12 @@ interface CheckoutTravelerStepProps {
   onContinue: () => void
   disabled?: boolean
   isNavigating?: boolean
+}
+
+function parseValidDate(value?: string): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const d = new Date(`${value}T00:00:00`)
+  return isNaN(d.getTime()) ? undefined : d
 }
 
 export function CheckoutTravelerStep({
@@ -313,39 +322,54 @@ export function CheckoutTravelerStep({
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field data-invalid={Boolean(errors.passengers?.[index]?.bornOn)}>
                     <FieldLabel>Date of birth <RequiredMark /></FieldLabel>
-                    <Popover>
-                      <PopoverTrigger
-                        className="w-full"
-                        render={
-                          <button
-                            type="button"
-                            className={cn(
-                              "flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 font-normal",
-                              !passenger.bornOn && "text-muted-foreground",
-                              Boolean(errors.passengers?.[index]?.bornOn) && "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
-                            )}
-                          >
-                            <span>{passenger.bornOn ? format(new Date(`${passenger.bornOn}T00:00:00`), "yyyy-MM-dd") : "yyyy-mm-dd"}</span>
-                            <CalendarIcon className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
-                          </button>
-                        }
+                    <div className="relative flex items-center">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={10}
+                        placeholder="yyyy-mm-dd"
+                        value={passenger.bornOn ?? ""}
+                        onChange={(e) => {
+                          form.setValue(`passengers.${index}.bornOn`, formatDateInputValue(e.target.value), {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        }}
+                        aria-invalid={Boolean(errors.passengers?.[index]?.bornOn)}
+                        className={cn(
+                          "h-9 w-full pr-8 text-sm font-normal",
+                          Boolean(errors.passengers?.[index]?.bornOn) && "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
+                        )}
                       />
-                      <PopoverContent align="start" className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          defaultMonth={passenger.bornOn ? new Date(`${passenger.bornOn}T00:00:00`) : new Date()}
-                          selected={passenger.bornOn ? new Date(`${passenger.bornOn}T00:00:00`) : undefined}
-                          disabled={{ after: new Date() }}
-                          onSelect={(date) => {
-                            if (!date) return
-                            form.setValue(`passengers.${index}.bornOn`, format(date, "yyyy-MM-dd"), {
-                              shouldValidate: true,
-                              shouldDirty: true
-                            })
-                          }}
+                      <Popover>
+                        <PopoverTrigger
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          render={
+                            <button type="button" aria-label="Open calendar">
+                              <CalendarIcon className="size-4 shrink-0" />
+                            </button>
+                          }
                         />
-                      </PopoverContent>
-                    </Popover>
+                        <PopoverContent align="end" className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            captionLayout="dropdown"
+                            startMonth={new Date(1900, 0)}
+                            endMonth={new Date()}
+                            defaultMonth={parseValidDate(passenger.bornOn) ?? new Date(1995, 0, 1)}
+                            selected={parseValidDate(passenger.bornOn)}
+                            disabled={{ after: new Date() }}
+                            onSelect={(date) => {
+                              if (!date) return
+                              form.setValue(`passengers.${index}.bornOn`, format(date, "yyyy-MM-dd"), {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              })
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                     <FieldError errors={[errors.passengers?.[index]?.bornOn]} />
                   </Field>
                   <Field>
@@ -465,39 +489,54 @@ export function CheckoutTravelerStep({
                       <FieldLabel>
                         Expiry date {data.identityDocumentsRequired ? <RequiredMark /> : null}
                       </FieldLabel>
-                      <Popover>
-                        <PopoverTrigger
-                          className="w-full"
-                          render={
-                            <button
-                              type="button"
-                              className={cn(
-                                "flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 font-normal",
-                                !passenger.identityExpiresOn && "text-muted-foreground",
-                                Boolean(errors.passengers?.[index]?.identityExpiresOn) && "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
-                              )}
-                            >
-                              <span>{passenger.identityExpiresOn ? format(new Date(`${passenger.identityExpiresOn}T00:00:00`), "yyyy-MM-dd") : "yyyy-mm-dd"}</span>
-                              <CalendarIcon className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
-                            </button>
-                          }
+                      <div className="relative flex items-center">
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={10}
+                          placeholder="yyyy-mm-dd"
+                          value={passenger.identityExpiresOn ?? ""}
+                          onChange={(e) => {
+                            form.setValue(`passengers.${index}.identityExpiresOn`, formatDateInputValue(e.target.value), {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            })
+                          }}
+                          aria-invalid={Boolean(errors.passengers?.[index]?.identityExpiresOn)}
+                          className={cn(
+                            "h-9 w-full pr-8 text-sm font-normal",
+                            Boolean(errors.passengers?.[index]?.identityExpiresOn) && "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
+                          )}
                         />
-                        <PopoverContent align="start" className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            defaultMonth={passenger.identityExpiresOn ? new Date(`${passenger.identityExpiresOn}T00:00:00`) : new Date()}
-                            selected={passenger.identityExpiresOn ? new Date(`${passenger.identityExpiresOn}T00:00:00`) : undefined}
-                            disabled={{ before: new Date() }}
-                            onSelect={(date) => {
-                              if (!date) return
-                              form.setValue(`passengers.${index}.identityExpiresOn`, format(date, "yyyy-MM-dd"), {
-                                shouldValidate: true,
-                                shouldDirty: true
-                              })
-                            }}
+                        <Popover>
+                          <PopoverTrigger
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                            render={
+                              <button type="button" aria-label="Open calendar">
+                                <CalendarIcon className="size-4 shrink-0" />
+                              </button>
+                            }
                           />
-                        </PopoverContent>
-                      </Popover>
+                          <PopoverContent align="end" className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              captionLayout="dropdown"
+                              startMonth={new Date()}
+                              endMonth={new Date(new Date().getFullYear() + 30, 11)}
+                              defaultMonth={parseValidDate(passenger.identityExpiresOn) ?? new Date()}
+                              selected={parseValidDate(passenger.identityExpiresOn)}
+                              disabled={{ before: new Date() }}
+                              onSelect={(date) => {
+                                if (!date) return
+                                form.setValue(`passengers.${index}.identityExpiresOn`, format(date, "yyyy-MM-dd"), {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                })
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                       <FieldError errors={[errors.passengers?.[index]?.identityExpiresOn]} />
                     </Field>
                   </div>

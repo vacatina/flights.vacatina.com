@@ -33,9 +33,8 @@ export function DatePickerField({
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const selectedDate = field.value ? new Date(`${field.value}T00:00:00`) : undefined
-
-  const displayValue = selectedDate ? format(selectedDate, "yyyy-MM-dd") : "yyyy-mm-dd"
+  const isValidDate = field.value && /^\d{4}-\d{2}-\d{2}$/.test(field.value) && !isNaN(new Date(`${field.value}T00:00:00`).getTime())
+  const selectedDate = isValidDate ? new Date(`${field.value}T00:00:00`) : undefined
 
   return (
     <Field
@@ -45,37 +44,46 @@ export function DatePickerField({
       <FieldLabel className={cn("text-sm font-medium", labelClassName)}>
         {label}
       </FieldLabel>
-      <Popover>
-        <PopoverTrigger
-          className="w-full"
-          render={
-            <Button
-              variant="outline"
-              className={cn(
-                "h-14 w-full justify-between rounded-xl border-input bg-background px-5 text-base font-normal text-foreground hover:bg-background",
-                triggerClassName
-              )}
-            >
-              <span>{displayValue}</span>
-              <CalendarIcon data-icon="inline-end" />
-            </Button>
-          }
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          placeholder="yyyy-mm-dd"
+          value={field.value ?? ""}
+          onChange={(e) => field.onChange(e.target.value)}
+          className={cn(
+            "h-14 w-full rounded-xl border border-input bg-background px-4 pr-12 text-base font-medium text-foreground placeholder:text-muted-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/50",
+            triggerClassName
+          )}
         />
-        <PopoverContent align="start" className="w-auto p-0">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            disabled={{ before: today }}
-            onSelect={(date) => {
-              if (!date) {
-                return
-              }
-
-              field.onChange(format(date, "yyyy-MM-dd"))
-            }}
+        <Popover>
+          <PopoverTrigger
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            render={
+              <button type="button" aria-label="Open calendar">
+                <CalendarIcon className="size-5 shrink-0" />
+              </button>
+            }
           />
-        </PopoverContent>
-      </Popover>
+          <PopoverContent align="end" className="w-auto p-0">
+            <Calendar
+              mode="single"
+              captionLayout="dropdown"
+              startMonth={today}
+              endMonth={new Date(today.getFullYear() + 3, 11)}
+              defaultMonth={selectedDate ?? today}
+              selected={selectedDate}
+              disabled={{ before: today }}
+              onSelect={(date) => {
+                if (!date) {
+                  return
+                }
+
+                field.onChange(format(date, "yyyy-MM-dd"))
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
       <FieldError>{fieldState.error?.message}</FieldError>
     </Field>
   )
