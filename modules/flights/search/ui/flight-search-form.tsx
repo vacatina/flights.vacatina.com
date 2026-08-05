@@ -393,7 +393,11 @@ export function FlightSearchForm({ initialValues }: FlightSearchFormProps) {
 
         {isMultiCityJourney && (
           <div className="flex flex-col gap-6">
-            <Accordion type="single" value={expandedFlightIndex} onValueChange={setExpandedFlightIndex} className="w-full space-y-4">
+            <Accordion
+              value={expandedFlightIndex ? [expandedFlightIndex] : []}
+              onValueChange={(value) => setExpandedFlightIndex(value[0] ?? "")}
+              className="w-full space-y-4"
+            >
               {fields.map((sliceField, index) => {
                 const origin = getValues(`slices.${index}.origin`)
                 const dest = getValues(`slices.${index}.destination`)

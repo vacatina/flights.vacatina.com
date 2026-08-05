@@ -166,7 +166,12 @@ const checkoutPayloadSnapshotSchema = z.object({
       phoneNumber: z.string().optional(),
       identityDocument: z
         .object({
-          type: z.enum(["passport", "tax_id"]),
+          type: z.enum([
+            "passport",
+            "tax_id",
+            "known_traveler_number",
+            "passenger_redress_number",
+          ]),
           uniqueIdentifier: z.string().min(1),
           issuingCountryCode: z.string().min(2).max(2),
           expiresOn: z.string().min(1),

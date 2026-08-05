@@ -43,7 +43,10 @@ export function mapPassengersToCreateOrderPassengers(input: {
     if (formPassenger.identityDocument) {
       passenger.identity_documents = [
         {
-          type: formPassenger.identityDocument.type,
+          // Duffel's API supports every type advertised by the offer, but the SDK's
+          // CreateOrderPassenger type still only lists passport and tax_id.
+          type: formPassenger.identityDocument
+            .type as NonNullable<CreateOrderPassenger["identity_documents"]>[number]["type"],
           unique_identifier: formPassenger.identityDocument.uniqueIdentifier.trim(),
           issuing_country_code:
             formPassenger.identityDocument.issuingCountryCode.trim().toUpperCase(),

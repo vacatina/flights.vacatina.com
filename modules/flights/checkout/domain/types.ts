@@ -25,7 +25,7 @@ export interface CheckoutContactInput {
 }
 
 export interface CheckoutIdentityDocumentInput {
-  type: "passport" | "tax_id"
+  type: Offer["supported_passenger_identity_document_types"][number]
   uniqueIdentifier: string
   issuingCountryCode: string
   expiresOn: string
