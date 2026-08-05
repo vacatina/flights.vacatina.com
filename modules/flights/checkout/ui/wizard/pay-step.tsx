@@ -76,7 +76,7 @@ export function CheckoutPayStep({
         <h2 className="text-2xl font-semibold tracking-tight md:text-xl">
           {paymentMode === "hold" ? "Confirm and pay later" : "Review and pay"}
         </h2>
-        <Card className="rounded-lg border-[#d7d8ce]">
+        <Card className="rounded-xl border-border bg-card">
           <CardContent className="space-y-3 p-4 md:p-5">
             <div className="flex items-center justify-between text-sm">
               <span>Fare</span>
@@ -159,11 +159,11 @@ export function CheckoutPayStep({
             </div>
           </div>
         ) : paypalClientId ? (
-          <div className="space-y-3 rounded-lg border border-[#d7d8ce] bg-white p-4">
-            <div className="flex items-start gap-2 text-sm text-[#66706b]">
-              <ShieldCheckIcon className="mt-0.5 size-4 text-emerald-700" />
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <ShieldCheckIcon className="mt-0.5 size-4 text-emerald-500" />
               <div>
-                <p className="font-medium text-[#17201d]">Payment secured by PayPal</p>
+                <p className="font-medium text-foreground">Payment secured by PayPal</p>
                 <p>
                   Traveler details must be complete before payment can start.
                 </p>
@@ -360,7 +360,7 @@ function PayPalV6PaymentControls({
 
   if (loading) {
     return (
-      <p className="rounded-md border border-[#d7d8ce] bg-[#f7f8f4] px-3 py-2 text-sm text-[#66706b]">
+      <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
         Loading payment options
       </p>
     )
@@ -387,7 +387,7 @@ function PayPalV6PaymentControls({
       {cardEligible ? (
         <div className="space-y-2">
           <div className="space-y-0.5">
-            <p className="text-sm font-medium text-[#17201d]">Debit or credit card</p>
+            <p className="text-sm font-medium text-foreground">Debit or credit card</p>
             <p className="text-xs text-muted-foreground">
               Pay securely by card without a PayPal account.
             </p>
@@ -446,7 +446,7 @@ function PayPalV6PaymentControls({
       {paypalEligible ? (
         <div className="space-y-2">
           <div className="space-y-0.5">
-            <p className="text-sm font-medium text-[#17201d]">PayPal</p>
+            <p className="text-sm font-medium text-foreground">PayPal</p>
             <p className="text-xs text-muted-foreground">
               Pay with your PayPal account.
             </p>
@@ -496,7 +496,7 @@ function PayPalV6PaymentControls({
       ) : null}
 
       {!cardEligible ? (
-        <p className="rounded-md border border-[#d7d8ce] bg-[#f7f8f4] px-3 py-2 text-xs text-muted-foreground">
+        <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Cards are unavailable for this booking. Use PayPal if available.
         </p>
       ) : null}

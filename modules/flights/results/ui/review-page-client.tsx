@@ -16,6 +16,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
+import { LoadingButton } from "@/components/ui/loading-button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
@@ -375,9 +376,9 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                             )}
                           >
                             {isPendingSelection ? (
-                              <span className="absolute top-4 right-4 flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                              <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <Loader2Icon className="size-3.5 animate-spin" />
-                                Updating
+
                               </span>
                             ) : option.isSelected ? (
                               <span className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -400,8 +401,8 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                                   <li key={line.id} className="flex items-start gap-2">
                                     {(line.kind === "carry_on" ||
                                       line.kind === "checked") && (
-                                      <BriefcaseIcon className="mt-0.5 size-4" />
-                                    )}
+                                        <BriefcaseIcon className="mt-0.5 size-4" />
+                                      )}
                                     <span>
                                       {line.money ? (
                                         <>
@@ -418,11 +419,11 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                               </ul>
                             </CardContent>
 
-                            <div className="mt-auto flex items-end justify-between rounded-b-2xl bg-muted/40 px-5 py-4 md:px-6">
-                              <p className="text-sm text-muted-foreground md:text-base">
-                                total amount from
+                            <div className="mt-auto flex flex-col items-start gap-1 rounded-b-2xl bg-muted/40 px-5 py-4 md:px-6">
+                              <p className="text-xs tracking-wider uppercase text-muted-foreground md:text-sm">
+                                Total from
                               </p>
-                              <p className="text-2xl font-semibold tracking-tight md:text-3xl">
+                              <p className="w-full text-2xl font-semibold tracking-tight md:text-3xl break-words">
                                 <Money
                                   money={option.priceFromMoney}
                                   fallbackLabel={option.priceFromLabel}
@@ -451,7 +452,7 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
 
                 <ul className="space-y-2 text-sm text-muted-foreground md:text-base">
                   {data.summary.conditions.map((condition) => (
-                    <li key={condition.id}>
+                    <li className="list-disc ml-4" key={condition.id}>
                       {condition.money ? (
                         <>
                           {condition.prefix}
@@ -463,13 +464,13 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                       )}
                     </li>
                   ))}
-                  <li>{data.summary.co2Label}</li>
+                  <li className="list-disc ml-4">{data.summary.co2Label}</li>
                 </ul>
 
                 <Separator />
 
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground md:text-base">total amount</p>
+                  <p className="text-sm font-medium tracking-wide uppercase text-muted-foreground md:text-base">Total Amount</p>
                   <p className="text-2xl font-semibold tracking-tight md:text-3xl">
                     {data.summary.totalMoney ? (
                       <Money
@@ -482,18 +483,19 @@ export function ReviewPageClient({ data }: { data: ReviewPageData }) {
                   </p>
                 </div>
 
-                <Button
+                <LoadingButton
                   className="h-12 w-full rounded-xl text-sm md:text-base"
                   disabled={
                     !data.summary.checkoutEnabled ||
                     isCreatingQuote ||
                     offerSession.expired
                   }
+                  isLoading={isCreatingQuote}
+                  isError={!!checkoutError}
                   onClick={onGoToCheckout}
                 >
-                  {isCreatingQuote ? "Preparing checkout..." : "Go to checkout"}
-                  <ArrowRightIcon data-icon="inline-end" />
-                </Button>
+                  Go to checkout
+                </LoadingButton>
 
                 {checkoutError ? (
                   <p className="text-sm text-destructive md:text-base">{checkoutError}</p>

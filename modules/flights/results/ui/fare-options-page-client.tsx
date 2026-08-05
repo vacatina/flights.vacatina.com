@@ -23,6 +23,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
+import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Card,
   CardContent,
@@ -561,8 +562,8 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                                           >
                                             {(metaItem.includes("carry-on") ||
                                               metaItem.includes("checked")) && (
-                                              <BriefcaseIcon className="size-4" />
-                                            )}
+                                                <BriefcaseIcon className="size-4" />
+                                              )}
                                             {metaItem}
                                           </span>
                                         ))}
@@ -618,19 +619,14 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                           </span>
                         </div>
                       ) : (
-                        <Button
+                        <LoadingButton
                           className="h-11 rounded-xl px-7 text-sm"
                           disabled={isSelectingOffer || offerSession.expired}
                           onClick={() => selectOffer(offer.id)}
+                          isLoading={isSelectingOffer && pendingOfferId === offer.id}
                         >
-                          {isSelectingOffer && pendingOfferId === offer.id ? (
-                            <Loader2Icon
-                              data-icon="inline-start"
-                              className="size-4 animate-spin"
-                            />
-                          ) : null}
                           Select
-                        </Button>
+                        </LoadingButton>
                       )}
                     </CardFooter>
                   </Card>

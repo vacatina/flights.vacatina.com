@@ -7,11 +7,11 @@ import { CheckIcon, LoaderCircleIcon, MapPinIcon } from "lucide-react"
 
 import {
   Field,
-  FieldError,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type {
   FlightSearchFormValues,
   PlaceSuggestionOption,
@@ -20,6 +20,8 @@ import { searchPlacesAction } from "@/modules/flights/search/server/actions"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 import { cn } from "@/lib/utils"
+
+import { createPortal } from "react-dom"
 
 interface PlaceAutocompleteFieldProps {
   control: Control<FlightSearchFormValues>
@@ -51,6 +53,25 @@ export function PlaceAutocompleteField({
   const [open, setOpen] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [options, setOptions] = useState<PlaceSuggestionOption[]>([])
+
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+
+  useEffect(() => {
+    if (!open || disabled || !inputRef.current) return
+    const updateRect = () => {
+      if (inputRef.current) {
+        setRect(inputRef.current.getBoundingClientRect())
+      }
+    }
+    updateRect()
+    window.addEventListener("scroll", updateRect, true)
+    window.addEventListener("resize", updateRect)
+    return () => {
+      window.removeEventListener("scroll", updateRect, true)
+      window.removeEventListener("resize", updateRect)
+    }
+  }, [open, disabled])
 
   const requestIdRef = useRef(0)
   const selectedDisplayName = field.value?.displayName ?? ""
@@ -169,6 +190,7 @@ export function PlaceAutocompleteField({
       </FieldLabel>
       <div className="relative flex flex-col">
         <Input
+          ref={inputRef}
           value={inputValue}
           onFocus={() => {
             setQuery(selectedDisplayName)
@@ -185,12 +207,21 @@ export function PlaceAutocompleteField({
             inputClassName
           )}
         />
-        {helperText ? (
+        {fieldState.error?.message ? (
+          <p className="mt-2 text-sm font-medium text-destructive">{fieldState.error.message}</p>
+        ) : helperText ? (
           <p className="mt-2 text-sm text-muted-foreground">{helperText}</p>
         ) : null}
 
-        {open && !disabled && (
-          <div className="absolute top-[calc(100%+6px)] z-40 w-full overflow-hidden rounded-xl border bg-popover shadow-md">
+        {open && !disabled && rect && typeof document !== "undefined" && createPortal(
+          <div 
+            className="fixed z-50 w-full overflow-hidden rounded-xl border bg-popover shadow-md"
+            style={{
+              top: rect.bottom + 6,
+              left: rect.left,
+              width: rect.width,
+            }}
+          >
             <Command className="rounded-none bg-transparent p-0">
               <CommandList className="max-h-64">
                 {isPending && (
@@ -232,10 +263,10 @@ export function PlaceAutocompleteField({
                 )}
               </CommandList>
             </Command>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
-      <FieldError>{fieldState.error?.message}</FieldError>
     </Field>
   )
 }

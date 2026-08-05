@@ -44,7 +44,7 @@ export function CheckoutWizardShell({
 
   return (
     <div className="space-y-5">
-      <nav aria-label="Checkout steps" className="rounded-lg border border-[#d7d8ce] bg-white p-2">
+      <nav aria-label="Checkout steps" className="rounded-xl border border-border bg-card p-2 shadow-sm">
         <ol className="grid gap-2 sm:grid-cols-3">
           {STEP_ORDER.map((step) => {
             const enabled = canNavigateToStep ? canNavigateToStep(step) : true
@@ -62,15 +62,15 @@ export function CheckoutWizardShell({
                   className={cn(
                     "flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     active
-                      ? "bg-[#17201d] text-white"
-                      : "text-[#66706b] hover:bg-[#f2f3ee]",
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted/40",
                     !enabled && "cursor-not-allowed opacity-50 hover:bg-transparent"
                   )}
                 >
                   <Icon
                     className={cn(
                       "size-4",
-                      complete && !active ? "text-emerald-700" : ""
+                      complete && !active ? "text-primary" : ""
                     )}
                   />
                   {STEP_LABELS[step]}
