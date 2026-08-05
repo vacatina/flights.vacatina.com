@@ -104,13 +104,17 @@ export function PassengerInlineControls({
               setIsAgesPopoverOpen(open)
             }}
           >
-            <PopoverTrigger asChild>
-              <div 
-                className="cursor-pointer"
-                onClick={() => {
-                  if (value.children > 0) setIsAgesPopoverOpen(true)
-                }}
-              >
+            <PopoverTrigger
+              render={
+                <div
+                  className="cursor-pointer"
+                  onClick={() => {
+                    if (value.children > 0) setIsAgesPopoverOpen(true)
+                  }}
+                />
+              }
+              nativeButton={false}
+            >
                 <PassengerStepper
                   label="Children (2-17)"
                   value={value.children}
@@ -119,7 +123,6 @@ export function PassengerInlineControls({
                   onDecrease={() => update(value.adults, value.children - 1, true)}
                   onIncrease={() => update(value.adults, value.children + 1, true)}
                 />
-              </div>
             </PopoverTrigger>
 
             {value.children > 0 && (

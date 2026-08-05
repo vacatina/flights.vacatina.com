@@ -54,6 +54,30 @@ test("mapPassengersToCreateOrderPassengers accepts matching passenger type and b
   expect(passengers[0]?.born_on).toBe("2016-07-24")
 })
 
+test("mapPassengersToCreateOrderPassengers preserves supported traveler numbers", () => {
+  const passenger = createPassenger({
+    type: "adult",
+    bornOn: "1980-07-24",
+  })
+  passenger.identityDocument = {
+    type: "known_traveler_number",
+    uniqueIdentifier: "123456789",
+    issuingCountryCode: "US",
+    expiresOn: "2030-07-24",
+  }
+
+  const passengers = mapPassengersToCreateOrderPassengers({
+    offer: createOffer({ passengerType: "adult" }),
+    contact,
+    passengers: [passenger],
+  })
+
+  expect(passengers[0]?.identity_documents?.[0]).toMatchObject({
+    type: "known_traveler_number",
+    unique_identifier: "123456789",
+  })
+})
+
 function createPassenger(input: {
   type: CheckoutPassengerInput["type"]
   bornOn: string

@@ -17,7 +17,7 @@ const contactSchema = z.object({
 })
 
 const identityDocumentSchema = z.object({
-  type: z.enum(["passport", "tax_id"]),
+  type: z.enum(["passport", "tax_id", "known_traveler_number", "passenger_redress_number"]),
   uniqueIdentifier: z.string().trim().min(1).max(50),
   issuingCountryCode: z.string().trim().length(2),
   expiresOn: z.iso.date(),
