@@ -4,9 +4,7 @@ import { format } from "date-fns"
 
 import type { ActorContext } from "@/modules/auth/types"
 import { GUEST_UNAVAILABLE_ID } from "@/modules/auth/constants"
-import {
-  canGuestAccessBooking,
-} from "@/modules/flights/orders/server/guest-access"
+import { canGuestAccessBooking } from "@/modules/flights/orders/server/guest-access"
 import { normalizeSnapshot } from "@/modules/flights/orders/domain/snapshot"
 import {
   calculateCancellationFee,
@@ -50,6 +48,7 @@ import {
   type AdminAlertRecipient,
 } from "@/modules/flights/cancellations/server/admin-notifications"
 import { refundPayPalCapture } from "@/modules/payments/server/providers/paypal"
+import { reconcilePaymentAttemptById } from "@/modules/payments/server/reconciliation-service"
 import { enqueueNotification } from "@/modules/notifications/server"
 import { createEmailHash } from "@/modules/flights/orders/server/identity"
 import type { NotificationEventType } from "@/modules/notifications/domain"
@@ -71,7 +70,9 @@ export interface CancellationStatusSummary {
 export interface CancellationEligibilityContext {
   booking: FlightOrderRecord
   snapshot: ReturnType<typeof normalizeSnapshot>
-  businessSettings: Awaited<ReturnType<CancellationRepository["getBusinessSettings"]>>
+  businessSettings: Awaited<
+    ReturnType<CancellationRepository["getBusinessSettings"]>
+  >
   existingRequest: CancellationStatusSummary | null
   canSubmit: boolean
   blockedReason: string | null
@@ -164,6 +165,7 @@ export interface CancellationServiceDeps {
     idempotencyKey: string
     noteToPayer?: string | null
   }) => Promise<{ id: string; status?: string; amount?: unknown }>
+  refreshPaymentCapture: (input: { paymentAttemptId: string }) => Promise<unknown>
   enqueueNotification: typeof enqueueNotification
   listAdminAlertRecipients: () => Promise<AdminAlertRecipient[]>
 }
@@ -176,6 +178,8 @@ const defaultDeps: CancellationServiceDeps = {
   now: () => new Date(),
   duffelService: defaultDuffelCancellationService,
   refundProvider: refundPayPalCapture,
+  refreshPaymentCapture: ({ paymentAttemptId }) =>
+    reconcilePaymentAttemptById({ paymentAttemptId }),
   enqueueNotification,
   listAdminAlertRecipients: listActiveAdminAlertRecipients,
 }
@@ -197,11 +201,16 @@ export async function getCancellationEligibilityContext(
   const snapshot = normalizeSnapshot(booking.orderSnapshot)
   const [existing, rejected, businessSettings] = await Promise.all([
     deps.cancellationRepository.findLatestRequestByFlightOrderId(booking.id),
-    deps.cancellationRepository.findLatestRejectedRequestByFlightOrderId(booking.id),
+    deps.cancellationRepository.findLatestRejectedRequestByFlightOrderId(
+      booking.id
+    ),
     deps.cancellationRepository.getBusinessSettings(),
   ])
   const activeRequest =
-    existing && existing.status !== "completed" && existing.status !== "rejected" && existing.status !== "failed"
+    existing &&
+    existing.status !== "completed" &&
+    existing.status !== "rejected" &&
+    existing.status !== "failed"
       ? existing
       : null
   const cooldownActive = isRejectedCancellationCooldownActive({
@@ -217,7 +226,8 @@ export async function getCancellationEligibilityContext(
         })
       : null
   const duffelApiAvailable = snapshot.availableActions.includes("cancel")
-  const manualSupportCase = isDeparted(snapshot, deps.now()) || !duffelApiAvailable
+  const manualSupportCase =
+    isDeparted(snapshot, deps.now()) || !duffelApiAvailable
   const estimatedFeeAmount = calculateDefaultCancellationFee({
     baseAmount: booking.sellAmount,
     currency: booking.currency,
@@ -267,7 +277,9 @@ export async function createCancellationRequest(
   )
 
   if (!context.canSubmit) {
-    throw new Error(context.blockedReason ?? "Cancellation request is not available.")
+    throw new Error(
+      context.blockedReason ?? "Cancellation request is not available."
+    )
   }
 
   const requester = toRequester(input.actor)
@@ -312,13 +324,17 @@ export async function createCancellationRequest(
       duffelApiAvailable: context.duffelApiAvailable,
     },
   })
-  await enqueueCancellationNotifications({
-    requestId: request.id,
-    eventType: status === "manual_processing"
-      ? "cancellation_manual_review"
-      : "cancellation_request_received",
-    adminAlert: true,
-  }, deps)
+  await enqueueCancellationNotifications(
+    {
+      requestId: request.id,
+      eventType:
+        status === "manual_processing"
+          ? "cancellation_manual_review"
+          : "cancellation_request_received",
+      adminAlert: true,
+    },
+    deps
+  )
 
   return toCancellationStatusSummary(request)
 }
@@ -357,8 +373,12 @@ export async function listAdminCancellationRequests(
         row.request.customerRefundAmount,
         row.request.customerRefundCurrency ?? row.order.currency
       ),
-      serviceFeeLabel: formatMoney(row.request.adminFeeAmount, row.order.currency),
-      latestActionState: row.request.customerMessage ?? toStatusLabel(row.request.status),
+      serviceFeeLabel: formatMoney(
+        row.request.adminFeeAmount,
+        row.order.currency
+      ),
+      latestActionState:
+        row.request.customerMessage ?? toStatusLabel(row.request.status),
       updatedAtLabel: formatDateTime(row.request.updatedAt),
     }
   })
@@ -486,7 +506,8 @@ export async function createOrRefreshDuffelCancellationQuote(
             "Your cancellation request needs manual admin review before we can confirm next steps.",
         },
         eventType: "duffel_quote_failed",
-        eventMessage: error instanceof Error ? error.message : "Duffel quote failed.",
+        eventMessage:
+          error instanceof Error ? error.message : "Duffel quote failed.",
         actorType: "system",
         actorId: null,
         notificationType: "cancellation_issue",
@@ -557,7 +578,8 @@ export async function approveCancellation(
           "Your cancellation has been approved and is being confirmed with the airline.",
       },
       eventType: "duffel_cancellation_confirming",
-      eventMessage: "Admin approved cancellation; confirming latest Duffel quote.",
+      eventMessage:
+        "Admin approved cancellation; confirming latest Duffel quote.",
       actorType: "admin",
       actorId: input.admin.appUserId,
       notificationType: "cancellation_approved",
@@ -620,7 +642,9 @@ export async function approveCancellation(
         },
         eventType: "duffel_confirm_failed",
         eventMessage:
-          error instanceof Error ? error.message : "Duffel confirmation failed.",
+          error instanceof Error
+            ? error.message
+            : "Duffel confirmation failed.",
         actorType: "system",
         actorId: null,
         notificationType: "cancellation_issue",
@@ -696,10 +720,34 @@ export async function approveRefund(
   input: { requestId: string; admin: AdminActor },
   deps: CancellationServiceDeps = defaultDeps
 ) {
-  const detail = await requireCancellationDetail(input.requestId, deps)
+  let detail = await requireCancellationDetail(input.requestId, deps)
   assertTransition(detail.request.status, "refund_pending")
+  const existingRefundAttempt = detail.refunds.find(
+    (refund) =>
+      refund.provider === "paypal" &&
+      ["approved", "processing", "completed", "manual_completed"].includes(
+        refund.status
+      )
+  )
+
+  if (existingRefundAttempt) {
+    return requireUpdated(detail.request)
+  }
+
+  if (!detail.paymentAttempt?.providerCaptureId && detail.paymentAttempt?.id) {
+    try {
+      await deps.refreshPaymentCapture({
+        paymentAttemptId: detail.paymentAttempt.id,
+      })
+      detail = await requireCancellationDetail(input.requestId, deps)
+    } catch {
+      // The normal PayPal failure/manual path below records the actionable state.
+    }
+  }
+
   const amount = detail.request.customerRefundAmount ?? 0
-  const currency = detail.request.customerRefundCurrency ?? detail.order.currency
+  const currency =
+    detail.request.customerRefundCurrency ?? detail.order.currency
   const captureId = detail.paymentAttempt?.providerCaptureId
   const cappedAmount = capCustomerRefundAmount({
     airlineRefundAmount: amount,
@@ -722,6 +770,9 @@ export async function approveRefund(
     rawPayload: {
       idempotencyKey: createRefundIdempotencyKey(input.requestId),
       cappedAtCapturedPaymentAmount: true,
+      airlineRefundAmount: amount,
+      cancellationFeeAmount: detail.request.adminFeeAmount,
+      customerRefundAmount: cappedAmount,
       capturedPaymentAmount: resolveCapturedPaymentAmount(
         toFlightOrderRecord(detail.order),
         detail.paymentAttempt
@@ -729,7 +780,7 @@ export async function approveRefund(
     },
   })
   await deps.cancellationRepository.updateRequest(input.requestId, {
-    status: "refund_pending",
+    status: captureId ? "refund_pending" : "manual_processing",
     customerRefundAmount: cappedAmount,
     customerRefundCurrency: currency,
     refundApprovedBy: input.admin.appUserId,
@@ -744,11 +795,14 @@ export async function approveRefund(
 
   if (!captureId) {
     const updated = await requireCancellationDetail(input.requestId, deps)
-    await enqueueCancellationNotifications({
-      requestId: input.requestId,
-      eventType: "cancellation_issue",
-      adminAlert: true,
-    }, deps)
+    await enqueueCancellationNotifications(
+      {
+        requestId: input.requestId,
+        eventType: "cancellation_issue",
+        adminAlert: true,
+      },
+      deps
+    )
     return toCancellationStatusSummary(updated.request)
   }
 
@@ -771,8 +825,7 @@ export async function approveRefund(
         requestId: input.requestId,
         status: "completed",
         patch: {
-          customerMessage:
-            "Your cancellation and refund have been completed.",
+          customerMessage: "Your cancellation and refund have been completed.",
         },
         eventType: "paypal_refund_completed",
         eventMessage: "PayPal refund completed.",
@@ -819,9 +872,10 @@ export async function markManualRefundCompleted(
   deps: CancellationServiceDeps = defaultDeps
 ) {
   const detail = await requireCancellationDetail(input.requestId, deps)
-  assertTransition(detail.request.status, "refund_completed")
+  assertTransition(detail.request.status, "completed")
   const amount = detail.request.customerRefundAmount ?? 0
-  const currency = detail.request.customerRefundCurrency ?? detail.order.currency
+  const currency =
+    detail.request.customerRefundCurrency ?? detail.order.currency
   const updated = await transitionRequestStatus(
     {
       requestId: input.requestId,
@@ -889,14 +943,22 @@ export async function updateCancellationFeeAndRefund(
     ),
     currency,
   })
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    adminFeeType: parsed.adminFeeType,
-    adminFeeValue: parsed.adminFeeValue,
-    adminFeeAmount: feeAmount,
-    customerRefundAmount,
-    customerRefundCurrency: currency,
-  })
-  await addAdminEvent(deps, input, "fee_refund_updated", "Admin updated fee and refund.")
+  const updated = await deps.cancellationRepository.updateRequest(
+    input.requestId,
+    {
+      adminFeeType: parsed.adminFeeType,
+      adminFeeValue: parsed.adminFeeValue,
+      adminFeeAmount: feeAmount,
+      customerRefundAmount,
+      customerRefundCurrency: currency,
+    }
+  )
+  await addAdminEvent(
+    deps,
+    input,
+    "fee_refund_updated",
+    "Admin updated fee and refund."
+  )
   return requireUpdated(updated)
 }
 
@@ -905,12 +967,20 @@ export async function updateCustomerMessage(
   deps: CancellationServiceDeps = defaultDeps
 ) {
   const message = input.message.trim()
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    customerMessage: message || null,
-    customerMessageUpdatedBy: input.admin.appUserId,
-    customerMessageUpdatedAt: deps.now(),
-  })
-  await addAdminEvent(deps, input, "customer_message_updated", "Admin updated customer message.")
+  const updated = await deps.cancellationRepository.updateRequest(
+    input.requestId,
+    {
+      customerMessage: message || null,
+      customerMessageUpdatedBy: input.admin.appUserId,
+      customerMessageUpdatedAt: deps.now(),
+    }
+  )
+  await addAdminEvent(
+    deps,
+    input,
+    "customer_message_updated",
+    "Admin updated customer message."
+  )
   return requireUpdated(updated)
 }
 
@@ -923,11 +993,14 @@ export async function recordCutoffTimingOverride(
     throw new Error("A timing override reason is required.")
   }
 
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    cutoffOverrideBy: input.admin.appUserId,
-    cutoffOverrideAt: deps.now(),
-    cutoffOverrideReason: reason,
-  })
+  const updated = await deps.cancellationRepository.updateRequest(
+    input.requestId,
+    {
+      cutoffOverrideBy: input.admin.appUserId,
+      cutoffOverrideAt: deps.now(),
+      cutoffOverrideReason: reason,
+    }
+  )
   await addAdminEvent(deps, input, "cutoff_override_recorded", reason)
   return requireUpdated(updated)
 }
@@ -1026,13 +1099,16 @@ function toCancellationStatusSummary(
   }
 }
 
-function mapAdminDetail(detail: CancellationDetailRecord): AdminCancellationDetailModel {
+function mapAdminDetail(
+  detail: CancellationDetailRecord
+): AdminCancellationDetailModel {
   const snapshot = normalizeSnapshot(detail.order.orderSnapshot)
   const firstLeg = snapshot.legs[0] ?? null
   const paymentAmount = detail.paymentAttempt
     ? Number(detail.paymentAttempt.amount)
     : Number(detail.order.sellAmount)
-  const paymentCurrency = detail.paymentAttempt?.currency ?? detail.order.currency
+  const paymentCurrency =
+    detail.paymentAttempt?.currency ?? detail.order.currency
 
   return {
     request: {
@@ -1056,10 +1132,16 @@ function mapAdminDetail(detail: CancellationDetailRecord): AdminCancellationDeta
       airlineName: firstLeg?.ownerName ?? "Airline unavailable",
       departureLabel: firstLeg?.departureLabel ?? "Departure unavailable",
       duffelOrderId: detail.order.duffelOrderId,
-      fareConditions: [snapshot.conditions.changes, snapshot.conditions.refunds],
+      fareConditions: [
+        snapshot.conditions.changes,
+        snapshot.conditions.refunds,
+      ],
       sellAmount: Number(detail.order.sellAmount),
       currency: detail.order.currency,
-      sellAmountLabel: formatMoney(Number(detail.order.sellAmount), detail.order.currency),
+      sellAmountLabel: formatMoney(
+        Number(detail.order.sellAmount),
+        detail.order.currency
+      ),
     },
     payment: {
       capturedAmount: paymentAmount,
@@ -1074,8 +1156,12 @@ function mapAdminDetail(detail: CancellationDetailRecord): AdminCancellationDeta
           ? "Refund unavailable"
           : formatMoney(quote.refundAmount, quote.refundCurrency),
       refundTo: quote.refundTo ?? "Not provided",
-      expiresAtLabel: quote.expiresAt ? formatDateTime(quote.expiresAt) : "No expiry",
-      confirmedAtLabel: quote.confirmedAt ? formatDateTime(quote.confirmedAt) : null,
+      expiresAtLabel: quote.expiresAt
+        ? formatDateTime(quote.expiresAt)
+        : "No expiry",
+      confirmedAtLabel: quote.confirmedAt
+        ? formatDateTime(quote.confirmedAt)
+        : null,
     })),
     passengers: snapshot.passengers.map((passenger) => ({
       id: passenger.id,
@@ -1109,7 +1195,10 @@ async function requireCancellationDetail(
   return detail
 }
 
-function assertTransition(from: FlightCancellationStatus, to: FlightCancellationStatus) {
+function assertTransition(
+  from: FlightCancellationStatus,
+  to: FlightCancellationStatus
+) {
   if (!canTransitionCancellationStatus(from, to)) {
     throw new Error(`Cannot move cancellation from ${from} to ${to}.`)
   }
@@ -1134,7 +1223,10 @@ async function transitionRequestStatus(
   input: {
     requestId: string
     status: FlightCancellationStatus
-    patch?: Omit<Parameters<CancellationRepository["updateRequest"]>[1], "status">
+    patch?: Omit<
+      Parameters<CancellationRepository["updateRequest"]>[1],
+      "status"
+    >
     eventType: string
     eventMessage: string
     actorType: "admin" | "system" | "customer" | "guest"
@@ -1145,16 +1237,21 @@ async function transitionRequestStatus(
   },
   deps: CancellationServiceDeps
 ) {
-  const existing = await deps.cancellationRepository.findRequestById(input.requestId)
+  const existing = await deps.cancellationRepository.findRequestById(
+    input.requestId
+  )
   if (!existing) {
     return null
   }
   assertTransition(existing.status, input.status)
 
-  const updated = await deps.cancellationRepository.updateRequest(input.requestId, {
-    ...input.patch,
-    status: input.status,
-  })
+  const updated = await deps.cancellationRepository.updateRequest(
+    input.requestId,
+    {
+      ...input.patch,
+      status: input.status,
+    }
+  )
   await deps.cancellationRepository.addEvent({
     cancellationRequestId: input.requestId,
     actorType: input.actorType,
@@ -1269,14 +1366,18 @@ function createRefundIdempotencyKey(requestId: string) {
   return `flight-cancellation-refund:${requestId}`
 }
 
-function toRefundAttemptStatus(status: string | undefined): "completed" | "processing" {
+function toRefundAttemptStatus(
+  status: string | undefined
+): "completed" | "processing" {
   return status?.toUpperCase() === "COMPLETED" ? "completed" : "processing"
 }
 
 function isDeparted(snapshot: ReturnType<typeof normalizeSnapshot>, now: Date) {
   const firstDeparture = snapshot.legs
     .map((leg) => (leg.departureAtIso ? new Date(leg.departureAtIso) : null))
-    .find((date): date is Date => Boolean(date && Number.isFinite(date.getTime())))
+    .find((date): date is Date =>
+      Boolean(date && Number.isFinite(date.getTime()))
+    )
 
   return firstDeparture ? firstDeparture.getTime() < now.getTime() : false
 }
@@ -1295,7 +1396,9 @@ function resolveCapturedPaymentAmount(
   return booking.sellAmount
 }
 
-function toFlightOrderRecord(order: CancellationDetailRecord["order"]): FlightOrderRecord {
+function toFlightOrderRecord(
+  order: CancellationDetailRecord["order"]
+): FlightOrderRecord {
   return {
     ...order,
     selectedPartialOffers: Array.isArray(order.selectedPartialOffers)

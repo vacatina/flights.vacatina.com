@@ -115,7 +115,7 @@ export async function capturePayPalPayment(
     (await deps.sessionRepository.findById(input.checkoutSessionId)) ?? session
   const nextStatus = toAttemptStatus(refreshedSession.status)
 
-  await deps.attemptsRepository.update(attempt.id, {
+  const updatedAttempt = await deps.attemptsRepository.update(attempt.id, {
     status: nextStatus,
     providerCaptureId: refreshedSession.providerPaymentId,
     providerStatus: refreshedSession.providerStatusCode,
@@ -126,7 +126,13 @@ export async function capturePayPalPayment(
   if (nextStatus === "capture_completed" || nextStatus === "fulfilled") {
     await appendEventOnce({
       deps,
-      attempt,
+      attempt:
+        updatedAttempt ?? {
+          ...attempt,
+          status: nextStatus,
+          providerCaptureId: refreshedSession.providerPaymentId,
+          providerStatus: refreshedSession.providerStatusCode,
+        },
       eventType: "CAPTURE_COMPLETED",
     })
     await tryProcessCapturedPaymentFulfillment({
@@ -137,7 +143,13 @@ export async function capturePayPalPayment(
   } else if (nextStatus === "capture_failed" || nextStatus === "capture_denied") {
     await appendEventOnce({
       deps,
-      attempt,
+      attempt:
+        updatedAttempt ?? {
+          ...attempt,
+          status: nextStatus,
+          providerCaptureId: refreshedSession.providerPaymentId,
+          providerStatus: refreshedSession.providerStatusCode,
+        },
       eventType: "CAPTURE_DENIED",
     })
   }

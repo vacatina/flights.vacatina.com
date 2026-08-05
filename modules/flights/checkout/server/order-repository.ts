@@ -13,6 +13,7 @@ export interface FlightOrderRecord {
   id: string
   bookingReference: string
   checkoutSessionId: string
+  paymentAttemptId?: string | null
   duffelOrderId: string
   partialOfferRequestId: string
   offerId: string
@@ -42,6 +43,7 @@ interface CreateFlightOrderInput {
   id: string
   bookingReference: string
   checkoutSessionId: string
+  paymentAttemptId?: string | null
   duffelOrderId: string
   partialOfferRequestId: string
   offerId: string
@@ -102,6 +104,7 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
     if (!db) {
       const record: FlightOrderRecord = {
         ...input,
+        paymentAttemptId: input.paymentAttemptId ?? null,
         createdAt: now,
         updatedAt: now,
       }
@@ -115,6 +118,7 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
       .insert(flightOrders)
       .values({
         ...input,
+        paymentAttemptId: input.paymentAttemptId ?? null,
         netAmount: toDbNumeric(input.netAmount),
         sellAmount: toDbNumeric(input.sellAmount),
         duffelTotalAmount: toDbNumeric(input.duffelTotalAmount),
@@ -224,6 +228,7 @@ function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord
     id: row.id,
     bookingReference: row.bookingReference,
     checkoutSessionId: row.checkoutSessionId,
+    paymentAttemptId: row.paymentAttemptId,
     duffelOrderId: row.duffelOrderId,
     partialOfferRequestId: row.partialOfferRequestId,
     offerId: row.offerId,

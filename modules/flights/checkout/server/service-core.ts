@@ -38,6 +38,12 @@ import {
   defaultPaymentOutboxRepository,
   type PaymentOutboxRepository,
 } from "@/modules/payments/server/outbox-repository"
+import {
+  defaultPaymentAttemptsRepository,
+  type PaymentAttemptRecord,
+} from "@/modules/payments/server/attempts-repository"
+import { defaultPaymentEventsRepository } from "@/modules/payments/server/events-repository"
+import { createPaymentEventId } from "@/modules/payments/server/ids"
 import { publishPaymentFulfillmentTask } from "@/modules/payments/server/job-publisher"
 import { createPaymentOutboxId } from "@/modules/payments/server/ids"
 import {
@@ -45,6 +51,7 @@ import {
 } from "@/modules/flights/checkout/server/metrics"
 import {
   defaultCheckoutSessionRepository,
+  type CheckoutSessionRecord,
   type CheckoutSessionRepository,
 } from "@/modules/flights/checkout/server/session-repository"
 import {
@@ -602,6 +609,13 @@ export async function captureCheckoutPayPalOrder(
 
   const capturedOrder = await capturePayPalOrder(input.paypalOrderId)
   const capture = getPayPalCaptureFromOrder(capturedOrder)
+  logFlightFlow("checkout.paypal", "capture_response_received", {
+    checkoutSessionId: session.id,
+    providerOrderId: input.paypalOrderId,
+    providerOrderStatus: capturedOrder.status ?? null,
+    providerCaptureId: capture?.id ?? null,
+    providerCaptureStatus: capture?.status ?? null,
+  })
   await processVerifiedPayPalCapture({
     session,
     capture,
@@ -609,6 +623,13 @@ export async function captureCheckoutPayPalOrder(
     deps,
     now: deps.now(),
     source: "capture_action",
+  })
+
+  const refreshedSession = await deps.sessionRepository.findById(session.id)
+  await syncPaymentAttemptAfterCapture({
+    session: refreshedSession ?? session,
+    captureId: capture?.id ?? null,
+    captureStatus: capture?.status ?? null,
   })
 
   return getCheckoutSessionStatus(
@@ -1115,6 +1136,95 @@ async function processVerifiedPayPalCapture(input: {
   })
 }
 
+async function syncPaymentAttemptAfterCapture(input: {
+  session: CheckoutSessionRecord
+  captureId: string | null
+  captureStatus: string | null
+}) {
+  if (!input.session.paymentAttemptId) {
+    logFlightFlow("checkout.paypal", "payment_attempt_sync_skipped", {
+      checkoutSessionId: input.session.id,
+      reason: "payment_attempt_missing",
+      providerCaptureId: input.captureId,
+    })
+    return
+  }
+
+  const attempt = await defaultPaymentAttemptsRepository.findById(
+    input.session.paymentAttemptId
+  )
+
+  if (!attempt) {
+    logFlightFlow("checkout.paypal", "payment_attempt_sync_skipped", {
+      checkoutSessionId: input.session.id,
+      paymentAttemptId: input.session.paymentAttemptId,
+      reason: "payment_attempt_not_found",
+      providerCaptureId: input.captureId,
+    })
+    return
+  }
+
+  const status = toPaymentAttemptStatusAfterCapture(input.session.status)
+  const updated = await defaultPaymentAttemptsRepository.update(attempt.id, {
+    status,
+    providerCaptureId: input.captureId,
+    providerStatus: input.captureStatus,
+    failureCode: input.session.errorCode,
+    failureMessage: input.session.errorMessage,
+  })
+  const eventAttempt = updated ?? {
+    ...attempt,
+    status,
+    providerCaptureId: input.captureId,
+    providerStatus: input.captureStatus,
+  }
+
+  if (status === "capture_completed") {
+    await appendPaymentCaptureEvent(eventAttempt)
+  }
+
+  logFlightFlow("checkout.paypal", "payment_attempt_synced", {
+    checkoutSessionId: input.session.id,
+    paymentAttemptId: attempt.id,
+    previousProviderCaptureId: attempt.providerCaptureId,
+    providerCaptureId: eventAttempt.providerCaptureId,
+    status: eventAttempt.status,
+  })
+}
+
+async function appendPaymentCaptureEvent(attempt: PaymentAttemptRecord) {
+  const events = await defaultPaymentEventsRepository.listByAttemptId(attempt.id)
+
+  if (events.some((event) => event.eventType === "CAPTURE_COMPLETED")) {
+    return
+  }
+
+  await defaultPaymentEventsRepository.append({
+    id: createPaymentEventId(),
+    paymentAttemptId: attempt.id,
+    eventType: "CAPTURE_COMPLETED",
+    provider: attempt.provider,
+    providerOrderId: attempt.providerOrderId,
+    providerCaptureId: attempt.providerCaptureId,
+    amount: attempt.amount,
+    currency: attempt.currency,
+  })
+}
+
+function toPaymentAttemptStatusAfterCapture(
+  status: CheckoutSessionRecord["status"]
+) {
+  if (status === "payment_authorized") {
+    return "capture_completed" as const
+  }
+
+  if (status === "reconciliation_required") {
+    return "reconciliation_required" as const
+  }
+
+  return "capture_failed" as const
+}
+
 export async function fulfillAuthorizedCheckoutSession(input: {
   checkoutSessionId: string
   paymentProvider: "paypal"
@@ -1306,6 +1416,7 @@ async function finalizeAuthorizedCheckoutSession(input: {
     {
       id: createFlightOrderId(),
       checkoutSessionId: input.session.id,
+      paymentAttemptId: input.session.paymentAttemptId,
       duffelOrderId: duffelOrder.id,
       partialOfferRequestId: snapshot.partialOfferRequestId,
       offerId: snapshot.offerId,

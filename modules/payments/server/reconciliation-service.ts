@@ -91,6 +91,27 @@ export async function reconcilePaymentAttempts(input: {
   }
 }
 
+export async function reconcilePaymentAttemptById(input: {
+  paymentAttemptId: string
+  now?: Date
+  deps?: Partial<ReconciliationDeps>
+}) {
+  const deps = { ...defaultDeps, ...input.deps }
+  const attempt = await deps.attemptsRepository.findById(input.paymentAttemptId)
+
+  if (!attempt) {
+    return null
+  }
+
+  await reconcilePaymentAttempt({
+    attempt,
+    deps,
+    now: input.now ?? new Date(),
+  })
+
+  return deps.attemptsRepository.findById(input.paymentAttemptId)
+}
+
 async function reconcilePaymentAttempt(input: {
   attempt: PaymentAttemptRecord
   deps: ReconciliationDeps

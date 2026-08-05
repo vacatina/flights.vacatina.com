@@ -6,6 +6,7 @@ import { desc, eq } from "drizzle-orm"
 
 import {
   businessSettings,
+  checkoutSessions,
   flightCancellationEvents,
   flightCancellationQuotes,
   flightCancellationRequests,
@@ -369,10 +370,25 @@ export const defaultCancellationRepository: CancellationRepository = {
       return null
     }
 
+    const checkoutPaymentAttemptId = order.paymentAttemptId
+      ? null
+      : await db.query.checkoutSessions.findFirst({
+          where: eq(checkoutSessions.id, order.checkoutSessionId),
+          columns: { paymentAttemptId: true },
+        }).then((session) => session?.paymentAttemptId ?? null)
+    const paymentAttemptId = order.paymentAttemptId ?? checkoutPaymentAttemptId
+
+    if (!order.paymentAttemptId && checkoutPaymentAttemptId) {
+      await db
+        .update(flightOrders)
+        .set({ paymentAttemptId: checkoutPaymentAttemptId })
+        .where(eq(flightOrders.id, order.id))
+    }
+
     const [paymentAttempt, quotes, refunds, events] = await Promise.all([
-      order.paymentAttemptId
+      paymentAttemptId
         ? db.query.paymentAttempts.findFirst({
-            where: eq(paymentAttempts.id, order.paymentAttemptId),
+            where: eq(paymentAttempts.id, paymentAttemptId),
           }).then((row) => row ?? null)
         : Promise.resolve(null),
       db.query.flightCancellationQuotes.findMany({

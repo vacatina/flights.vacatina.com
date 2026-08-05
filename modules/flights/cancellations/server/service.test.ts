@@ -15,6 +15,7 @@ import {
   getAdminCancellationDetail,
   getCancellationEligibilityContext,
   listAdminCancellationRequests,
+  markManualRefundCompleted,
   rejectCancellation,
   updateBusinessSettings,
   type CancellationServiceDeps,
@@ -232,7 +233,10 @@ describe("flight cancellation service", () => {
       deps
     )
 
-    const updated = await approveCancellation({ requestId: request.id, admin }, deps)
+    const updated = await approveCancellation(
+      { requestId: request.id, admin },
+      deps
+    )
 
     expect(updated.status).toBe("manual_processing")
   })
@@ -261,6 +265,7 @@ describe("flight cancellation service", () => {
       customerMessage: null,
       status: "refund_pending",
     })
+    const originalGetDetail = deps.cancellationRepository.getDetail
     deps.cancellationRepository.getDetail = vi.fn(async () => ({
       request,
       order: {
@@ -325,7 +330,11 @@ describe("flight cancellation service", () => {
       events: [],
     }))
 
-    await approveRefund({ requestId: request.id, admin }, deps)
+    try {
+      await approveRefund({ requestId: request.id, admin }, deps)
+    } finally {
+      deps.cancellationRepository.getDetail = originalGetDetail
+    }
 
     expect(refundProvider).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -334,6 +343,73 @@ describe("flight cancellation service", () => {
         idempotencyKey: `flight-cancellation-refund:${request.id}`,
       })
     )
+  })
+
+  test("keeps refunds manual and idempotent when the PayPal capture is missing", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    const refundProvider = vi.fn()
+    deps.refundProvider = refundProvider
+    const request = await deps.cancellationRepository.createRequest({
+      flightOrderId: "flo_manual",
+      bookingReference: "VACMANUAL",
+      duffelOrderId: "ord_manual",
+      requestedByUserId: actor.appUserId,
+      requestedByGuestId: null,
+      customerReason:
+        "My travel dates changed and I need the entire booking cancelled.",
+      duffelApiAvailable: true,
+      adminFeeType: "fixed",
+      adminFeeValue: 25,
+      adminFeeAmount: 25,
+      customerRefundAmount: 250,
+      customerRefundCurrency: "USD",
+      customerMessage: null,
+      status: "refund_pending",
+    })
+
+    const firstApproval = await approveRefund(
+      { requestId: request.id, admin },
+      deps
+    )
+    const secondApproval = await approveRefund(
+      { requestId: request.id, admin },
+      deps
+    )
+    const detail = await deps.cancellationRepository.getDetail(request.id)
+
+    expect(firstApproval.status).toBe("manual_processing")
+    expect(secondApproval.status).toBe("manual_processing")
+    expect(refundProvider).not.toHaveBeenCalled()
+    expect(detail?.refunds).toHaveLength(1)
+    expect(detail?.refunds[0]?.status).toBe("approved")
+  })
+
+  test("allows manual refund completion after PayPal fallback", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    const request = await deps.cancellationRepository.createRequest({
+      flightOrderId: "flo_manual_2",
+      bookingReference: "VACMANUAL2",
+      duffelOrderId: "ord_manual_2",
+      requestedByUserId: actor.appUserId,
+      requestedByGuestId: null,
+      customerReason:
+        "My travel dates changed and I need the entire booking cancelled.",
+      duffelApiAvailable: true,
+      adminFeeType: "none",
+      adminFeeValue: 0,
+      adminFeeAmount: 0,
+      customerRefundAmount: 250,
+      customerRefundCurrency: "USD",
+      customerMessage: null,
+      status: "manual_processing",
+    })
+
+    const completed = await markManualRefundCompleted(
+      { requestId: request.id, admin },
+      deps
+    )
+
+    expect(completed.status).toBe("completed")
   })
 
   test("updates business settings from admin input", async () => {
@@ -418,6 +494,7 @@ function createDeps(now: Date): CancellationServiceDeps {
       id: "paypal_refund_1",
       status: "COMPLETED",
     })),
+    refreshPaymentCapture: vi.fn(async () => undefined),
     enqueueNotification: vi.fn(async (input) => ({
       id: `not_${input.eventType}`,
       eventType: input.eventType,

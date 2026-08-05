@@ -73,9 +73,16 @@ export function AdminCancellationDetail({
     "refund_pending",
   ].includes(status)
   const canReject = !isTerminal
+  const hasPayPalCapture = Boolean(detail.payment.providerCaptureId)
+  const refundActionLabel = hasPayPalCapture
+    ? "Refund via PayPal"
+    : "Approve manual refund"
+  const refundHelperText = hasPayPalCapture
+    ? "Sends the calculated refund to the original PayPal payment."
+    : "No PayPal capture ID is available. Support must complete this refund manually."
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
         <div className="space-y-2">
@@ -123,24 +130,47 @@ export function AdminCancellationDetail({
       />
 
       {/* Actions Card (Integrated into main flow) */}
-      <section className="space-y-5 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+      <section className="space-y-5 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e8ebf0] pb-4">
           <div>
-            <h2 className="text-lg font-semibold">Cancellation Actions</h2>
-            <p className="text-xs text-muted-foreground">
-              Current workflow state:{" "}
-              <span className="font-semibold text-foreground">
-                {detail.request.statusLabel}
-              </span>
+            <p className="text-xs font-semibold tracking-[0.08em] text-[#1749d8] uppercase">
+              Next step
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-[#172033]">
+              Cancellation actions
+            </h2>
+            <p className="mt-1 text-sm text-[#667085]">
+              Choose the action that matches the current workflow state.
             </p>
           </div>
+          <span className="rounded-full bg-[#f3f5f8] px-3 py-1 text-xs font-semibold text-[#596273]">
+            {detail.request.statusLabel}
+          </span>
         </div>
+
+        {canApproveCancellation ? (
+          <div className="flex items-start gap-3 rounded-md border border-[#cbd9ff] bg-[#f5f8ff] p-4">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#1749d8] text-white">
+              <MaterialIcon name="task_alt" filled className="text-[20px]" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[#172033]">
+                Ready for your decision
+              </p>
+              <p className="mt-0.5 text-sm leading-5 text-[#596273]">
+                Review the booking details above, then approve the cancellation
+                to continue.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <ActionForm
             action={createDuffelCancellationQuoteFormAction}
             requestId={detail.request.id}
             label="Create / refresh Duffel quote"
+            icon="refresh"
             variant="outline"
             disabled={!canCreateQuote}
             helperText={
@@ -154,6 +184,8 @@ export function AdminCancellationDetail({
             action={approveCancellationFormAction}
             requestId={detail.request.id}
             label="Approve cancellation"
+            icon="check_circle"
+            featured={canApproveCancellation}
             variant={canApproveCancellation ? "default" : "outline"}
             disabled={!canApproveCancellation}
             helperText={
@@ -167,6 +199,7 @@ export function AdminCancellationDetail({
             action={moveManualProcessingFormAction}
             requestId={detail.request.id}
             label="Move to manual processing"
+            icon="support_agent"
             variant="outline"
             disabled={!canMoveToManual}
             helperText="Forces request into manual processing mode for support team handling."
@@ -175,65 +208,83 @@ export function AdminCancellationDetail({
           <ActionForm
             action={approveRefundFormAction}
             requestId={detail.request.id}
-            label="Approve refund"
+            label={refundActionLabel}
+            icon="payments"
             variant={canApproveRefund ? "default" : "secondary"}
             disabled={!canApproveRefund}
-            helperText={
-              detail.payment.providerCaptureId
-                ? "Triggers automated PayPal refund to customer's account."
-                : "Approves refund for manual processing."
-            }
+            helperText={refundHelperText}
           />
 
           <ActionForm
             action={markManualRefundCompletedFormAction}
             requestId={detail.request.id}
             label="Mark manual refund complete"
+            icon="task_alt"
             variant="secondary"
             disabled={!canMarkRefundComplete}
-            helperText="Marks refund as manually completed when processed outside automated API."
+            helperText="Use after support confirms the customer received the manual refund."
           />
         </div>
 
-        <Separator className="my-3" />
+        <Separator className="my-2" />
 
         {/* Rejection Form */}
-        <form
-          action={rejectCancellationFormAction}
-          className="max-w-2xl space-y-3"
-        >
-          <input type="hidden" name="requestId" value={detail.request.id} />
-          <Label className="text-sm font-semibold">
-            Reject cancellation request
-          </Label>
-          <Textarea
-            name="reason"
-            placeholder="Rejection reason shown to the customer"
-            required
-            disabled={!canReject}
-            className="min-h-20 text-sm"
-          />
-          <div className="flex items-center gap-3">
-            <PendingSubmitButton
-              variant="destructive"
-              pendingLabel="Rejecting..."
-              disabled={!canReject}
-            >
-              Reject request
-            </PendingSubmitButton>
-            {!canReject && (
-              <span className="text-xs text-muted-foreground">
-                This request is in a terminal state (
-                {detail.request.statusLabel}) and cannot be rejected.
-              </span>
-            )}
+        <div className="rounded-md border border-[#f3d2d0] bg-[#fff8f7] p-4">
+          <div className="mb-3 flex items-start gap-3">
+            <MaterialIcon
+              name="block"
+              className="mt-0.5 text-[20px] text-[#b42318]"
+            />
+            <div>
+              <Label className="text-sm font-semibold text-[#8f1d16]">
+                Reject this request
+              </Label>
+              <p className="mt-0.5 text-xs text-[#a04b44]">
+                Use only when the cancellation cannot be accepted.
+              </p>
+            </div>
           </div>
-        </form>
+          <form
+            action={rejectCancellationFormAction}
+            className="max-w-2xl space-y-3"
+          >
+            <input type="hidden" name="requestId" value={detail.request.id} />
+            <Textarea
+              name="reason"
+              placeholder="Explain the reason shown to the customer"
+              required
+              disabled={!canReject}
+              className="min-h-20 border-[#e8c8c5] bg-white text-sm"
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <PendingSubmitButton
+                size="lg"
+                variant="destructive"
+                pendingLabel="Rejecting..."
+                disabled={!canReject}
+              >
+                <MaterialIcon name="block" className="text-[18px]" />
+                Reject request
+              </PendingSubmitButton>
+              {!canReject && (
+                <span className="text-xs text-[#a04b44]">
+                  This request is already{" "}
+                  {detail.request.statusLabel.toLowerCase()}.
+                </span>
+              )}
+            </div>
+          </form>
+        </div>
       </section>
 
       {/* Customer Request */}
-      <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Customer request</h2>
+      <section className="space-y-3 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon name="person" className="text-[20px] text-[#1749d8]" />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Customer request
+          </h2>
+        </div>
         <p className="text-sm text-muted-foreground">
           {detail.request.customerReason}
         </p>
@@ -245,8 +296,16 @@ export function AdminCancellationDetail({
       </section>
 
       {/* Fare conditions */}
-      <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Fare conditions</h2>
+      <section className="space-y-3 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon
+            name="description"
+            className="text-[20px] text-[#1749d8]"
+          />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Fare conditions
+          </h2>
+        </div>
         {detail.booking.fareConditions.map((condition) => (
           <p key={condition} className="text-sm text-muted-foreground">
             {condition}
@@ -255,8 +314,16 @@ export function AdminCancellationDetail({
       </section>
 
       {/* Fee and refund */}
-      <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Fee and refund</h2>
+      <section className="space-y-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon
+            name="payments"
+            className="text-[20px] text-[#1749d8]"
+          />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Fee and refund
+          </h2>
+        </div>
         <form
           action={updateCancellationFeeRefundFormAction}
           className="grid gap-4 md:grid-cols-4"
@@ -295,7 +362,7 @@ export function AdminCancellationDetail({
             }
           />
           <div className="md:col-span-4">
-            <PendingSubmitButton pendingLabel="Updating...">
+            <PendingSubmitButton size="lg" pendingLabel="Updating...">
               Update fee/refund
             </PendingSubmitButton>
           </div>
@@ -335,8 +402,13 @@ export function AdminCancellationDetail({
       </section>
 
       {/* Customer message */}
-      <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Customer message</h2>
+      <section className="space-y-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon name="mail" className="text-[20px] text-[#1749d8]" />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Customer message
+          </h2>
+        </div>
         <form action={updateCustomerMessageFormAction} className="space-y-3">
           <input type="hidden" name="requestId" value={detail.request.id} />
           <Textarea
@@ -344,15 +416,23 @@ export function AdminCancellationDetail({
             defaultValue={detail.request.customerMessage ?? ""}
             className="min-h-28"
           />
-          <PendingSubmitButton pendingLabel="Saving...">
+          <PendingSubmitButton size="lg" pendingLabel="Saving...">
             Save message
           </PendingSubmitButton>
         </form>
       </section>
 
       {/* Timing override */}
-      <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Timing override</h2>
+      <section className="space-y-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon
+            name="schedule"
+            className="text-[20px] text-[#1749d8]"
+          />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Timing override
+          </h2>
+        </div>
         {detail.request.cutoffOverrideReason ? (
           <p className="text-sm text-muted-foreground">
             {detail.request.cutoffOverrideReason}
@@ -361,15 +441,27 @@ export function AdminCancellationDetail({
         <form action={recordCutoffOverrideFormAction} className="space-y-3">
           <input type="hidden" name="requestId" value={detail.request.id} />
           <Input name="reason" placeholder="Reason for timing override" />
-          <PendingSubmitButton variant="outline" pendingLabel="Recording...">
+          <PendingSubmitButton
+            size="lg"
+            variant="outline"
+            pendingLabel="Recording..."
+          >
             Record override
           </PendingSubmitButton>
         </form>
       </section>
 
       {/* Duffel cancellation quotes */}
-      <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Duffel cancellation quotes</h2>
+      <section className="space-y-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon
+            name="request_quote"
+            className="text-[20px] text-[#1749d8]"
+          />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Duffel cancellation quotes
+          </h2>
+        </div>
         {detail.quotes.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No Duffel quote stored yet.
@@ -395,8 +487,16 @@ export function AdminCancellationDetail({
       </section>
 
       {/* Refund attempts */}
-      <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Refund attempts</h2>
+      <section className="space-y-3 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon
+            name="currency_exchange"
+            className="text-[20px] text-[#1749d8]"
+          />
+          <h2 className="text-lg font-semibold text-[#172033]">
+            Refund attempts
+          </h2>
+        </div>
         {detail.refunds.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No refund records yet.
@@ -420,8 +520,11 @@ export function AdminCancellationDetail({
       </section>
 
       {/* Audit trail */}
-      <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Audit trail</h2>
+      <section className="space-y-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex items-center gap-2">
+          <MaterialIcon name="history" className="text-[20px] text-[#1749d8]" />
+          <h2 className="text-lg font-semibold text-[#172033]">Audit trail</h2>
+        </div>
         <div className="space-y-3">
           {detail.events.length === 0 ? (
             <p className="text-sm text-muted-foreground">No events yet.</p>
@@ -535,6 +638,8 @@ function ActionForm({
   action,
   requestId,
   label,
+  icon,
+  featured = false,
   variant = "default",
   disabled = false,
   helperText,
@@ -542,6 +647,8 @@ function ActionForm({
   action: (formData: FormData) => Promise<void>
   requestId: string
   label: string
+  icon: string
+  featured?: boolean
   variant?: "default" | "outline" | "secondary"
   disabled?: boolean
   helperText?: string
@@ -551,12 +658,18 @@ function ActionForm({
       <form action={action}>
         <input type="hidden" name="requestId" value={requestId} />
         <PendingSubmitButton
+          size="lg"
           variant={variant}
-          className="w-full"
+          className={
+            featured
+              ? "h-12 w-full bg-[#1749d8] text-white hover:bg-[#123fc0]"
+              : "h-12 w-full"
+          }
           pendingLabel="Working..."
           disabled={disabled}
         >
-          {label}
+          <MaterialIcon name={icon} filled={featured} className="text-[19px]" />
+          <span>{label}</span>
         </PendingSubmitButton>
       </form>
       {helperText && (
@@ -585,13 +698,15 @@ function Field({
 
 function InfoGrid({ items }: { items: Array<[string, string]> }) {
   return (
-    <div className="grid gap-5 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:grid-cols-2 md:p-6">
+    <div className="grid gap-x-8 gap-y-5 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:grid-cols-3 md:p-6">
       {items.map(([label, value]) => (
         <div key={label} className="space-y-1">
-          <p className="text-xs tracking-wide text-muted-foreground uppercase">
+          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#7b8492] uppercase">
             {label}
           </p>
-          <p className="text-sm font-medium text-foreground">{value}</p>
+          <p className="text-sm font-semibold break-words text-[#172033]">
+            {value}
+          </p>
         </div>
       ))}
     </div>
