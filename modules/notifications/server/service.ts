@@ -168,6 +168,32 @@ function toNotificationContent(
     }
   }
 
+  if (eventType.startsWith("cancellation_")) {
+    const businessName = safePayload.businessName ?? "Vacatina"
+    const subject =
+      safePayload.recipientRole === "admin"
+        ? `Cancellation update - ${safePayload.bookingReference}`
+        : `${safePayload.statusLabel} - ${safePayload.bookingReference}`
+    const lines = [
+      `Booking: ${safePayload.bookingReference}`,
+      `Route: ${safePayload.routeLabel}`,
+      `Status: ${safePayload.statusLabel}`,
+      `Amount: ${safePayload.amountLabel}`,
+      safePayload.customerMessage ? `Message: ${safePayload.customerMessage}` : null,
+      safePayload.supportEmail ? `Support: ${safePayload.supportEmail}` : null,
+      safePayload.supportPhone ? `Phone: ${safePayload.supportPhone}` : null,
+    ].filter((line): line is string => Boolean(line))
+
+    return {
+      subject,
+      text: [`${businessName} cancellation update`, ...lines].join("\n"),
+      html: wrapHtml({
+        title: `${businessName} cancellation update`,
+        body: lines.map(escapeHtml),
+      }),
+    }
+  }
+
   const subject = `Booking needs manual review - ${safePayload.bookingReference}`
   const text = [
     `Payment was received for booking ${safePayload.bookingReference}, but manual reconciliation is required.`,

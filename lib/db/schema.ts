@@ -47,17 +47,61 @@ export const checkoutSettlementTypeEnum = pgEnum("checkout_settlement_type", [
   "balance",
 ])
 
-export const notificationOutboxStatusEnum = pgEnum("notification_outbox_status", [
-  "pending",
-  "sent",
-  "failed",
-])
+export const notificationOutboxStatusEnum = pgEnum(
+  "notification_outbox_status",
+  ["pending", "sent", "failed"]
+)
 
 export const notificationEventTypeEnum = pgEnum("notification_event_type", [
   "booking_confirmed",
   "hold_created",
   "reconciliation_required",
+  "cancellation_request_received",
+  "cancellation_manual_review",
+  "cancellation_quote_ready",
+  "cancellation_approved",
+  "cancellation_rejected",
+  "cancellation_completed",
+  "cancellation_refund_completed",
+  "cancellation_issue",
 ])
+
+export const flightCancellationStatusEnum = pgEnum(
+  "flight_cancellation_status",
+  [
+    "requested",
+    "quote_pending",
+    "quote_ready",
+    "admin_review_required",
+    "duffel_confirming",
+    "duffel_cancelled",
+    "manual_processing",
+    "refund_pending",
+    "refund_completed",
+    "completed",
+    "rejected",
+    "failed",
+  ]
+)
+
+export const flightCancellationFeeTypeEnum = pgEnum(
+  "flight_cancellation_fee_type",
+  ["none", "fixed", "percent"]
+)
+
+export const flightRefundStatusEnum = pgEnum("flight_refund_status", [
+  "pending",
+  "approved",
+  "processing",
+  "completed",
+  "failed",
+  "manual_completed",
+])
+
+export const flightCancellationEventActorTypeEnum = pgEnum(
+  "flight_cancellation_event_actor_type",
+  ["customer", "guest", "admin", "system"]
+)
 
 export const paymentProviderEnum = pgEnum("payment_provider", ["paypal"])
 
@@ -99,13 +143,10 @@ export const paymentEventTypeEnum = pgEnum("payment_event_type", [
   "RECONCILIATION_REQUIRED",
 ])
 
-export const paymentWebhookInboxStatusEnum = pgEnum("payment_webhook_inbox_status", [
-  "received",
-  "processing",
-  "processed",
-  "failed",
-  "ignored",
-])
+export const paymentWebhookInboxStatusEnum = pgEnum(
+  "payment_webhook_inbox_status",
+  ["received", "processing", "processed", "failed", "ignored"]
+)
 
 export const paymentOutboxStatusEnum = pgEnum("payment_outbox_status", [
   "pending",
@@ -200,7 +241,9 @@ export const guestUserLinks = pgTable(
       .references(() => users.id, {
         onDelete: "cascade",
       }),
-    linkedAt: timestamp("linked_at", { withTimezone: true }).defaultNow().notNull(),
+    linkedAt: timestamp("linked_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -209,9 +252,9 @@ export const guestUserLinks = pgTable(
       .notNull(),
   },
   (table) => ({
-    guestSessionUniqueIdx: uniqueIndex("guest_user_links_guest_session_unique_idx").on(
-      table.guestSessionId
-    ),
+    guestSessionUniqueIdx: uniqueIndex(
+      "guest_user_links_guest_session_unique_idx"
+    ).on(table.guestSessionId),
     userLookupIdx: index("guest_user_links_user_lookup_idx").on(table.userId),
   })
 )
@@ -239,12 +282,15 @@ export const organizationMembers = pgTable(
       .notNull(),
   },
   (table) => ({
-    orgUserUniqueIdx: uniqueIndex("organization_members_org_user_unique_idx").on(
-      table.organizationId,
+    orgUserUniqueIdx: uniqueIndex(
+      "organization_members_org_user_unique_idx"
+    ).on(table.organizationId, table.userId),
+    orgLookupIdx: index("organization_members_org_lookup_idx").on(
+      table.organizationId
+    ),
+    userLookupIdx: index("organization_members_user_lookup_idx").on(
       table.userId
     ),
-    orgLookupIdx: index("organization_members_org_lookup_idx").on(table.organizationId),
-    userLookupIdx: index("organization_members_user_lookup_idx").on(table.userId),
   })
 )
 
@@ -267,7 +313,10 @@ export const pricingRules = pgTable(
     enabled: boolean("enabled").notNull().default(true),
     priority: integer("priority").notNull().default(0),
     adjustmentType: pricingAdjustmentTypeEnum("adjustment_type").notNull(),
-    adjustmentValue: numeric("adjustment_value", { precision: 14, scale: 4 }).notNull(),
+    adjustmentValue: numeric("adjustment_value", {
+      precision: 14,
+      scale: 4,
+    }).notNull(),
     activeFrom: timestamp("active_from", { withTimezone: true }),
     activeTo: timestamp("active_to", { withTimezone: true }),
     journeyType: pricingJourneyTypeEnum("journey_type"),
@@ -305,7 +354,9 @@ export const pricedQuotes = pgTable(
     id: text("id").primaryKey(),
     partialOfferRequestId: text("partial_offer_request_id").notNull(),
     offerId: text("offer_id").notNull(),
-    selectedPartialOffers: jsonb("selected_partial_offers").$type<string[]>().notNull(),
+    selectedPartialOffers: jsonb("selected_partial_offers")
+      .$type<string[]>()
+      .notNull(),
     currency: text("currency").notNull(),
     netAmount: numeric("net_amount", { precision: 14, scale: 4 }).notNull(),
     sellAmount: numeric("sell_amount", { precision: 14, scale: 4 }).notNull(),
@@ -423,13 +474,18 @@ export const paymentAttempts = pgTable(
       .notNull(),
   },
   (table) => ({
-    providerOrderUniqueIdx: uniqueIndex("payment_attempts_provider_order_unique_idx").on(
-      table.provider,
-      table.providerOrderId
-    ).where(sql`${table.providerOrderId} is not null`),
+    providerOrderUniqueIdx: uniqueIndex(
+      "payment_attempts_provider_order_unique_idx"
+    )
+      .on(table.provider, table.providerOrderId)
+      .where(sql`${table.providerOrderId} is not null`),
     internalIdempotencyUniqueIdx: uniqueIndex(
       "payment_attempts_internal_idempotency_unique_idx"
-    ).on(table.internalOrderType, table.internalOrderId, table.clientIdempotencyKey),
+    ).on(
+      table.internalOrderType,
+      table.internalOrderId,
+      table.clientIdempotencyKey
+    ),
     createIdempotencyUniqueIdx: uniqueIndex(
       "payment_attempts_create_idempotency_unique_idx"
     ).on(table.createIdempotencyKey),
@@ -475,11 +531,11 @@ export const paymentEvents = pgTable(
       table.paymentAttemptId,
       table.createdAt
     ),
-    providerEventUniqueIdx: uniqueIndex("payment_events_provider_event_unique_idx").on(
-      table.provider,
-      table.providerEventId,
-      table.eventType
-    ).where(sql`${table.providerEventId} is not null`),
+    providerEventUniqueIdx: uniqueIndex(
+      "payment_events_provider_event_unique_idx"
+    )
+      .on(table.provider, table.providerEventId, table.eventType)
+      .where(sql`${table.providerEventId} is not null`),
   })
 )
 
@@ -492,7 +548,9 @@ export const paymentWebhookInbox = pgTable(
     eventType: text("event_type").notNull(),
     providerOrderId: text("provider_order_id"),
     providerCaptureId: text("provider_capture_id"),
-    status: paymentWebhookInboxStatusEnum("status").notNull().default("received"),
+    status: paymentWebhookInboxStatusEnum("status")
+      .notNull()
+      .default("received"),
     payload: jsonb("payload"),
     headers: jsonb("headers"),
     attemptCount: integer("attempt_count").notNull().default(0),
@@ -500,7 +558,9 @@ export const paymentWebhookInbox = pgTable(
     receivedAt: timestamp("received_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
+    processingStartedAt: timestamp("processing_started_at", {
+      withTimezone: true,
+    }),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     claimedBy: text("claimed_by"),
     claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
@@ -531,11 +591,9 @@ export const paymentWebhookInbox = pgTable(
       table.claimedBy,
       table.claimExpiresAt
     ),
-    providerOrderLookupIdx: index("payment_webhook_inbox_provider_order_lookup_idx").on(
-      table.provider,
-      table.providerOrderId,
-      table.receivedAt
-    ),
+    providerOrderLookupIdx: index(
+      "payment_webhook_inbox_provider_order_lookup_idx"
+    ).on(table.provider, table.providerOrderId, table.receivedAt),
   })
 )
 
@@ -561,7 +619,9 @@ export const paymentOutbox = pgTable(
       .notNull(),
     claimedBy: text("claimed_by"),
     claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
-    processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
+    processingStartedAt: timestamp("processing_started_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -571,7 +631,9 @@ export const paymentOutbox = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
   (table) => ({
-    uniqueKeyIdx: uniqueIndex("payment_outbox_unique_key_idx").on(table.uniqueKey),
+    uniqueKeyIdx: uniqueIndex("payment_outbox_unique_key_idx").on(
+      table.uniqueKey
+    ),
     statusRetryIdx: index("payment_outbox_status_retry_idx").on(
       table.status,
       table.nextAttemptAt
@@ -604,7 +666,9 @@ export const checkoutSessions = pgTable(
         onDelete: "cascade",
       }),
     offerId: text("offer_id").notNull(),
-    selectedPartialOffers: jsonb("selected_partial_offers").$type<string[]>().notNull(),
+    selectedPartialOffers: jsonb("selected_partial_offers")
+      .$type<string[]>()
+      .notNull(),
     ownerUserId: text("owner_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -626,12 +690,19 @@ export const checkoutSessions = pgTable(
     paymentCurrency: text("payment_currency"),
     paymentAmount: numeric("payment_amount", { precision: 14, scale: 4 }),
     checkoutPayloadSnapshot: jsonb("checkout_payload_snapshot"),
-    paymentAttemptId: text("payment_attempt_id").references(() => paymentAttempts.id, {
-      onDelete: "set null",
-    }),
+    paymentAttemptId: text("payment_attempt_id").references(
+      () => paymentAttempts.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     duffelOrderId: text("duffel_order_id"),
-    paymentInitiatedAt: timestamp("payment_initiated_at", { withTimezone: true }),
-    paymentConfirmedAt: timestamp("payment_confirmed_at", { withTimezone: true }),
+    paymentInitiatedAt: timestamp("payment_initiated_at", {
+      withTimezone: true,
+    }),
+    paymentConfirmedAt: timestamp("payment_confirmed_at", {
+      withTimezone: true,
+    }),
     finalizedAt: timestamp("finalized_at", { withTimezone: true }),
     status: checkoutSessionStatusEnum("status").notNull().default("processing"),
     errorCode: text("error_code"),
@@ -645,9 +716,9 @@ export const checkoutSessions = pgTable(
       .notNull(),
   },
   (table) => ({
-    idempotencyKeyUniqueIdx: uniqueIndex("checkout_sessions_idempotency_key_unique_idx").on(
-      table.idempotencyKey
-    ),
+    idempotencyKeyUniqueIdx: uniqueIndex(
+      "checkout_sessions_idempotency_key_unique_idx"
+    ).on(table.idempotencyKey),
     lifecycleIdx: index("checkout_sessions_lifecycle_idx").on(
       table.status,
       table.expiresAt
@@ -657,9 +728,9 @@ export const checkoutSessions = pgTable(
       table.offerId,
       table.createdAt
     ),
-    providerOrderIdUniqueIdx: uniqueIndex("checkout_sessions_provider_order_id_unique_idx").on(
-      table.providerOrderId
-    ),
+    providerOrderIdUniqueIdx: uniqueIndex(
+      "checkout_sessions_provider_order_id_unique_idx"
+    ).on(table.providerOrderId),
   })
 )
 
@@ -680,15 +751,12 @@ export const paymentWebhookEvents = pgTable(
       .notNull(),
   },
   (table) => ({
-    providerEventUniqueIdx: uniqueIndex("payment_webhook_events_provider_event_unique_idx").on(
-      table.provider,
-      table.eventKey
-    ),
-    providerOrderLookupIdx: index("payment_webhook_events_provider_order_lookup_idx").on(
-      table.provider,
-      table.providerOrderId,
-      table.createdAt
-    ),
+    providerEventUniqueIdx: uniqueIndex(
+      "payment_webhook_events_provider_event_unique_idx"
+    ).on(table.provider, table.eventKey),
+    providerOrderLookupIdx: index(
+      "payment_webhook_events_provider_order_lookup_idx"
+    ).on(table.provider, table.providerOrderId, table.createdAt),
   })
 )
 
@@ -702,13 +770,18 @@ export const flightOrders = pgTable(
       .references(() => checkoutSessions.id, {
         onDelete: "cascade",
       }),
-    paymentAttemptId: text("payment_attempt_id").references(() => paymentAttempts.id, {
-      onDelete: "set null",
-    }),
+    paymentAttemptId: text("payment_attempt_id").references(
+      () => paymentAttempts.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     duffelOrderId: text("duffel_order_id").notNull(),
     partialOfferRequestId: text("partial_offer_request_id").notNull(),
     offerId: text("offer_id").notNull(),
-    selectedPartialOffers: jsonb("selected_partial_offers").$type<string[]>().notNull(),
+    selectedPartialOffers: jsonb("selected_partial_offers")
+      .$type<string[]>()
+      .notNull(),
     ownerUserId: text("owner_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -738,7 +811,9 @@ export const flightOrders = pgTable(
       withTimezone: true,
     }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
-    orderSnapshot: jsonb("order_snapshot").$type<Record<string, unknown>>().notNull(),
+    orderSnapshot: jsonb("order_snapshot")
+      .$type<Record<string, unknown>>()
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -747,21 +822,23 @@ export const flightOrders = pgTable(
       .notNull(),
   },
   (table) => ({
-    checkoutSessionUniqueIdx: uniqueIndex("flight_orders_checkout_session_unique_idx").on(
-      table.checkoutSessionId
-    ),
-    paymentAttemptUniqueIdx: uniqueIndex("flight_orders_payment_attempt_unique_idx").on(
-      table.paymentAttemptId
-    ).where(sql`${table.paymentAttemptId} is not null`),
-    bookingReferenceUniqueIdx: uniqueIndex("flight_orders_booking_reference_unique_idx").on(
-      table.bookingReference
-    ),
-    duffelOrderUniqueIdx: uniqueIndex("flight_orders_duffel_order_unique_idx").on(
-      table.duffelOrderId
-    ),
-    contactEmailHashLookupIdx: index("flight_orders_contact_email_hash_lookup_idx").on(
-      table.contactEmailHash
-    ),
+    checkoutSessionUniqueIdx: uniqueIndex(
+      "flight_orders_checkout_session_unique_idx"
+    ).on(table.checkoutSessionId),
+    paymentAttemptUniqueIdx: uniqueIndex(
+      "flight_orders_payment_attempt_unique_idx"
+    )
+      .on(table.paymentAttemptId)
+      .where(sql`${table.paymentAttemptId} is not null`),
+    bookingReferenceUniqueIdx: uniqueIndex(
+      "flight_orders_booking_reference_unique_idx"
+    ).on(table.bookingReference),
+    duffelOrderUniqueIdx: uniqueIndex(
+      "flight_orders_duffel_order_unique_idx"
+    ).on(table.duffelOrderId),
+    contactEmailHashLookupIdx: index(
+      "flight_orders_contact_email_hash_lookup_idx"
+    ).on(table.contactEmailHash),
     ownerLookupIdx: index("flight_orders_owner_lookup_idx").on(
       table.ownerUserId,
       table.ownerGuestId,
@@ -775,6 +852,219 @@ export const flightOrders = pgTable(
   })
 )
 
+export const flightCancellationRequests = pgTable(
+  "flight_cancellation_requests",
+  {
+    id: text("id").primaryKey(),
+    flightOrderId: text("flight_order_id")
+      .notNull()
+      .references(() => flightOrders.id, {
+        onDelete: "cascade",
+      }),
+    bookingReference: text("booking_reference").notNull(),
+    duffelOrderId: text("duffel_order_id").notNull(),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    requestedByGuestId: text("requested_by_guest_id").references(
+      () => guestSessions.id,
+      {
+        onDelete: "set null",
+      }
+    ),
+    customerReason: text("customer_reason").notNull(),
+    status: flightCancellationStatusEnum("status")
+      .notNull()
+      .default("requested"),
+    duffelApiAvailable: boolean("duffel_api_available"),
+    adminFeeType: flightCancellationFeeTypeEnum("admin_fee_type")
+      .notNull()
+      .default("none"),
+    adminFeeValue: numeric("admin_fee_value", { precision: 14, scale: 4 })
+      .notNull()
+      .default("0"),
+    adminFeeAmount: numeric("admin_fee_amount", { precision: 14, scale: 4 })
+      .notNull()
+      .default("0"),
+    customerRefundAmount: numeric("customer_refund_amount", {
+      precision: 14,
+      scale: 4,
+    }),
+    customerRefundCurrency: text("customer_refund_currency"),
+    customerMessage: text("customer_message"),
+    customerMessageUpdatedBy: text("customer_message_updated_by").references(
+      () => users.id,
+      {
+        onDelete: "set null",
+      }
+    ),
+    customerMessageUpdatedAt: timestamp("customer_message_updated_at", {
+      withTimezone: true,
+    }),
+    cutoffOverrideBy: text("cutoff_override_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    cutoffOverrideAt: timestamp("cutoff_override_at", { withTimezone: true }),
+    cutoffOverrideReason: text("cutoff_override_reason"),
+    cancellationApprovedBy: text("cancellation_approved_by").references(
+      () => users.id,
+      {
+        onDelete: "set null",
+      }
+    ),
+    cancellationApprovedAt: timestamp("cancellation_approved_at", {
+      withTimezone: true,
+    }),
+    refundApprovedBy: text("refund_approved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    refundApprovedAt: timestamp("refund_approved_at", { withTimezone: true }),
+    adminRejectionReason: text("admin_rejection_reason"),
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    flightOrderLookupIdx: index(
+      "flight_cancellation_requests_order_lookup_idx"
+    ).on(table.flightOrderId, table.createdAt),
+    bookingReferenceLookupIdx: index(
+      "flight_cancellation_requests_booking_reference_lookup_idx"
+    ).on(table.bookingReference, table.createdAt),
+    statusQueueIdx: index("flight_cancellation_requests_status_queue_idx").on(
+      table.status,
+      table.updatedAt
+    ),
+    requesterLookupIdx: index(
+      "flight_cancellation_requests_requester_lookup_idx"
+    ).on(table.requestedByUserId, table.requestedByGuestId, table.createdAt),
+  })
+)
+
+export const flightCancellationQuotes = pgTable(
+  "flight_cancellation_quotes",
+  {
+    id: text("id").primaryKey(),
+    cancellationRequestId: text("cancellation_request_id")
+      .notNull()
+      .references(() => flightCancellationRequests.id, {
+        onDelete: "cascade",
+      }),
+    duffelOrderCancellationId: text("duffel_order_cancellation_id").notNull(),
+    refundAmount: numeric("refund_amount", { precision: 14, scale: 4 }),
+    refundCurrency: text("refund_currency"),
+    refundTo: text("refund_to"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    requestTimelineIdx: index(
+      "flight_cancellation_quotes_request_timeline_idx"
+    ).on(table.cancellationRequestId, table.createdAt),
+    duffelCancellationUniqueIdx: uniqueIndex(
+      "flight_cancellation_quotes_duffel_cancellation_unique_idx"
+    ).on(table.duffelOrderCancellationId),
+  })
+)
+
+export const flightRefundAttempts = pgTable(
+  "flight_refund_attempts",
+  {
+    id: text("id").primaryKey(),
+    cancellationRequestId: text("cancellation_request_id")
+      .notNull()
+      .references(() => flightCancellationRequests.id, {
+        onDelete: "cascade",
+      }),
+    paymentAttemptId: text("payment_attempt_id").references(
+      () => paymentAttempts.id,
+      {
+        onDelete: "set null",
+      }
+    ),
+    provider: paymentProviderEnum("provider").notNull(),
+    providerCaptureId: text("provider_capture_id"),
+    providerRefundId: text("provider_refund_id"),
+    amount: numeric("amount", { precision: 14, scale: 4 }).notNull(),
+    currency: text("currency").notNull(),
+    status: flightRefundStatusEnum("status").notNull().default("pending"),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    requestTimelineIdx: index("flight_refund_attempts_request_timeline_idx").on(
+      table.cancellationRequestId,
+      table.createdAt
+    ),
+    providerRefundUniqueIdx: uniqueIndex(
+      "flight_refund_attempts_provider_refund_unique_idx"
+    )
+      .on(table.provider, table.providerRefundId)
+      .where(sql`${table.providerRefundId} is not null`),
+  })
+)
+
+export const flightCancellationEvents = pgTable(
+  "flight_cancellation_events",
+  {
+    id: text("id").primaryKey(),
+    cancellationRequestId: text("cancellation_request_id")
+      .notNull()
+      .references(() => flightCancellationRequests.id, {
+        onDelete: "cascade",
+      }),
+    actorType: flightCancellationEventActorTypeEnum("actor_type").notNull(),
+    actorId: text("actor_id"),
+    eventType: text("event_type").notNull(),
+    message: text("message"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    requestTimelineIdx: index(
+      "flight_cancellation_events_request_timeline_idx"
+    ).on(table.cancellationRequestId, table.createdAt),
+    eventTypeIdx: index("flight_cancellation_events_type_idx").on(
+      table.eventType,
+      table.createdAt
+    ),
+  })
+)
+
+export const businessSettings = pgTable("business_settings", {
+  id: text("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  supportEmail: text("support_email").notNull(),
+  supportPhone: text("support_phone").notNull(),
+  supportWhatsapp: text("support_whatsapp").notNull(),
+  address: text("address").notNull(),
+  timezone: text("timezone").notNull(),
+  updatedBy: text("updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})
+
 export const notificationOutbox = pgTable(
   "notification_outbox",
   {
@@ -784,9 +1074,12 @@ export const notificationOutbox = pgTable(
     flightOrderId: text("flight_order_id").references(() => flightOrders.id, {
       onDelete: "set null",
     }),
-    checkoutSessionId: text("checkout_session_id").references(() => checkoutSessions.id, {
-      onDelete: "set null",
-    }),
+    checkoutSessionId: text("checkout_session_id").references(
+      () => checkoutSessions.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     bookingReference: text("booking_reference"),
     recipientEmail: text("recipient_email").notNull(),
     recipientEmailHash: text("recipient_email_hash").notNull(),
@@ -813,10 +1106,9 @@ export const notificationOutbox = pgTable(
       table.recipientEmailHash,
       table.createdAt
     ),
-    flightOrderLookupIdx: index("notification_outbox_flight_order_lookup_idx").on(
-      table.flightOrderId,
-      table.createdAt
-    ),
+    flightOrderLookupIdx: index(
+      "notification_outbox_flight_order_lookup_idx"
+    ).on(table.flightOrderId, table.createdAt),
   })
 )
 
@@ -843,6 +1135,27 @@ export type NewPaymentOutboxRow = typeof paymentOutbox.$inferInsert
 
 export type FlightOrderRow = typeof flightOrders.$inferSelect
 export type NewFlightOrderRow = typeof flightOrders.$inferInsert
+
+export type FlightCancellationRequestRow =
+  typeof flightCancellationRequests.$inferSelect
+export type NewFlightCancellationRequestRow =
+  typeof flightCancellationRequests.$inferInsert
+
+export type FlightCancellationQuoteRow =
+  typeof flightCancellationQuotes.$inferSelect
+export type NewFlightCancellationQuoteRow =
+  typeof flightCancellationQuotes.$inferInsert
+
+export type FlightRefundAttemptRow = typeof flightRefundAttempts.$inferSelect
+export type NewFlightRefundAttemptRow = typeof flightRefundAttempts.$inferInsert
+
+export type FlightCancellationEventRow =
+  typeof flightCancellationEvents.$inferSelect
+export type NewFlightCancellationEventRow =
+  typeof flightCancellationEvents.$inferInsert
+
+export type BusinessSettingsRow = typeof businessSettings.$inferSelect
+export type NewBusinessSettingsRow = typeof businessSettings.$inferInsert
 
 export type NotificationOutboxRow = typeof notificationOutbox.$inferSelect
 export type NewNotificationOutboxRow = typeof notificationOutbox.$inferInsert

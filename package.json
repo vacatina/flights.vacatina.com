@@ -10,7 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:seed": "bun run scripts/seed-pricing-rules.ts",
+    "db:seed": "node scripts/seed-application-defaults.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

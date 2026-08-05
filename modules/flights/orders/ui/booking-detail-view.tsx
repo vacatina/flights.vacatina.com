@@ -13,10 +13,14 @@ import {
 } from "lucide-react"
 
 import type {
+  CancellationStatusSummary,
+} from "@/modules/flights/cancellations/server/service"
+import type {
   BookingDetailModel,
   FlightOrderSnapshotLeg,
   FlightOrderSnapshotTimelineEvent,
 } from "@/modules/flights/orders/domain"
+import { CancellationStatusPanel } from "@/modules/flights/cancellations/ui"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -29,6 +33,7 @@ import {
 interface BookingDetailViewProps {
   detail: BookingDetailModel
   refreshHref?: string
+  cancellationStatus?: CancellationStatusSummary | null
 }
 
 interface DisplayTimelineEvent {
@@ -51,6 +56,7 @@ interface DisplayLeg {
 export function BookingDetailView({
   detail,
   refreshHref,
+  cancellationStatus = null,
 }: BookingDetailViewProps) {
   const firstLeg = detail.snapshot.legs[0] ?? null
   const passengers = getPassengersForDisplay(detail)
@@ -566,6 +572,11 @@ export function BookingDetailView({
               )}
             </p>
           </div>
+
+          <CancellationStatusPanel
+            bookingReference={detail.bookingReference}
+            status={cancellationStatus}
+          />
 
           <div className="space-y-3">
             {notifications.map((item) => (

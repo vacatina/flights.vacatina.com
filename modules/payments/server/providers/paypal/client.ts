@@ -27,6 +27,12 @@ export interface PayPalCapture {
   amount?: PayPalAmount
 }
 
+export interface PayPalRefund {
+  id: string
+  status?: string
+  amount?: PayPalAmount
+}
+
 export interface PayPalCaptureOrder {
   id: string
   status?: string
@@ -188,6 +194,26 @@ export function toPayPalAmount(amount: number, currency: string): PayPalAmount {
     currency_code: normalizedCurrency,
     value: amount.toFixed(digits),
   }
+}
+
+export async function refundPayPalCapture(input: {
+  captureId: string
+  amount: number
+  currency: string
+  idempotencyKey: string
+  noteToPayer?: string | null
+}): Promise<PayPalRefund> {
+  return paypalRequest<PayPalRefund>(
+    `/v2/payments/captures/${encodeURIComponent(input.captureId)}/refund`,
+    {
+      method: "POST",
+      body: {
+        amount: toPayPalAmount(input.amount, input.currency),
+        note_to_payer: input.noteToPayer ?? undefined,
+      },
+      requestId: input.idempotencyKey,
+    }
+  )
 }
 
 function paypalCurrencyMinorUnit(currency: string) {
