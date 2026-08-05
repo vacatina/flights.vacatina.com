@@ -1,10 +1,4 @@
 import Link from "next/link"
-import {
-  AlertTriangleIcon,
-  CheckCircle2Icon,
-  HelpCircleIcon,
-  InfoIcon,
-} from "lucide-react"
 
 import type { AdminCancellationDetailModel } from "@/modules/flights/cancellations/server/service"
 import {
@@ -22,7 +16,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MaterialIcon } from "@/components/ui/material-icon"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { PendingSubmitButton } from "@/modules/flights/cancellations/ui/pending-submit-button"
@@ -38,29 +39,63 @@ export function AdminCancellationDetail({
   const isTerminal = ["completed", "rejected"].includes(status)
   const isDuffelAvailable = detail.request.duffelApiAvailable
 
-  const canCreateQuote = ["requested", "quote_pending", "quote_ready", "admin_review_required", "manual_processing", "failed"].includes(status)
-  const canApproveCancellation = ["requested", "quote_pending", "quote_ready", "admin_review_required"].includes(status)
-  const canMoveToManual = ["requested", "quote_pending", "quote_ready", "admin_review_required", "duffel_confirming", "refund_pending", "failed"].includes(status)
-  const canApproveRefund = ["duffel_cancelled", "manual_processing", "refund_pending"].includes(status)
-  const canMarkRefundComplete = ["duffel_cancelled", "manual_processing", "refund_pending"].includes(status)
+  const canCreateQuote = [
+    "requested",
+    "quote_pending",
+    "quote_ready",
+    "admin_review_required",
+    "manual_processing",
+    "failed",
+  ].includes(status)
+  const canApproveCancellation = [
+    "requested",
+    "quote_pending",
+    "quote_ready",
+    "admin_review_required",
+  ].includes(status)
+  const canMoveToManual = [
+    "requested",
+    "quote_pending",
+    "quote_ready",
+    "admin_review_required",
+    "duffel_confirming",
+    "refund_pending",
+    "failed",
+  ].includes(status)
+  const canApproveRefund = [
+    "duffel_cancelled",
+    "manual_processing",
+    "refund_pending",
+  ].includes(status)
+  const canMarkRefundComplete = [
+    "duffel_cancelled",
+    "manual_processing",
+    "refund_pending",
+  ].includes(status)
   const canReject = !isTerminal
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-border bg-background p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
         <div className="space-y-2">
-          <Button variant="ghost" render={<Link href="/admin/cancellations" />}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="-ml-2 text-[#596273]"
+            render={<Link href="/admin/cancellations" />}
+          >
+            <MaterialIcon name="arrow_back" className="text-[18px]" />
             Back
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+          <h1 className="text-2xl font-semibold text-[#111827] md:text-3xl">
             {detail.booking.reference}
           </h1>
           <p className="text-sm text-muted-foreground">
             {detail.booking.routeLabel} · {detail.booking.customerEmail}
           </p>
         </div>
-        <Badge variant="secondary" className="rounded-full">
+        <Badge variant="secondary" className="bg-[#eef3ff] text-[#1749d8]">
           {detail.request.statusLabel}
         </Badge>
       </div>
@@ -93,7 +128,10 @@ export function AdminCancellationDetail({
           <div>
             <h2 className="text-lg font-semibold">Cancellation Actions</h2>
             <p className="text-xs text-muted-foreground">
-              Current workflow state: <span className="font-semibold text-foreground">{detail.request.statusLabel}</span>
+              Current workflow state:{" "}
+              <span className="font-semibold text-foreground">
+                {detail.request.statusLabel}
+              </span>
             </p>
           </div>
         </div>
@@ -160,9 +198,14 @@ export function AdminCancellationDetail({
         <Separator className="my-3" />
 
         {/* Rejection Form */}
-        <form action={rejectCancellationFormAction} className="space-y-3 max-w-2xl">
+        <form
+          action={rejectCancellationFormAction}
+          className="max-w-2xl space-y-3"
+        >
           <input type="hidden" name="requestId" value={detail.request.id} />
-          <Label className="text-sm font-semibold">Reject cancellation request</Label>
+          <Label className="text-sm font-semibold">
+            Reject cancellation request
+          </Label>
           <Textarea
             name="reason"
             placeholder="Rejection reason shown to the customer"
@@ -180,7 +223,8 @@ export function AdminCancellationDetail({
             </PendingSubmitButton>
             {!canReject && (
               <span className="text-xs text-muted-foreground">
-                This request is in a terminal state ({detail.request.statusLabel}) and cannot be rejected.
+                This request is in a terminal state (
+                {detail.request.statusLabel}) and cannot be rejected.
               </span>
             )}
           </div>
@@ -194,7 +238,7 @@ export function AdminCancellationDetail({
           {detail.request.customerReason}
         </p>
         {detail.request.adminRejectionReason ? (
-          <p className="text-sm text-destructive font-medium">
+          <p className="text-sm font-medium text-destructive">
             Rejection reason: {detail.request.adminRejectionReason}
           </p>
         ) : null}
@@ -213,7 +257,10 @@ export function AdminCancellationDetail({
       {/* Fee and refund */}
       <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Fee and refund</h2>
-        <form action={updateCancellationFeeRefundFormAction} className="grid gap-4 md:grid-cols-4">
+        <form
+          action={updateCancellationFeeRefundFormAction}
+          className="grid gap-4 md:grid-cols-4"
+        >
           <input type="hidden" name="requestId" value={detail.request.id} />
           <div className="space-y-2">
             <Label htmlFor="feeType">Fee type</Label>
@@ -255,18 +302,34 @@ export function AdminCancellationDetail({
         </form>
         <InfoGrid
           items={[
-            ["Service fee", formatMoney(detail.request.adminFeeAmount, detail.booking.currency)],
+            [
+              "Service fee",
+              formatMoney(
+                detail.request.adminFeeAmount,
+                detail.booking.currency
+              ),
+            ],
             [
               "Customer refund",
               detail.request.customerRefundAmount === null
                 ? "Not set"
                 : formatMoney(
                     detail.request.customerRefundAmount,
-                    detail.request.customerRefundCurrency ?? detail.booking.currency
+                    detail.request.customerRefundCurrency ??
+                      detail.booking.currency
                   ),
             ],
-            ["Payment captured", formatMoney(detail.payment.capturedAmount, detail.payment.currency)],
-            ["Refund approval", detail.request.refundApprovedAtLabel ?? "Pending"],
+            [
+              "Payment captured",
+              formatMoney(
+                detail.payment.capturedAmount,
+                detail.payment.currency
+              ),
+            ],
+            [
+              "Refund approval",
+              detail.request.refundApprovedAtLabel ?? "Pending",
+            ],
           ]}
         />
       </section>
@@ -308,17 +371,24 @@ export function AdminCancellationDetail({
       <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Duffel cancellation quotes</h2>
         {detail.quotes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No Duffel quote stored yet.</p>
+          <p className="text-sm text-muted-foreground">
+            No Duffel quote stored yet.
+          </p>
         ) : null}
         {detail.quotes.map((quote) => (
-          <div key={quote.id} className="space-y-1 rounded-md border border-border p-3">
+          <div
+            key={quote.id}
+            className="space-y-1 rounded-md border border-border p-3"
+          >
             <p className="text-sm font-medium">{quote.refundLabel}</p>
             <p className="text-xs text-muted-foreground">
               {quote.duffelOrderCancellationId} · {quote.refundTo}
             </p>
             <p className="text-xs text-muted-foreground">
               Expires {quote.expiresAtLabel}
-              {quote.confirmedAtLabel ? ` · Confirmed ${quote.confirmedAtLabel}` : ""}
+              {quote.confirmedAtLabel
+                ? ` · Confirmed ${quote.confirmedAtLabel}`
+                : ""}
             </p>
           </div>
         ))}
@@ -328,13 +398,22 @@ export function AdminCancellationDetail({
       <section className="space-y-3 rounded-lg border border-border bg-background p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Refund attempts</h2>
         {detail.refunds.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No refund records yet.</p>
+          <p className="text-sm text-muted-foreground">
+            No refund records yet.
+          </p>
         ) : null}
         {detail.refunds.map((refund) => (
-          <div key={refund.id} className="space-y-1 rounded-md border border-border p-3">
+          <div
+            key={refund.id}
+            className="space-y-1 rounded-md border border-border p-3"
+          >
             <p className="text-sm font-medium">{refund.amountLabel}</p>
             <p className="text-xs text-muted-foreground">
-              Status: <span className="font-semibold text-foreground">{refund.status}</span> · {refund.createdAtLabel}
+              Status:{" "}
+              <span className="font-semibold text-foreground">
+                {refund.status}
+              </span>{" "}
+              · {refund.createdAtLabel}
             </p>
           </div>
         ))}
@@ -348,7 +427,10 @@ export function AdminCancellationDetail({
             <p className="text-sm text-muted-foreground">No events yet.</p>
           ) : null}
           {detail.events.map((event) => (
-            <div key={event.id} className="space-y-1 border-b border-border pb-3 last:border-0">
+            <div
+              key={event.id}
+              className="space-y-1 border-b border-border pb-3 last:border-0"
+            >
               <p className="text-sm font-medium text-foreground">
                 {event.eventType}
               </p>
@@ -370,16 +452,23 @@ function DuffelStatusCard({ apiAvailable }: { apiAvailable: boolean | null }) {
   if (apiAvailable === true) {
     return (
       <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-950 dark:text-emerald-200">
-        <CheckCircle2Icon className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <MaterialIcon
+          name="check_circle"
+          filled
+          className="mt-0.5 shrink-0 text-[21px] text-emerald-600"
+        />
         <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">Duffel API Cancellation Available</span>
-            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 text-[10px] uppercase">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">
+              Duffel API Cancellation Available
+            </span>
+            <Badge className="bg-emerald-600 text-[10px] text-white uppercase hover:bg-emerald-600">
               API Supported
             </Badge>
           </div>
           <p className="text-xs text-emerald-800 dark:text-emerald-300">
-            This booking order can be automatically quoted and cancelled directly via the Duffel API.
+            This booking order can be automatically quoted and cancelled
+            directly via the Duffel API.
           </p>
         </div>
       </div>
@@ -389,16 +478,27 @@ function DuffelStatusCard({ apiAvailable }: { apiAvailable: boolean | null }) {
   if (apiAvailable === false) {
     return (
       <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-950 dark:text-amber-200">
-        <AlertTriangleIcon className="size-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+        <MaterialIcon
+          name="warning"
+          filled
+          className="mt-0.5 shrink-0 text-[21px] text-amber-600"
+        />
         <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">Manual Airline Processing Required</span>
-            <Badge variant="outline" className="border-amber-600 text-amber-700 dark:text-amber-300 font-semibold text-[10px] uppercase">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">
+              Manual Airline Processing Required
+            </span>
+            <Badge
+              variant="outline"
+              className="border-amber-600 text-[10px] font-semibold text-amber-700 uppercase dark:text-amber-300"
+            >
               API Unavailable
             </Badge>
           </div>
           <p className="text-xs text-amber-800 dark:text-amber-300">
-            Automated Duffel API cancellation is not supported for this ticket/airline. Support must process cancellation manually via the airline portal or Duffel dashboard, then approve manual refund.
+            Automated Duffel API cancellation is not supported for this
+            ticket/airline. Support must process cancellation manually via the
+            airline portal or Duffel dashboard, then approve manual refund.
           </p>
         </div>
       </div>
@@ -407,16 +507,24 @@ function DuffelStatusCard({ apiAvailable }: { apiAvailable: boolean | null }) {
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-blue-950 dark:text-blue-200">
-      <HelpCircleIcon className="size-5 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+      <MaterialIcon
+        name="help"
+        filled
+        className="mt-0.5 shrink-0 text-[21px] text-blue-600"
+      />
       <div className="space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-sm">Duffel API Status Unchecked</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold">
+            Duffel API Status Unchecked
+          </span>
           <Badge variant="secondary" className="text-[10px] uppercase">
             Unknown
           </Badge>
         </div>
         <p className="text-xs text-blue-800 dark:text-blue-300">
-          Click "Create / refresh Duffel quote" in the action panel to verify live Duffel API cancellation capability for this booking.
+          Select <strong>Create / refresh Duffel quote</strong> in the action
+          panel to verify live Duffel API cancellation capability for this
+          booking.
         </p>
       </div>
     </div>
@@ -452,9 +560,7 @@ function ActionForm({
         </PendingSubmitButton>
       </form>
       {helperText && (
-        <p className="text-[11px] text-muted-foreground px-1">
-          {helperText}
-        </p>
+        <p className="px-1 text-[11px] text-muted-foreground">{helperText}</p>
       )}
     </div>
   )
@@ -479,7 +585,7 @@ function Field({
 
 function InfoGrid({ items }: { items: Array<[string, string]> }) {
   return (
-    <div className="grid gap-4 rounded-lg border border-border bg-background p-5 shadow-sm md:grid-cols-2">
+    <div className="grid gap-5 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:grid-cols-2 md:p-6">
       {items.map(([label, value]) => (
         <div key={label} className="space-y-1">
           <p className="text-xs tracking-wide text-muted-foreground uppercase">
@@ -502,4 +608,3 @@ function formatMoney(amount: number, currency: string) {
     return `${currency} ${amount.toFixed(2)}`
   }
 }
-

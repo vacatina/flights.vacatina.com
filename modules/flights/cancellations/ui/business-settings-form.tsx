@@ -14,7 +14,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
       <form
         action={updateBusinessSettingsFormAction}
-        className="space-y-5 rounded-lg border border-border bg-background p-5 shadow-sm"
+        className="space-y-5 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6"
       >
         <div>
           <h2 className="text-lg font-semibold">Business settings</h2>
@@ -59,14 +59,20 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
             className="min-h-28"
           />
         </div>
-        <Button type="submit">Save settings</Button>
+        <Button
+          type="submit"
+          size="lg"
+          className="h-10 bg-[#1749d8] hover:bg-[#123fc0]"
+        >
+          Save settings
+        </Button>
       </form>
 
-      <section className="space-y-4 rounded-lg border border-border bg-background p-5 shadow-sm">
+      <section className="space-y-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
         <h2 className="text-lg font-semibold">Customer support card</h2>
-        <div className="rounded-lg bg-primary p-4 text-primary-foreground">
+        <div className="rounded-md bg-[#13357b] p-4 text-white">
           <p className="text-lg font-semibold">{settings.businessName}</p>
-          <p className="mt-1 text-sm text-primary-foreground/80">
+          <p className="mt-1 text-sm text-white/75">
             Manual cases and refund questions
           </p>
         </div>

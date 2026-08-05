@@ -1,15 +1,14 @@
+/* eslint-disable @next/next/no-page-custom-font */
 import { Google_Sans_Flex as Figtree, Geist_Mono } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 import { cookies } from "next/headers"
 import { after } from "next/server"
 
 import "./globals.css"
-import { SiteFooter } from "@/components/navigation/site-footer"
-import { SiteNavbar } from "@/components/navigation/site-navbar"
+import { AppShell } from "@/components/navigation/app-shell"
 import { cn } from "@/lib/utils"
 import { isClerkConfigured } from "@/modules/auth/server/config"
 import type { Metadata } from "next"
-import { TopLoader } from "@/components/ui/top-loader"
 import {
   DISPLAY_CURRENCY_COOKIE_NAME,
   parseDisplayCurrency,
@@ -54,12 +53,7 @@ export default async function RootLayout({
       initialCurrency={initialCurrency}
       initialFxSnapshot={initialFxSnapshot}
     >
-      <TopLoader />
-      <div id="top" className="min-h-svh">
-        <SiteNavbar clerkEnabled={clerkEnabled} />
-        {children}
-        <SiteFooter />
-      </div>
+      <AppShell clerkEnabled={clerkEnabled}>{children}</AppShell>
     </CurrencyProvider>
   )
 
@@ -75,6 +69,18 @@ export default async function RootLayout({
         figtreeHeading.variable
       )}
     >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+        />
+      </head>
       <body>
         {clerkEnabled ? <ClerkProvider>{appShell}</ClerkProvider> : appShell}
       </body>
