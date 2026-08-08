@@ -1,9 +1,23 @@
 import "server-only"
 
-import { and, asc, count, desc, eq, ilike } from "drizzle-orm"
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  notInArray,
+  or,
+  sql,
+  type SQLWrapper,
+} from "drizzle-orm"
 
-import { flightOrders, getDbClient } from "@/lib/db"
+import { flightCancellationRequests, flightOrders, getDbClient } from "@/lib/db"
 import { normalizeUnknownSelectedStrings } from "@/lib/shared/selection"
+import type { FlightCancellationStatus } from "@/modules/flights/cancellations/domain"
 import type {
   BookingListSort,
   BookingListStatusFilter,
@@ -78,6 +92,33 @@ interface ListFlightOrdersByUserInput {
 
 interface FlightOrderListResult {
   records: FlightOrderRecord[]
+  total: number
+}
+
+export type AdminBookingStatusFilter =
+  | "all"
+  | "confirmed"
+  | "payment_pending"
+  | "on_hold"
+  | "cancellation_in_progress"
+  | "cancelled"
+
+export interface ListAdminFlightOrdersInput {
+  limit: number
+  offset: number
+  q?: string
+  status: AdminBookingStatusFilter
+  sort: BookingListSort
+}
+
+export interface AdminFlightOrderListRecord {
+  order: FlightOrderRecord
+  cancellationStatus: FlightCancellationStatus | null
+  cancellationRequestId: string | null
+}
+
+export interface AdminFlightOrderListResult {
+  records: AdminFlightOrderListRecord[]
   total: number
 }
 
@@ -223,6 +264,105 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
   },
 }
 
+const cancellationInProgressStatuses: FlightCancellationStatus[] = [
+  "requested",
+  "quote_pending",
+  "quote_ready",
+  "admin_review_required",
+  "duffel_confirming",
+  "manual_processing",
+]
+
+const cancelledStatuses: FlightCancellationStatus[] = [
+  "duffel_cancelled",
+  "refund_pending",
+  "refund_completed",
+  "completed",
+]
+
+export async function listAdminFlightOrders(
+  input: ListAdminFlightOrdersInput
+): Promise<AdminFlightOrderListResult> {
+  const db = getDbClient()
+
+  if (!db) {
+    const records = Array.from(inMemoryOrders.values())
+      .map((order) => ({
+        order,
+        cancellationStatus: null,
+        cancellationRequestId: null,
+      }))
+      .filter((record) => matchesAdminStatusFilter(record, input.status))
+      .filter((record) => matchesAdminQuery(record.order, input.q))
+      .sort((left, right) =>
+        compareOrdersForSort(left.order, right.order, input.sort)
+      )
+
+    return {
+      records: records.slice(input.offset, input.offset + input.limit),
+      total: records.length,
+    }
+  }
+
+  // Keep the outer order relationship explicit. A scalar correlated subquery
+  // can emit an unqualified `id` here, which PostgreSQL binds to the inner
+  // cancellation table and silently returns no matching status.
+  const latestCancellation = db
+    .selectDistinctOn([flightCancellationRequests.flightOrderId], {
+      flightOrderId: flightCancellationRequests.flightOrderId,
+      status: flightCancellationRequests.status,
+      requestId: flightCancellationRequests.id,
+    })
+    .from(flightCancellationRequests)
+    .orderBy(
+      flightCancellationRequests.flightOrderId,
+      desc(flightCancellationRequests.createdAt)
+    )
+    .as("latest_flight_cancellation")
+  const statusCondition = toAdminStatusFilterCondition(
+    input.status,
+    latestCancellation.status
+  )
+  const queryCondition = toAdminQueryCondition(input.q)
+  const whereCondition = and(statusCondition, queryCondition)
+  const orderBy = toOrderBy(input.sort)
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select({
+        order: flightOrders,
+        cancellationStatus: latestCancellation.status,
+        cancellationRequestId: latestCancellation.requestId,
+      })
+      .from(flightOrders)
+      .leftJoin(
+        latestCancellation,
+        eq(latestCancellation.flightOrderId, flightOrders.id)
+      )
+      .where(whereCondition)
+      .orderBy(...orderBy)
+      .limit(input.limit)
+      .offset(input.offset),
+    db
+      .select({ count: count() })
+      .from(flightOrders)
+      .leftJoin(
+        latestCancellation,
+        eq(latestCancellation.flightOrderId, flightOrders.id)
+      )
+      .where(whereCondition),
+  ])
+
+  return {
+    records: rows.map((row) => ({
+      order: toOrderRecord(row.order),
+      cancellationStatus: row.cancellationStatus,
+      cancellationRequestId: row.cancellationRequestId,
+    })),
+    total: totalRows[0]?.count ?? 0,
+  }
+}
+
 function toOrderRecord(row: typeof flightOrders.$inferSelect): FlightOrderRecord {
   return {
     id: row.id,
@@ -265,6 +405,54 @@ function matchesQuery(order: FlightOrderRecord, query: string | undefined) {
   }
 
   return order.bookingReference.toLowerCase().includes(query.toLowerCase())
+}
+
+function matchesAdminQuery(order: FlightOrderRecord, query: string | undefined) {
+  if (!query) {
+    return true
+  }
+
+  const normalizedQuery = query.toLowerCase()
+  const snapshot = toOrderSnapshot(order.orderSnapshot)
+  const searchableValues = [
+    order.bookingReference,
+    order.contactEmail,
+    order.duffelOrderId,
+    order.checkoutSessionId,
+    typeof snapshot.routeLabel === "string" ? snapshot.routeLabel : "",
+    typeof snapshot.airlineBookingReference === "string"
+      ? snapshot.airlineBookingReference
+      : "",
+  ]
+
+  return searchableValues.some((value) =>
+    value.toLowerCase().includes(normalizedQuery)
+  )
+}
+
+function matchesAdminStatusFilter(
+  record: AdminFlightOrderListRecord,
+  status: AdminBookingStatusFilter
+) {
+  if (
+    record.cancellationStatus &&
+    cancelledStatuses.includes(record.cancellationStatus)
+  ) {
+    return status === "all" || status === "cancelled"
+  }
+
+  if (
+    record.cancellationStatus &&
+    cancellationInProgressStatuses.includes(record.cancellationStatus)
+  ) {
+    return status === "all" || status === "cancellation_in_progress"
+  }
+
+  if (status === "cancellation_in_progress" || status === "cancelled") {
+    return false
+  }
+
+  return status === "all" || matchesStatusFilter(record.order, status)
 }
 
 function matchesStatusFilter(
@@ -322,6 +510,49 @@ function toQueryCondition(query: string | undefined) {
   }
 
   return ilike(flightOrders.bookingReference, `%${query}%`)
+}
+
+function toAdminQueryCondition(query: string | undefined) {
+  if (!query) {
+    return undefined
+  }
+
+  const pattern = `%${query}%`
+  return or(
+    ilike(flightOrders.bookingReference, pattern),
+    ilike(flightOrders.contactEmail, pattern),
+    ilike(flightOrders.duffelOrderId, pattern),
+    ilike(flightOrders.checkoutSessionId, pattern),
+    sql`${flightOrders.orderSnapshot} ->> 'routeLabel' ilike ${pattern}`,
+    sql`${flightOrders.orderSnapshot} ->> 'airlineBookingReference' ilike ${pattern}`
+  )
+}
+
+function toAdminStatusFilterCondition(
+  status: AdminBookingStatusFilter,
+  latestCancellationStatus: SQLWrapper
+) {
+  if (status === "cancelled") {
+    return inArray(latestCancellationStatus, cancelledStatuses)
+  }
+
+  if (status === "cancellation_in_progress") {
+    return inArray(latestCancellationStatus, cancellationInProgressStatuses)
+  }
+
+  if (status === "all") {
+    return undefined
+  }
+
+  const noActiveCancellation = or(
+    isNull(latestCancellationStatus),
+    notInArray(latestCancellationStatus, [
+      ...cancelledStatuses,
+      ...cancellationInProgressStatuses,
+    ])
+  )
+
+  return and(noActiveCancellation, toStatusFilterCondition(status))
 }
 
 function toOrderBy(sort: BookingListSort) {

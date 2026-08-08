@@ -8,7 +8,7 @@ import type { AdminCancellationQueueItem } from "@/modules/flights/cancellations
 import { AdminSidebarProfile } from "@/modules/flights/cancellations/ui/admin-sidebar-profile"
 
 interface AdminPanelShellProps {
-  active: "dashboard" | "cancellations" | "settings"
+  active: "dashboard" | "bookings" | "cancellations" | "settings"
   title: string
   description: string
   adminEmail?: string | null
@@ -22,6 +22,12 @@ const navItems = [
     label: "Dashboard",
     value: "dashboard",
     icon: "space_dashboard",
+  },
+  {
+    href: "/admin/bookings",
+    label: "Bookings",
+    value: "bookings",
+    icon: "flight_takeoff",
   },
   {
     href: "/admin/cancellations",
@@ -118,6 +124,7 @@ export function AdminPanelShell({
                 <Button
                   size="sm"
                   variant="secondary"
+                  nativeButton={false}
                   className="mt-4 w-full bg-white text-[#13357b] hover:bg-white/90"
                   render={<Link href="/admin/settings" />}
                 >
@@ -147,6 +154,7 @@ export function AdminPanelShell({
             <Button
               size="lg"
               variant="outline"
+              nativeButton={false}
               className="hidden h-10 border-[#d7dce5] bg-white text-[#273142] md:inline-flex"
               render={<Link href="/" />}
             >
