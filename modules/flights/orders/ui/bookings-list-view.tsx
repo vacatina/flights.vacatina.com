@@ -19,8 +19,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ChevronRightIcon, PlaneTakeoffIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { FxEstimateDisclosure, Money } from "@/modules/currency/ui"
+import {
+  getCustomerBookingStatus,
+  type CustomerBookingStatusTone,
+} from "@/modules/flights/cancellations/ui/status-presentation"
 
 interface BookingsListViewProps {
   items: BookingListItem[]
@@ -95,7 +98,13 @@ export function BookingsListView(input: BookingsListViewProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {input.items.map((item) => (
+                {input.items.map((item) => {
+                  const bookingStatus = getCustomerBookingStatus({
+                    bookingStatusLabel: item.statusLabel,
+                    cancellationStatus: item.cancellationStatus,
+                  })
+
+                  return (
                   <TableRow key={item.bookingReference} className="hover:bg-muted/30">
                     <TableCell>
                       <div className="space-y-1">
@@ -137,9 +146,17 @@ export function BookingsListView(input: BookingsListViewProps) {
                       </p>
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("text-sm", getStatusBadgeClassName(item.statusCode))}>
-                        {item.statusLabel}
+                      <Badge
+                        variant={getStatusBadgeVariant(bookingStatus.tone)}
+                        className="text-sm"
+                      >
+                        {bookingStatus.label}
                       </Badge>
+                      {bookingStatus.description ? (
+                        <p className="mt-1 max-w-52 text-xs leading-snug text-muted-foreground">
+                          {bookingStatus.description}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <span className="text-base text-foreground">
@@ -166,17 +183,24 @@ export function BookingsListView(input: BookingsListViewProps) {
                         }
                       >
                         View
-                        <ChevronRightIcon className="ml-1 size-4" />
+                        <ChevronRightIcon data-icon="inline-end" />
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
               </TableBody>
             </Table>
           </div>
 
           <div className="space-y-3 lg:hidden">
-            {input.items.map((item) => (
+            {input.items.map((item) => {
+              const bookingStatus = getCustomerBookingStatus({
+                bookingStatusLabel: item.statusLabel,
+                cancellationStatus: item.cancellationStatus,
+              })
+
+              return (
               <Card key={item.bookingReference} className="rounded-2xl border-border/80 shadow-xs">
                 <CardContent className="space-y-3 pt-5">
                   <div className="flex items-start justify-between gap-3">
@@ -213,14 +237,23 @@ export function BookingsListView(input: BookingsListViewProps) {
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <Badge className={cn("text-sm", getStatusBadgeClassName(item.statusCode))}>
-                      {item.statusLabel}
+                    <Badge
+                      variant={getStatusBadgeVariant(bookingStatus.tone)}
+                      className="text-sm"
+                    >
+                      {bookingStatus.label}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {item.passengerCount} passenger{item.passengerCount === 1 ? "" : "s"} ·{" "}
                       {item.legCount} leg{item.legCount === 1 ? "" : "s"}
                     </span>
                   </div>
+
+                  {bookingStatus.description ? (
+                    <p className="text-sm leading-snug text-muted-foreground">
+                      {bookingStatus.description}
+                    </p>
+                  ) : null}
 
                   <p className="text-sm text-muted-foreground">
                     {item.paymentMode === "pay_now" ? "Pay now" : "Hold order"} · {item.createdAtLabel}
@@ -232,11 +265,12 @@ export function BookingsListView(input: BookingsListViewProps) {
                     render={<Link href={`/booking/${encodeURIComponent(item.bookingReference)}`} />}
                   >
                     View booking
-                    <ChevronRightIcon className="ml-1 size-4" />
+                    <ChevronRightIcon data-icon="inline-end" />
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+              )
+            })}
           </div>
           <FxEstimateDisclosure
             sourceCurrencies={input.items.map(
@@ -288,15 +322,16 @@ function buildBookingsHref(input: {
   return `/bookings?${searchParams.toString()}`
 }
 
-function getStatusBadgeClassName(statusCode: BookingListItem["statusCode"]) {
-  switch (statusCode) {
-    case "payment_pending":
-      return "border border-amber-200 bg-amber-100 text-amber-900"
-    case "on_hold":
-      return "border border-violet-200 bg-violet-100 text-violet-900"
-    case "confirmed":
+function getStatusBadgeVariant(tone: CustomerBookingStatusTone) {
+  switch (tone) {
+    case "cancelled":
+      return "destructive" as const
+    case "pending":
+    case "attention":
+      return "secondary" as const
+    case "active":
     default:
-      return "border border-emerald-200 bg-emerald-100 text-emerald-900"
+      return "default" as const
   }
 }
 

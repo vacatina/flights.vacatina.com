@@ -29,6 +29,10 @@ import {
   defaultNotificationOutboxRepository,
   type NotificationOutboxRepository,
 } from "@/modules/notifications/server/outbox-repository"
+import {
+  defaultCancellationRepository,
+  type CancellationRepository,
+} from "@/modules/flights/cancellations/server/repository"
 import { logDuffelError } from "@/modules/flights/results/server/error-map"
 import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 
@@ -39,6 +43,10 @@ interface OrdersServiceDeps {
   orderRepository: FlightOrderRepository
   checkoutSessionRepository: CheckoutSessionRepository
   notificationOutboxRepository: NotificationOutboxRepository
+  cancellationRepository?: Pick<
+    CancellationRepository,
+    "findLatestRequestByFlightOrderId"
+  >
   getDuffelOrderById: (duffelOrderId: string) => Promise<Order | null>
 }
 
@@ -46,6 +54,7 @@ const defaultDeps: OrdersServiceDeps = {
   orderRepository: defaultFlightOrderRepository,
   checkoutSessionRepository: defaultCheckoutSessionRepository,
   notificationOutboxRepository: defaultNotificationOutboxRepository,
+  cancellationRepository: defaultCancellationRepository,
   async getDuffelOrderById(duffelOrderId) {
     try {
       const { getDuffelClient } = await import("@/lib/duffel")
@@ -90,6 +99,13 @@ export async function listMyBookings(
     status: parsed.status,
     sort: parsed.sort,
   })
+  const cancellationRequests = deps.cancellationRepository
+    ? await Promise.all(
+        result.records.map((order) =>
+          deps.cancellationRepository?.findLatestRequestByFlightOrderId(order.id)
+        )
+      )
+    : result.records.map(() => null)
 
   return {
     page: parsed.page,
@@ -98,7 +114,11 @@ export async function listMyBookings(
     status: parsed.status,
     sort: parsed.sort,
     total: result.total,
-    items: result.records.map(mapFlightOrderToListItem),
+    items: result.records.map((order, index) =>
+      mapFlightOrderToListItem(order, {
+        cancellationStatus: cancellationRequests[index]?.status ?? null,
+      })
+    ),
   }
 }
 

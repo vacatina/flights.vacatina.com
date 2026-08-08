@@ -165,6 +165,7 @@ export interface BookingListItem {
   createdAtLabel: string
   paymentMode: "pay_now" | "hold"
   statusLabel: string
+  cancellationStatus: import("@/modules/flights/cancellations/domain").FlightCancellationStatus | null
   sellAmountLabel: string
   sellMoney: SerializedMoney
 }

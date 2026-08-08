@@ -153,7 +153,12 @@ export function buildFlightOrderSnapshot(
   }
 }
 
-export function mapFlightOrderToListItem(order: FlightOrderRecord): BookingListItem {
+export function mapFlightOrderToListItem(
+  order: FlightOrderRecord,
+  context?: {
+    cancellationStatus?: BookingListItem["cancellationStatus"]
+  }
+): BookingListItem {
   const snapshot = normalizeSnapshot(order.orderSnapshot)
   const firstLeg = snapshot.legs[0] ?? null
   const lastLeg = snapshot.legs[snapshot.legs.length - 1] ?? null
@@ -176,6 +181,7 @@ export function mapFlightOrderToListItem(order: FlightOrderRecord): BookingListI
     createdAtLabel: format(order.createdAt, "d MMM yyyy, HH:mm"),
     paymentMode: order.paymentMode,
     statusLabel: toStatusLabel(order),
+    cancellationStatus: context?.cancellationStatus ?? null,
     sellAmountLabel: formatCurrencyAmount(order.sellAmount, order.currency),
     sellMoney: serializeMoney(order.sellAmount, order.currency),
   }

@@ -10,6 +10,9 @@ test("listMyBookings applies q/status/sort filters and paginates", async () => {
     records: [createOrderRecord()],
     total: 1,
   })
+  const findLatestRequestByFlightOrderId = vi.fn().mockResolvedValue({
+    status: "completed",
+  })
 
   const result = await listMyBookings(
     {
@@ -47,6 +50,9 @@ test("listMyBookings applies q/status/sort filters and paginates", async () => {
         markSent: vi.fn(),
         markFailed: vi.fn(),
       },
+      cancellationRepository: {
+        findLatestRequestByFlightOrderId,
+      },
       getDuffelOrderById: vi.fn(),
     }
   )
@@ -65,6 +71,8 @@ test("listMyBookings applies q/status/sort filters and paginates", async () => {
   expect(result.sort).toBe("amount_high")
   expect(result.total).toBe(1)
   expect(result.items[0]?.bookingReference).toBe("BK-F60F36ABAD")
+  expect(findLatestRequestByFlightOrderId).toHaveBeenCalledWith("fdo_1")
+  expect(result.items[0]?.cancellationStatus).toBe("completed")
 })
 
 test("listMyBookings rejects guest actor", async () => {

@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import {
   BaggageClaimIcon,
   BriefcaseIcon,
+  CheckCircle2Icon,
   ChevronDownIcon,
   CopyIcon,
   FileDownIcon,
@@ -21,6 +22,10 @@ import type {
   FlightOrderSnapshotTimelineEvent,
 } from "@/modules/flights/orders/domain"
 import { CancellationStatusPanel } from "@/modules/flights/cancellations/ui"
+import {
+  getCustomerBookingStatus,
+  type CustomerBookingStatusTone,
+} from "@/modules/flights/cancellations/ui/status-presentation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -69,6 +74,10 @@ export function BookingDetailView({
   const bookedServices = detail.snapshot.bookedServices
   const availableActions = detail.snapshot.availableActions
   const metadataEntries = detail.snapshot.metadataEntries
+  const bookingStatus = getCustomerBookingStatus({
+    bookingStatusLabel: detail.statusLabel,
+    cancellationStatus: cancellationStatus?.status,
+  })
   const notifications =
     detail.notifications.length > 0
       ? detail.notifications
@@ -87,17 +96,29 @@ export function BookingDetailView({
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-9">
       <section className="space-y-10">
         <header className="flex flex-wrap items-start justify-between gap-5">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-              {detail.bookingReference}
-            </h1>
-            <button
-              type="button"
-              className="text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Copy booking reference"
-            >
-              <CopyIcon className="size-6" />
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                {detail.bookingReference}
+              </h1>
+              <button
+                type="button"
+                className="text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Copy booking reference"
+              >
+                <CopyIcon className="size-6" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={getBookingStatusBadgeVariant(bookingStatus.tone)}>
+                {bookingStatus.label}
+              </Badge>
+              {bookingStatus.description ? (
+                <p className="text-sm text-muted-foreground">
+                  {bookingStatus.description}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -106,7 +127,7 @@ export function BookingDetailView({
               variant="outline"
               className="h-11 px-5 text-base"
             >
-              <TicketIcon className="mr-2 size-4" />
+              <TicketIcon data-icon="inline-start" />
               Ticket numbers
               {ticketDocuments.length > 0 ? ` (${ticketDocuments.length})` : ""}
             </Button>
@@ -115,17 +136,32 @@ export function BookingDetailView({
               variant="outline"
               className="h-11 px-5 text-base"
             >
-              <FileDownIcon className="mr-2 size-4" />
+              <FileDownIcon data-icon="inline-start" />
               Export itinerary
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="h-11 px-5 text-base"
-            >
-              Manage this order
-              <ChevronDownIcon className="ml-2 size-4" />
-            </Button>
+            {bookingStatus.tone === "cancelled" ? (
+              <Button
+                variant="secondary"
+                className="h-11 px-5 text-base"
+                render={
+                  <Link
+                    href={`/booking/${encodeURIComponent(detail.bookingReference)}/cancel`}
+                  />
+                }
+              >
+                <CheckCircle2Icon data-icon="inline-start" />
+                Cancellation details
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-11 px-5 text-base"
+              >
+                Manage this order
+                <ChevronDownIcon data-icon="inline-end" />
+              </Button>
+            )}
           </div>
         </header>
 
@@ -486,8 +522,8 @@ export function BookingDetailView({
         </section>
       </section>
 
-      <aside className="border-l border-border pl-8">
-        <div className="sticky top-8 space-y-6">
+      <aside className="border-t border-border pt-8 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-8">
+        <div className="space-y-6 xl:sticky xl:top-8">
           <div className="space-y-1">
             <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
               Summary
@@ -512,18 +548,18 @@ export function BookingDetailView({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Status</p>
+              <p className="text-sm text-muted-foreground">Booking status</p>
               <Badge
-                variant="outline"
-                className={cn(
-                  "rounded-full px-3 py-1 text-sm",
-                  detail.statusLabel.toLowerCase().includes("confirm")
-                    ? "border-primary/20 bg-primary/10 text-primary"
-                    : "border-border bg-muted text-foreground"
-                )}
+                variant={getBookingStatusBadgeVariant(bookingStatus.tone)}
+                className="h-auto max-w-full whitespace-normal px-3 py-1 text-left text-sm"
               >
-                {detail.statusLabel}
+                {bookingStatus.label}
               </Badge>
+              {bookingStatus.description ? (
+                <p className="text-xs leading-snug text-muted-foreground">
+                  {bookingStatus.description}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-1">
@@ -547,7 +583,7 @@ export function BookingDetailView({
 
           <div className="space-y-1">
             <p className="text-xs tracking-wide text-muted-foreground uppercase">
-              Fare conditions
+              {cancellationStatus ? "Original fare conditions" : "Fare conditions"}
             </p>
             <p className="text-base text-muted-foreground">
               {detail.snapshot.conditions.changesMoney ? (
@@ -962,4 +998,17 @@ function toActionLabel(value: string) {
     .split("_")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ")
+}
+
+function getBookingStatusBadgeVariant(tone: CustomerBookingStatusTone) {
+  switch (tone) {
+    case "cancelled":
+      return "destructive" as const
+    case "pending":
+    case "attention":
+      return "secondary" as const
+    case "active":
+    default:
+      return "default" as const
+  }
 }
