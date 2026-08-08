@@ -1,4 +1,7 @@
 export * from "@/modules/flights/orders/ui/booking-detail-view"
+export * from "@/modules/flights/orders/ui/admin-bookings-table"
+export * from "@/modules/flights/orders/ui/admin-booking-detail"
+export * from "@/modules/flights/orders/ui/admin-cancel-booking-dialog"
 export * from "@/modules/flights/orders/ui/bookings-filters-bar"
 export * from "@/modules/flights/orders/ui/bookings-list-view"
 export * from "@/modules/flights/orders/ui/guest-booking-lookup-form"

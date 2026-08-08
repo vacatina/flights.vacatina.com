@@ -13,6 +13,7 @@ import {
 import {
   approveCancellation,
   approveRefund,
+  createAdminCancellationRequest,
   createOrRefreshDuffelCancellationQuote,
   createCancellationRequest,
   getCancellationEligibilityContext,
@@ -49,7 +50,10 @@ export async function getCancellationEligibilityAction(
     return actionSuccess(context)
   } catch (error) {
     logFlightFlowError("cancellations.actions", "eligibility_failed", error)
-    return actionFailure("UPSTREAM_ERROR", "Unable to load cancellation details.")
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Unable to load cancellation details."
+    )
   }
 }
 
@@ -71,7 +75,10 @@ export async function getCancellationStatusForBookingAction(
     return actionSuccess(status)
   } catch (error) {
     logFlightFlowError("cancellations.actions", "status_failed", error)
-    return actionFailure("UPSTREAM_ERROR", "Unable to load cancellation status.")
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Unable to load cancellation status."
+    )
   }
 }
 
@@ -101,8 +108,48 @@ export async function createCancellationRequestFormAction(formData: FormData) {
     )
   }
 
-  revalidatePath(`/booking/${encodeURIComponent(String(bookingReference ?? ""))}`)
-  redirect(`/booking/${encodeURIComponent(String(bookingReference ?? ""))}/cancel?submitted=1`)
+  revalidatePath(
+    `/booking/${encodeURIComponent(String(bookingReference ?? ""))}`
+  )
+  redirect(
+    `/booking/${encodeURIComponent(String(bookingReference ?? ""))}/cancel?submitted=1`
+  )
+}
+
+export async function createAdminCancellationRequestFormAction(
+  formData: FormData
+) {
+  const admin = await requireActiveAdmin()
+  const bookingReference = requireFormString(formData, "bookingReference")
+  const reason = requireFormString(formData, "reason")
+  let request: Awaited<ReturnType<typeof createAdminCancellationRequest>>
+
+  try {
+    request = await createAdminCancellationRequest({
+      bookingReference,
+      reason,
+      admin,
+    })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      redirect(
+        `/admin/bookings/${encodeURIComponent(bookingReference)}?cancelError=${encodeURIComponent(error.issues[0]?.message ?? "Invalid cancellation details.")}`
+      )
+    }
+
+    logFlightFlowError("cancellations.actions", "admin_create_failed", error, {
+      bookingReference,
+      adminId: admin.appUserId,
+    })
+    redirect(
+      `/admin/bookings/${encodeURIComponent(bookingReference)}?cancelError=${encodeURIComponent(toSafeUserErrorMessage(error instanceof Error ? error.message : null, "Unable to start cancellation."))}`
+    )
+  }
+
+  revalidatePath("/admin/bookings")
+  revalidatePath(`/admin/bookings/${encodeURIComponent(bookingReference)}`)
+  revalidatePath("/admin/cancellations")
+  redirect(`/admin/cancellations/${request.id}`)
 }
 
 export async function approveCancellationFormAction(formData: FormData) {
@@ -112,7 +159,9 @@ export async function approveCancellationFormAction(formData: FormData) {
   revalidateAdminCancellation(requestId)
 }
 
-export async function createDuffelCancellationQuoteFormAction(formData: FormData) {
+export async function createDuffelCancellationQuoteFormAction(
+  formData: FormData
+) {
   const admin = await requireActiveAdmin()
   const requestId = requireFormString(formData, "requestId")
   await createOrRefreshDuffelCancellationQuote({ requestId, admin })
@@ -152,7 +201,9 @@ export async function markManualRefundCompletedFormAction(formData: FormData) {
   revalidateAdminCancellation(requestId)
 }
 
-export async function updateCancellationFeeRefundFormAction(formData: FormData) {
+export async function updateCancellationFeeRefundFormAction(
+  formData: FormData
+) {
   const admin = await requireActiveAdmin()
   const requestId = requireFormString(formData, "requestId")
   await updateCancellationFeeAndRefund({
@@ -160,8 +211,13 @@ export async function updateCancellationFeeRefundFormAction(formData: FormData) 
     admin,
     feeType: parseFeeType(requireFormString(formData, "feeType")),
     feeValue: Number(requireFormString(formData, "feeValue")),
-    airlineRefundAmount: Number(requireFormString(formData, "airlineRefundAmount")),
-    customerRefundCurrency: requireFormString(formData, "customerRefundCurrency"),
+    airlineRefundAmount: Number(
+      requireFormString(formData, "airlineRefundAmount")
+    ),
+    customerRefundCurrency: requireFormString(
+      formData,
+      "customerRefundCurrency"
+    ),
   })
   revalidateAdminCancellation(requestId)
 }
