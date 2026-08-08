@@ -165,7 +165,9 @@ export interface CancellationServiceDeps {
     idempotencyKey: string
     noteToPayer?: string | null
   }) => Promise<{ id: string; status?: string; amount?: unknown }>
-  refreshPaymentCapture: (input: { paymentAttemptId: string }) => Promise<unknown>
+  refreshPaymentCapture: (input: {
+    paymentAttemptId: string
+  }) => Promise<unknown>
   enqueueNotification: typeof enqueueNotification
   listAdminAlertRecipients: () => Promise<AdminAlertRecipient[]>
 }
@@ -331,6 +333,108 @@ export async function createCancellationRequest(
         status === "manual_processing"
           ? "cancellation_manual_review"
           : "cancellation_request_received",
+      adminAlert: true,
+    },
+    deps
+  )
+
+  return toCancellationStatusSummary(request)
+}
+
+export async function createAdminCancellationRequest(
+  input: {
+    bookingReference: string
+    reason: string
+    admin: AdminActor
+  },
+  deps: CancellationServiceDeps = defaultDeps
+) {
+  const booking = await deps.orderRepository.findByBookingReference(
+    input.bookingReference.trim().toUpperCase()
+  )
+
+  if (!booking) {
+    throw new Error("Booking not found.")
+  }
+
+  const existing =
+    await deps.cancellationRepository.findLatestRequestByFlightOrderId(
+      booking.id
+    )
+
+  if (existing?.status === "completed") {
+    throw new Error("This booking has already been cancelled.")
+  }
+
+  if (
+    existing &&
+    existing.status !== "rejected" &&
+    existing.status !== "failed"
+  ) {
+    throw new Error("A cancellation case is already open for this booking.")
+  }
+
+  const snapshot = normalizeSnapshot(booking.orderSnapshot)
+  const duffelApiAvailable = snapshot.availableActions.includes("cancel")
+  const manualSupportCase =
+    isDeparted(snapshot, deps.now()) || !duffelApiAvailable
+  const estimatedFeeAmount = calculateDefaultCancellationFee({
+    baseAmount: booking.sellAmount,
+    currency: booking.currency,
+    config: deps.config,
+  })
+  const estimatedRefundAmount = capCustomerRefundAmount({
+    airlineRefundAmount: booking.sellAmount,
+    feeAmount: estimatedFeeAmount,
+    capturedPaymentAmount: resolveCapturedPaymentAmount(booking, null),
+    currency: booking.currency,
+  })
+  const parsed = parseCreateFlightCancellationRequestInput({
+    flightOrderId: booking.id,
+    bookingReference: booking.bookingReference,
+    duffelOrderId: booking.duffelOrderId,
+    requestedByUserId: input.admin.appUserId,
+    requestedByGuestId: null,
+    customerReason: input.reason,
+    duffelApiAvailable,
+  })
+  const status: FlightCancellationStatus = manualSupportCase
+    ? "manual_processing"
+    : "requested"
+  const request = await deps.cancellationRepository.createRequest({
+    ...parsed,
+    requestedByUserId: input.admin.appUserId,
+    requestedByGuestId: null,
+    duffelApiAvailable,
+    adminFeeType: deps.config.defaultFeeType,
+    adminFeeValue: deps.config.defaultFeeValue,
+    adminFeeAmount: estimatedFeeAmount,
+    customerRefundAmount: estimatedRefundAmount,
+    customerRefundCurrency: booking.currency,
+    customerMessage: manualSupportCase
+      ? "An administrator started your cancellation. It is with support for manual review."
+      : "An administrator started your cancellation. It is awaiting review.",
+    status,
+  })
+
+  await deps.cancellationRepository.addEvent({
+    cancellationRequestId: request.id,
+    actorType: "admin",
+    actorId: input.admin.appUserId,
+    eventType: "request_created",
+    message: "Admin started a full-booking cancellation case.",
+    metadata: {
+      scope: "full_booking",
+      initiatedBy: "admin",
+      duffelApiAvailable,
+    },
+  })
+  await enqueueCancellationNotifications(
+    {
+      requestId: request.id,
+      eventType: manualSupportCase
+        ? "cancellation_manual_review"
+        : "cancellation_request_received",
       adminAlert: true,
     },
     deps

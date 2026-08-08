@@ -10,6 +10,7 @@ import {
 import {
   approveCancellation,
   approveRefund,
+  createAdminCancellationRequest,
   createOrRefreshDuffelCancellationQuote,
   createCancellationRequest,
   getAdminCancellationDetail,
@@ -71,6 +72,55 @@ describe("flight cancellation service", () => {
     const queue = await listAdminCancellationRequests()
     expect(queue).toHaveLength(1)
     expect(queue[0]?.bookingReference).toBe("VAC123")
+  })
+
+  test("allows an admin to start a tracked cancellation case", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    const request = await createAdminCancellationRequest(
+      {
+        admin,
+        bookingReference: "VAC123",
+        reason:
+          "Customer contacted support and asked us to cancel the booking.",
+      },
+      deps
+    )
+
+    expect(request.status).toBe("requested")
+    const detail = await deps.cancellationRepository.getDetail(request.id)
+    expect(detail?.request.requestedByUserId).toBe(admin.appUserId)
+    expect(detail?.events).toContainEqual(
+      expect.objectContaining({
+        actorType: "admin",
+        actorId: admin.appUserId,
+        eventType: "request_created",
+      })
+    )
+  })
+
+  test("prevents an admin from opening a duplicate cancellation case", async () => {
+    const deps = createDeps(new Date("2026-07-31T10:00:00.000Z"))
+    await createAdminCancellationRequest(
+      {
+        admin,
+        bookingReference: "VAC123",
+        reason:
+          "Customer contacted support and asked us to cancel the booking.",
+      },
+      deps
+    )
+
+    await expect(
+      createAdminCancellationRequest(
+        {
+          admin,
+          bookingReference: "VAC123",
+          reason:
+            "A second admin should not create another open cancellation case.",
+        },
+        deps
+      )
+    ).rejects.toThrow("already open")
   })
 
   test("prevents duplicate active cancellation requests", async () => {

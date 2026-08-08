@@ -10,13 +10,18 @@ import { AdminBookingDetail } from "@/modules/flights/orders/ui"
 
 interface AdminBookingDetailPageProps {
   params: Promise<{ bookingReference: string }>
+  searchParams: Promise<{ cancelError?: string }>
 }
 
 export default async function AdminBookingDetailPage({
   params,
+  searchParams,
 }: AdminBookingDetailPageProps) {
   const admin = await requireActiveAdmin()
-  const { bookingReference } = await params
+  const [{ bookingReference }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ])
   const [detail, queueItems] = await Promise.all([
     getAdminBookingDetail(bookingReference),
     listAdminCancellationRequests(),
@@ -34,7 +39,10 @@ export default async function AdminBookingDetailPage({
       adminEmail={admin.email}
       queueItems={queueItems}
     >
-      <AdminBookingDetail detail={detail} />
+      <AdminBookingDetail
+        detail={detail}
+        cancellationError={resolvedSearchParams.cancelError}
+      />
     </AdminPanelShell>
   )
 }

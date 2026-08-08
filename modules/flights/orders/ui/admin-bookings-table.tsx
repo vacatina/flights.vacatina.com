@@ -18,7 +18,6 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
 import {
@@ -73,8 +72,11 @@ const sortOptions = [
 ] as const
 
 export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
-  const hasFilters = Boolean(result.q || result.status !== "all" || result.sort !== "newest")
-  const firstResult = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1
+  const hasFilters = Boolean(
+    result.q || result.status !== "all" || result.sort !== "newest"
+  )
+  const firstResult =
+    result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1
   const lastResult = Math.min(result.page * result.pageSize, result.total)
 
   return (
@@ -83,11 +85,16 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
         <CardHeader className="border-b">
           <CardTitle>Find a booking</CardTitle>
           <CardDescription>
-            Search by booking reference, email, airline PNR, Duffel order, checkout ID, or route.
+            Search by booking reference, email, airline PNR, Duffel order,
+            checkout ID, or route.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action="/admin/bookings" method="get" className="flex flex-col gap-3 xl:flex-row">
+          <form
+            action="/admin/bookings"
+            method="get"
+            className="flex flex-col gap-3 xl:flex-row"
+          >
             <InputGroup className="h-10 flex-1 bg-background">
               <InputGroupAddon>
                 <SearchIcon />
@@ -98,15 +105,17 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
                 placeholder="Search BK-…, customer@email.com, PNR, Duffel ID, or CMB → DXB"
                 aria-label="Search all bookings"
               />
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton type="submit" variant="default" size="sm">
-                  Search
-                </InputGroupButton>
-              </InputGroupAddon>
             </InputGroup>
 
-            <Select name="status" defaultValue={result.status} items={statusOptions}>
-              <SelectTrigger className="h-10 w-full bg-background xl:w-56" aria-label="Filter by booking status">
+            <Select
+              name="status"
+              defaultValue={result.status}
+              items={statusOptions}
+            >
+              <SelectTrigger
+                className="h-10 w-full bg-background xl:w-56"
+                aria-label="Filter by booking status"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
@@ -121,7 +130,10 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
             </Select>
 
             <Select name="sort" defaultValue={result.sort} items={sortOptions}>
-              <SelectTrigger className="h-10 w-full bg-background xl:w-48" aria-label="Sort bookings">
+              <SelectTrigger
+                className="h-10 w-full bg-background xl:w-48"
+                aria-label="Sort bookings"
+              >
                 <ArrowDownAZIcon />
                 <SelectValue />
               </SelectTrigger>
@@ -136,11 +148,17 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
               </SelectContent>
             </Select>
 
-            <Button type="submit" className="h-10 xl:px-6">
-              Apply
+            <Button type="submit" className="h-10 shrink-0 xl:px-6">
+              <SearchIcon data-icon="inline-start" />
+              Search bookings
             </Button>
             {hasFilters ? (
-              <Button variant="ghost" className="h-10" nativeButton={false} render={<Link href="/admin/bookings" />}>
+              <Button
+                variant="ghost"
+                className="h-10"
+                nativeButton={false}
+                render={<Link href="/admin/bookings" />}
+              >
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset
               </Button>
@@ -170,7 +188,9 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
                   <TableHead>Status</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="pr-6 text-right"><span className="sr-only">Actions</span></TableHead>
+                  <TableHead className="pr-6 text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -181,7 +201,9 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  result.items.map((item) => <BookingRow key={item.bookingReference} item={item} />)
+                  result.items.map((item) => (
+                    <BookingRow key={item.bookingReference} item={item} />
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -189,9 +211,13 @@ export function AdminBookingsTable({ result }: AdminBookingsTableProps) {
 
           <div className="flex flex-col divide-y md:hidden">
             {result.items.length === 0 ? (
-              <div className="px-5 py-12"><EmptyBookings hasFilters={hasFilters} /></div>
+              <div className="px-5 py-12">
+                <EmptyBookings hasFilters={hasFilters} />
+              </div>
             ) : (
-              result.items.map((item) => <BookingCard key={item.bookingReference} item={item} />)
+              result.items.map((item) => (
+                <BookingCard key={item.bookingReference} item={item} />
+              ))
             )}
           </div>
         </CardContent>
@@ -213,14 +239,22 @@ function BookingRow({ item }: { item: AdminBookingListItem }) {
   return (
     <TableRow className="group">
       <TableCell className="pl-6">
-        <Link href={`/admin/bookings/${item.bookingReference}`} className="font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline">
+        <Link
+          href={`/admin/bookings/${item.bookingReference}`}
+          className="font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline"
+        >
           {item.bookingReference}
         </Link>
-        <p className="mt-1 text-xs text-muted-foreground">PNR {item.airlineBookingReference ?? "Pending"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          PNR {item.airlineBookingReference ?? "Pending"}
+        </p>
       </TableCell>
       <TableCell className="max-w-56">
         <p className="truncate font-medium">{item.customerEmail}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{item.passengerCount} {item.passengerCount === 1 ? "traveler" : "travelers"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {item.passengerCount}{" "}
+          {item.passengerCount === 1 ? "traveler" : "travelers"}
+        </p>
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-3">
@@ -229,22 +263,40 @@ function BookingRow({ item }: { item: AdminBookingListItem }) {
           </span>
           <div className="min-w-0">
             <p className="max-w-48 truncate font-semibold">{item.routeLabel}</p>
-            <p className="mt-1 max-w-48 truncate text-xs text-muted-foreground">{item.airlineName} · {item.journeyTypeLabel}</p>
+            <p className="mt-1 max-w-48 truncate text-xs text-muted-foreground">
+              {item.airlineName} · {item.journeyTypeLabel}
+            </p>
           </div>
         </div>
       </TableCell>
       <TableCell>
-        <p className="font-medium">{item.departureDateLabel ?? "Not available"}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Booked {item.createdAtLabel}</p>
+        <p className="font-medium">
+          {item.departureDateLabel ?? "Not available"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Booked {item.createdAtLabel}
+        </p>
       </TableCell>
-      <TableCell><BookingStatusBadge item={item} /></TableCell>
+      <TableCell>
+        <BookingStatusBadge item={item} />
+      </TableCell>
       <TableCell>
         <p className="font-medium">{item.paymentLabel}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{item.paymentMode === "hold" ? "Hold order" : "Pay now"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {item.paymentMode === "hold" ? "Hold order" : "Pay now"}
+        </p>
       </TableCell>
-      <TableCell className="text-right font-semibold tabular-nums">{item.sellAmountLabel}</TableCell>
+      <TableCell className="text-right font-semibold tabular-nums">
+        {item.sellAmountLabel}
+      </TableCell>
       <TableCell className="pr-6 text-right">
-        <Button variant="ghost" size="icon" nativeButton={false} aria-label={`Inspect ${item.bookingReference}`} render={<Link href={`/admin/bookings/${item.bookingReference}`} />}>
+        <Button
+          variant="ghost"
+          size="icon"
+          nativeButton={false}
+          aria-label={`Inspect ${item.bookingReference}`}
+          render={<Link href={`/admin/bookings/${item.bookingReference}`} />}
+        >
           <ChevronRightIcon />
         </Button>
       </TableCell>
@@ -257,20 +309,33 @@ function BookingCard({ item }: { item: AdminBookingListItem }) {
     <article className="flex flex-col gap-4 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link href={`/admin/bookings/${item.bookingReference}`} className="font-semibold text-primary">
+          <Link
+            href={`/admin/bookings/${item.bookingReference}`}
+            className="font-semibold text-primary"
+          >
             {item.bookingReference}
           </Link>
-          <p className="mt-1 truncate text-sm text-muted-foreground">{item.customerEmail}</p>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
+            {item.customerEmail}
+          </p>
         </div>
         <BookingStatusBadge item={item} />
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <MobileDatum label="Journey" value={item.routeLabel} />
-        <MobileDatum label="Departure" value={item.departureDateLabel ?? "Not available"} />
+        <MobileDatum
+          label="Departure"
+          value={item.departureDateLabel ?? "Not available"}
+        />
         <MobileDatum label="Payment" value={item.paymentLabel} />
         <MobileDatum label="Total" value={item.sellAmountLabel} />
       </div>
-      <Button variant="outline" className="w-full" nativeButton={false} render={<Link href={`/admin/bookings/${item.bookingReference}`} />}>
+      <Button
+        variant="outline"
+        className="w-full"
+        nativeButton={false}
+        render={<Link href={`/admin/bookings/${item.bookingReference}`} />}
+      >
         Inspect booking
         <ChevronRightIcon data-icon="inline-end" />
       </Button>
@@ -281,8 +346,17 @@ function BookingCard({ item }: { item: AdminBookingListItem }) {
 function BookingStatusBadge({ item }: { item: AdminBookingListItem }) {
   return (
     <Badge
-      variant={item.statusTone === "cancelled" ? "destructive" : item.statusTone === "active" ? "default" : "secondary"}
-      className={cn("max-w-44 whitespace-normal", item.statusTone === "attention" && "ring-1 ring-border")}
+      variant={
+        item.statusTone === "cancelled"
+          ? "destructive"
+          : item.statusTone === "active"
+            ? "default"
+            : "secondary"
+      }
+      className={cn(
+        "whitespace-nowrap",
+        item.statusTone === "attention" && "ring-1 ring-border"
+      )}
     >
       {item.statusLabel}
     </Badge>
@@ -290,35 +364,73 @@ function BookingStatusBadge({ item }: { item: AdminBookingListItem }) {
 }
 
 function MobileDatum({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-medium">{value}</p></div>
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium">{value}</p>
+    </div>
+  )
 }
 
 function EmptyBookings({ hasFilters }: { hasFilters: boolean }) {
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
-      <span className="flex size-10 items-center justify-center rounded-full bg-muted"><SearchIcon className="size-4 text-muted-foreground" /></span>
-      <p className="font-semibold">{hasFilters ? "No matching bookings" : "No bookings yet"}</p>
-      <p className="text-sm text-muted-foreground">{hasFilters ? "Try a broader search or reset the current filters." : "Bookings will appear here after an order is created."}</p>
+      <span className="flex size-10 items-center justify-center rounded-full bg-muted">
+        <SearchIcon className="size-4 text-muted-foreground" />
+      </span>
+      <p className="font-semibold">
+        {hasFilters ? "No matching bookings" : "No bookings yet"}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        {hasFilters
+          ? "Try a broader search or reset the current filters."
+          : "Bookings will appear here after an order is created."}
+      </p>
     </div>
   )
 }
 
-function BookingPagination({ result }: { result: Awaited<ReturnType<typeof listAdminBookings>> }) {
+function BookingPagination({
+  result,
+}: {
+  result: Awaited<ReturnType<typeof listAdminBookings>>
+}) {
   const pages = visiblePages(result.page, result.pageCount)
 
   return (
     <Pagination className="mx-0 w-auto justify-end">
       <PaginationContent>
         <PaginationItem>
-          <PaginationPrevious href={bookingHref(result, Math.max(1, result.page - 1))} aria-disabled={result.page === 1} className={cn(result.page === 1 && "pointer-events-none opacity-50")} />
+          <PaginationPrevious
+            href={bookingHref(result, Math.max(1, result.page - 1))}
+            aria-disabled={result.page === 1}
+            className={cn(
+              result.page === 1 && "pointer-events-none opacity-50"
+            )}
+          />
         </PaginationItem>
         {pages.map((page) => (
           <PaginationItem key={page}>
-            <PaginationLink href={bookingHref(result, page)} isActive={page === result.page}>{page}</PaginationLink>
+            <PaginationLink
+              href={bookingHref(result, page)}
+              isActive={page === result.page}
+            >
+              {page}
+            </PaginationLink>
           </PaginationItem>
         ))}
         <PaginationItem>
-          <PaginationNext href={bookingHref(result, Math.min(result.pageCount, result.page + 1))} aria-disabled={result.page === result.pageCount} className={cn(result.page === result.pageCount && "pointer-events-none opacity-50")} />
+          <PaginationNext
+            href={bookingHref(
+              result,
+              Math.min(result.pageCount, result.page + 1)
+            )}
+            aria-disabled={result.page === result.pageCount}
+            className={cn(
+              result.page === result.pageCount &&
+                "pointer-events-none opacity-50"
+            )}
+          />
         </PaginationItem>
       </PaginationContent>
     </Pagination>
