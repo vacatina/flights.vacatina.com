@@ -1,4 +1,6 @@
 export * from "@/modules/payments/server/actions"
+export * from "@/modules/payments/server/admin-repository"
+export * from "@/modules/payments/server/admin-service"
 export * from "@/modules/payments/server/adapters"
 export * from "@/modules/payments/server/attempts-repository"
 export * from "@/modules/payments/server/events-repository"

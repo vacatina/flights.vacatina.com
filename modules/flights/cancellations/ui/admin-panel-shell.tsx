@@ -8,7 +8,7 @@ import type { AdminCancellationQueueItem } from "@/modules/flights/cancellations
 import { AdminSidebarProfile } from "@/modules/flights/cancellations/ui/admin-sidebar-profile"
 
 interface AdminPanelShellProps {
-  active: "dashboard" | "bookings" | "cancellations" | "settings"
+  active: "dashboard" | "bookings" | "payments" | "cancellations" | "settings"
   title: string
   description: string
   adminEmail?: string | null
@@ -34,6 +34,12 @@ const navItems = [
     label: "Cancellations",
     value: "cancellations",
     icon: "confirmation_number",
+  },
+  {
+    href: "/admin/payments",
+    label: "Payments & Refunds",
+    value: "payments",
+    icon: "payments",
   },
   {
     href: "/admin/settings",
