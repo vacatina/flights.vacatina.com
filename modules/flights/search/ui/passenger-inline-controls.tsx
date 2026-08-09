@@ -97,15 +97,15 @@ export function PassengerInlineControls({
         />
 
         <div className="flex flex-col gap-2 relative">
-          <Popover 
-            open={isAgesPopoverOpen} 
+          <Popover
+            open={isAgesPopoverOpen}
             onOpenChange={(open) => {
               if (open && value.children === 0) return
               setIsAgesPopoverOpen(open)
             }}
           >
-            <PopoverTrigger asChild>
-              <div 
+            <PopoverTrigger render={<div />} nativeButton={false}>
+              <div
                 className="cursor-pointer"
                 onClick={() => {
                   if (value.children > 0) setIsAgesPopoverOpen(true)

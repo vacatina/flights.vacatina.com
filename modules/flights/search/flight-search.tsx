@@ -9,6 +9,7 @@ export function FlightSearch({ initialValues }: FlightSearchProps) {
   return (
     <main className="bg-muted">
       <section className="relative isolate -mt-[90px] flex h-fit min-h-[100dvh] md:h-[100dvh] md:min-h-[700px] flex-col overflow-hidden pb-10 pt-[90px]">
+       <div className="absolute inset-0 bg-gradient-to-b from-[#5f83a8] via-[#e8a878] via-55% to-[#1a2a3d]" />
         <div className="absolute inset-0 bg-[url('/img/hero.jpg')] bg-cover bg-center bg-no-repeat" />
         <div className="absolute inset-0 bg-[#05103680]" />
 

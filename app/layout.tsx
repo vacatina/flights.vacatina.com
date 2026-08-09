@@ -20,9 +20,10 @@ import { CurrencyProvider } from "@/modules/currency/ui"
 const figtreeHeading = Figtree({
   subsets: ["latin"],
   variable: "--font-heading",
+  adjustFontFallback: false,
 })
 
-const inter = Figtree({ subsets: ["latin"], variable: "--font-sans" })
+const inter = Figtree({ subsets: ["latin"], variable: "--font-sans", adjustFontFallback: false })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
