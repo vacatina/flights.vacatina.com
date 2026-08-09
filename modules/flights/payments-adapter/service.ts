@@ -1,5 +1,7 @@
 import "server-only"
 
+export * from "@/modules/flights/payments-adapter/change-payment-service"
+
 import "@/modules/flights/payments-adapter/register"
 import type {
   CheckoutPaymentStartResult,

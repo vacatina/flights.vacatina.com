@@ -16,6 +16,8 @@ import type { AdminActor } from "@/modules/flights/cancellations/server/admin-gu
 import { listActiveAdminAlertRecipients } from "@/modules/flights/cancellations/server/admin-notifications"
 import type { NotificationEventType } from "@/modules/notifications/domain"
 import type { FlightChangeHandlingMode, FlightChangeRequestType } from "@/modules/flights/changes/domain"
+import type { PaymentProvider } from "@/modules/payments/domain"
+import type { PayableResourceFulfillmentResult } from "@/modules/payments/server/adapters"
 
 export interface ChangeServiceDeps { orderRepository:FlightOrderRepository; cancellationRepository:Pick<CancellationRepository,"findActiveRequestByFlightOrderId"|"getBusinessSettings">; changeRepository:ChangeRepository; duffel:DuffelChangeAdapter; notifications:Pick<NotificationOutboxRepository,"create">; listAdminRecipients?:typeof listActiveAdminAlertRecipients; now:()=>Date }
 const depsDefault:ChangeServiceDeps={orderRepository:defaultFlightOrderRepository,cancellationRepository:defaultCancellationRepository,changeRepository:defaultChangeRepository,duffel:defaultDuffelChangeAdapter,notifications:defaultNotificationOutboxRepository,listAdminRecipients:listActiveAdminAlertRecipients,now:()=>new Date()}
@@ -31,6 +33,73 @@ export async function selectChangeOffer(input:{requestId:string;offerId:string;a
 
 export async function confirmZeroPriceChange(input:{requestId:string;actor:ActorContext},deps=depsDefault){const detail=await requireAccessibleChange(input.requestId,input.actor,deps);const pending=detail.pendingChange;if(!pending)throw new Error("The final flight change is unavailable.");if(pending.confirmedAt&&detail.request.status==="completed")return toStatusSummary(detail.request);if(pending.changeTotalAmount!==0)throw new Error("Only a zero-price change can be confirmed without payment or admin approval.");const fresh=await deps.duffel.getPendingChange(pending.duffelOrderChangeId);assertPendingChangeMatches({pending:fresh,expectedAmount:0,expectedCurrency:pending.changeTotalCurrency,now:deps.now()});let confirming=await transition(deps,detail.request,"duffel_confirming",input.actor,"confirmation_started","Customer confirmed the zero-price flight change.");try{const confirmed=await deps.duffel.confirmPendingChange(pending.duffelOrderChangeId,{amount:0,currency:pending.changeTotalCurrency});if(!confirmed.confirmedAt)throw new Error("Duffel did not confirm the flight change.");await deps.changeRepository.upsertPendingChange({...pending,confirmedAt:confirmed.confirmedAt,rawPayload:confirmed.rawPayload});const live=await deps.duffel.getOrder(detail.order.duffelOrderId);const current=detail.order.orderSnapshot&&typeof detail.order.orderSnapshot==="object"&&!Array.isArray(detail.order.orderSnapshot)?detail.order.orderSnapshot as Record<string,unknown>:{};if(!deps.orderRepository.updateOrderSnapshot)throw new Error("Order snapshot persistence is unavailable.");const persisted=await deps.orderRepository.updateOrderSnapshot({id:detail.order.id,orderSnapshot:{...current,availableActions:live.availableActions,supplierOrder:live.rawPayload,supplierOrderRefreshedAt:deps.now().toISOString()}});if(!persisted)throw new Error("Confirmed change could not be saved locally.");confirming=await transition(deps,confirming,"completed",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"change_completed","Duffel confirmed the flight change and the booking snapshot was refreshed.",{customerMessage:"Your flight change is confirmed. Your updated itinerary is available on this booking."});await notify(deps,confirming,detail.order,"change_completed",true);return toStatusSummary(confirming)}catch(error){const updated=await transition(deps,confirming,"reconciliation_required",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"confirmation_attention",error instanceof Error?error.message:"Confirmation requires attention.",{customerMessage:"We are checking the airline confirmation. Your case remains open and no further action is needed right now."});await notify(deps,updated,detail.order,"change_issue",true);return toStatusSummary(updated)}}
 
+/** Called only by the shared payment outbox through the flight_change adapter. */
+export async function fulfillPaidFlightChange(input:{changeRequestId:string;paymentAttemptId:string;provider:PaymentProvider;providerPaymentId:string|null;expectedRequestType?:FlightChangeRequestType},deps=depsDefault):Promise<PayableResourceFulfillmentResult>{
+  const detail=await requireDetail(input.changeRequestId,deps),pending=detail.pendingChange
+  if(input.expectedRequestType&&detail.request.requestType!==input.expectedRequestType)throw new Error("Payment resource does not match this flight change request.")
+  if(detail.request.paymentAttemptId!==input.paymentAttemptId)throw new Error("Payment attempt is not linked to this flight change request.")
+  if(!pending)throw new Error("The final flight change is unavailable.")
+  if(pending.changeTotalAmount<=0)throw new Error("Only positive-price itinerary changes can be fulfilled by a payment adapter.")
+  if(detail.request.status==="completed")return {status:"already_fulfilled",externalOrderId:detail.order.duffelOrderId}
+  let working=detail.request
+  try{
+    const fresh=await deps.duffel.getPendingChange(pending.duffelOrderChangeId)
+    if(!fresh.confirmedAt)assertPendingChangeMatches({pending:fresh,expectedAmount:pending.changeTotalAmount,expectedCurrency:pending.changeTotalCurrency,now:deps.now()})
+    if(working.status==="payment_pending")working=await transition(deps,working,"payment_processing",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"payment_capture_received","PayPal captured the exact additional change amount.",{customerMessage:"Your payment was received. We are confirming the change with the airline."})
+    if(working.status==="payment_processing")working=await transition(deps,working,"payment_captured",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"payment_captured","Payment capture is ready for airline confirmation.")
+    if(working.status==="payment_captured"||working.status==="reconciliation_required")working=await transition(deps,working,"duffel_confirming",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"confirmation_started","Confirming the paid change with the airline.")
+    const confirmed=fresh.confirmedAt?fresh:await deps.duffel.confirmPendingChange(pending.duffelOrderChangeId,{amount:pending.changeTotalAmount,currency:pending.changeTotalCurrency})
+    if(!confirmed.confirmedAt)throw new Error("Duffel did not confirm the paid flight change.")
+    await deps.changeRepository.upsertPendingChange({...pending,confirmedAt:confirmed.confirmedAt,rawPayload:confirmed.rawPayload})
+    const live=await deps.duffel.getOrder(detail.order.duffelOrderId)
+    const current=detail.order.orderSnapshot&&typeof detail.order.orderSnapshot==="object"&&!Array.isArray(detail.order.orderSnapshot)?detail.order.orderSnapshot as Record<string,unknown>:{}
+    if(!deps.orderRepository.updateOrderSnapshot)throw new Error("Order snapshot persistence is unavailable.")
+    const persisted=await deps.orderRepository.updateOrderSnapshot({id:detail.order.id,orderSnapshot:{...current,availableActions:live.availableActions,supplierOrder:live.rawPayload,supplierOrderRefreshedAt:deps.now().toISOString()}})
+    if(!persisted)throw new Error("Duffel confirmed the change but the local order snapshot could not be saved.")
+    const completed=await transition(deps,working,"completed",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"paid_change_completed","Payment and airline confirmation completed.",{customerMessage:"Your flight change is confirmed. Your updated itinerary is available on this booking."})
+    await notify(deps,completed,detail.order,"change_completed",true)
+    return {status:"fulfilled",externalOrderId:detail.order.duffelOrderId}
+  }catch(error){
+    if(working.status!=="reconciliation_required"){
+      const updated=await transition(deps,working,"reconciliation_required",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"paid_change_reconciliation_required",error instanceof Error?error.message:"Paid airline change requires reconciliation.",{customerMessage:"We received your payment and are reconciling the airline confirmation. No further payment is needed."})
+      await notify(deps,updated,detail.order,"change_issue",true)
+    }
+    throw error
+  }
+}
+
+/** Adds only supplier-offered post-booking services. Removal remains an admin case. */
+export async function fulfillPaidPostBookingService(input:{changeRequestId:string;paymentAttemptId:string;provider:PaymentProvider;providerPaymentId:string|null},deps=depsDefault):Promise<PayableResourceFulfillmentResult>{
+  const detail=await requireDetail(input.changeRequestId,deps)
+  if(detail.request.requestType!=="add_baggage")throw new Error("Payment resource does not match a baggage request.")
+  if(detail.request.paymentAttemptId!==input.paymentAttemptId)throw new Error("Payment attempt is not linked to this baggage request.")
+  if(detail.request.status==="completed")return {status:"already_fulfilled",externalOrderId:detail.order.duffelOrderId}
+  const requested=readBaggageSelection(detail.request.requestedChange)
+  if(requested.length===0)throw new Error("No baggage services were selected.")
+  if(!deps.duffel.getAvailableServices||!deps.duffel.addServices)throw new Error("Post-booking services are not configured for this supplier.")
+  let working=detail.request
+  try{
+    const available=await deps.duffel.getAvailableServices(detail.order.duffelOrderId)
+    const offered=new Set(available.map(service=>readServiceId(service)).filter((id):id is string=>Boolean(id)))
+    if(requested.some(service=>!offered.has(service.id)))throw new Error("A selected baggage service is no longer available. Review the live options.")
+    if(working.status==="payment_pending")working=await transition(deps,working,"payment_processing",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"baggage_payment_captured","Payment captured; adding baggage with the airline.")
+    if(working.status==="payment_processing")working=await transition(deps,working,"payment_captured",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"baggage_payment_ready","Payment capture is ready for baggage fulfillment.")
+    if(working.status==="payment_captured"||working.status==="reconciliation_required")working=await transition(deps,working,"duffel_confirming",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"baggage_add_started","Adding the selected baggage with the airline.")
+    await deps.duffel.addServices(detail.order.duffelOrderId,requested)
+    const live=await deps.duffel.getOrder(detail.order.duffelOrderId)
+    const current=detail.order.orderSnapshot&&typeof detail.order.orderSnapshot==="object"&&!Array.isArray(detail.order.orderSnapshot)?detail.order.orderSnapshot as Record<string,unknown>:{}
+    if(!deps.orderRepository.updateOrderSnapshot)throw new Error("Order snapshot persistence is unavailable.")
+    const persisted=await deps.orderRepository.updateOrderSnapshot({id:detail.order.id,orderSnapshot:{...current,availableActions:live.availableActions,supplierOrder:live.rawPayload,supplierOrderRefreshedAt:deps.now().toISOString()}})
+    if(!persisted)throw new Error("Baggage was added but the local order snapshot could not be saved.")
+    const completed=await transition(deps,working,"completed",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"baggage_added","Baggage was added and the booking snapshot was refreshed.",{customerMessage:"Your baggage has been added to the booking."})
+    await notify(deps,completed,detail.order,"change_completed",true)
+    return {status:"fulfilled",externalOrderId:detail.order.duffelOrderId}
+  }catch(error){
+    if(working.status!=="reconciliation_required"){const updated=await transition(deps,working,"reconciliation_required",{type:"guest",guestId:GUEST_UNAVAILABLE_ID},"baggage_reconciliation_required",error instanceof Error?error.message:"Baggage fulfillment requires reconciliation.",{customerMessage:"We received your payment and are reconciling the baggage request. No further payment is needed."});await notify(deps,updated,detail.order,"change_issue",true)}
+    throw error
+  }
+}
+
 export async function getChangeStatus(input:{requestId:string;actor:ActorContext},deps=depsDefault){const detail=await requireAccessibleChange(input.requestId,input.actor,deps);return mapDetail(detail)}
 export async function getLatestChangeStatusForBooking(input:{bookingReference:string;actor:ActorContext},deps=depsDefault){const order=await requireAccessibleBooking(input,deps),request=await deps.changeRepository.findLatestByFlightOrderId(order.id);return request?toStatusSummary(request):null}
 export async function listAdminChanges(input:{status?:FlightChangeStatus;type?:FlightChangeRequestType;mode?:FlightChangeHandlingMode}={},deps=depsDefault){const rows=await deps.changeRepository.listRequests({limit:100,offset:0,...input});return rows.map(({request,order})=>({id:request.id,bookingReference:request.bookingReference,customerEmail:order.contactEmail,requestType:request.requestType,handlingMode:request.handlingMode,status:request.status,pricingDirection:request.pricingDirection,amount:request.additionalPaymentAmount??request.customerRefundAmount,currency:request.currency,updatedAtLabel:format(request.updatedAt,"d MMM yyyy, HH:mm")}))}
@@ -44,6 +113,8 @@ async function transition(deps:ChangeServiceDeps,current:ChangeRequestRecord,sta
 async function audit(deps:ChangeServiceDeps,request:ChangeRequestRecord,actor:ActorContext,eventType:string,message:string,metadata?:unknown){await deps.changeRepository.addEvent({changeRequestId:request.id,actorType:actor.type==="user"?"customer":actor.guestId===GUEST_UNAVAILABLE_ID?"system":"guest",actorId:actor.type==="user"?actor.appUserId:actor.guestId===GUEST_UNAVAILABLE_ID?null:actor.guestId,eventType,message,metadata})}
 async function notify(deps:ChangeServiceDeps,request:ChangeRequestRecord,order:Pick<FlightOrderRecord,"id"|"checkoutSessionId"|"bookingReference"|"contactEmail"|"contactEmailHash"|"orderSnapshot">,eventType:NotificationEventType,adminAlert:boolean){const snapshot=normalizeSnapshot(order.orderSnapshot),settings=await deps.cancellationRepository.getBusinessSettings(),payload={bookingReference:order.bookingReference,routeLabel:snapshot.routeLabel,amountLabel:formatAmount(request),statusLabel:label(request.status),customerMessage:request.customerMessage,businessName:settings.businessName,supportEmail:settings.supportEmail,supportPhone:settings.supportPhone,supportWhatsapp:settings.supportWhatsapp,businessAddress:settings.address,recipientRole:"customer" as const};await deps.notifications.create({id:`not_${randomUUID().replaceAll("-","")}`,eventType,flightOrderId:order.id,checkoutSessionId:order.checkoutSessionId,bookingReference:order.bookingReference,recipientEmail:order.contactEmail,recipientEmailHash:order.contactEmailHash||createEmailHash(order.contactEmail),payload});if(adminAlert){await deps.changeRepository.addEvent({changeRequestId:request.id,actorType:"system",actorId:null,eventType:"admin_alert_created",message:`Admin attention requested for ${label(request.status)}.`});const recipients=await (deps.listAdminRecipients?.()??Promise.resolve([]));await Promise.all(recipients.map(recipient=>deps.notifications.create({id:`not_${randomUUID().replaceAll("-","")}`,eventType,flightOrderId:order.id,checkoutSessionId:order.checkoutSessionId,bookingReference:order.bookingReference,recipientEmail:recipient.email,recipientEmailHash:createEmailHash(recipient.email),payload:{...payload,recipientRole:"admin"}})))} }
 function validatePassengerIds(ids:string[],passengers:Array<{id:string}>){const valid=new Set(passengers.map(p=>p.id));if(ids.some(id=>!valid.has(id)))throw new Error("A selected traveller is not part of this booking.")}
+function readBaggageSelection(value:unknown){if(!value||typeof value!=="object"||Array.isArray(value))return [];const raw=(value as {services?:unknown}).services;if(!Array.isArray(raw))return [];return raw.flatMap(item=>{if(!item||typeof item!=="object")return [];const service=item as {id?:unknown;quantity?:unknown};return typeof service.id==="string"&&service.id.trim()&&Number.isInteger(service.quantity)&&Number(service.quantity)>0?[{id:service.id.trim(),quantity:Number(service.quantity)}]:[]})}
+function readServiceId(value:unknown){return value&&typeof value==="object"&&typeof (value as {id?:unknown}).id==="string"?(value as {id:string}).id:null}
 function toRequester(actor:ActorContext){return actor.type==="user"?{requestedByUserId:actor.appUserId,requestedByGuestId:null}:{requestedByUserId:null,requestedByGuestId:actor.guestId===GUEST_UNAVAILABLE_ID?null:actor.guestId}}
 function toBookingSummary(order:FlightOrderRecord){const s=normalizeSnapshot(order.orderSnapshot);return {reference:order.bookingReference,routeLabel:s.routeLabel,passengers:s.passengers,legs:s.legs,currency:order.currency}}
 function toStatusSummary(r:ChangeRequestRecord){return {id:r.id,requestType:r.requestType,handlingMode:r.handlingMode,status:r.status,statusLabel:label(r.status),pricingDirection:r.pricingDirection,amount:r.additionalPaymentAmount??r.customerRefundAmount,currency:r.currency,customerMessage:r.customerMessage,updatedAtLabel:format(r.updatedAt,"d MMM yyyy, HH:mm")}}

@@ -14,6 +14,8 @@ export interface DuffelChangeAdapter {
   createPendingChange(offerId:string):Promise<DuffelPendingChangeResult>
   getPendingChange(id:string):Promise<DuffelPendingChangeResult>
   confirmPendingChange(id:string,input:{amount:number;currency:string}):Promise<DuffelPendingChangeResult>
+  getAvailableServices?(orderId:string):Promise<unknown[]>
+  addServices?(orderId:string,services:Array<{id:string;quantity:number}>):Promise<unknown>
 }
 
 export const defaultDuffelChangeAdapter:DuffelChangeAdapter={
@@ -24,6 +26,8 @@ export const defaultDuffelChangeAdapter:DuffelChangeAdapter={
   async createPendingChange(offerId){return mapDuffelPendingChange((await getDuffelClient().orderChanges.create({selected_order_change_offer:offerId})).data as unknown as OrderChange,offerId)},
   async getPendingChange(id){return mapDuffelPendingChange((await getDuffelClient().orderChanges.get(id)).data as unknown as OrderChange)},
   async confirmPendingChange(id,input){const options=input.amount>0?{payment:{amount:input.amount.toFixed(2),currency:input.currency,type:"balance" as const}}:{};return mapDuffelPendingChange((await getDuffelClient().orderChanges.confirm(id,options)).data as unknown as OrderChange)},
+  async getAvailableServices(orderId){return ((await (getDuffelClient().orders as unknown as {getAvailableServices:(id:string)=>Promise<{data:unknown[]}>}).getAvailableServices(orderId)).data)??[]},
+  async addServices(orderId,services){return (await (getDuffelClient().orders as unknown as {addServices:(id:string,payload:{services:Array<{id:string;quantity:number}>})=>Promise<{data:unknown}>}).addServices(orderId,{services})).data},
 }
 
 export function assertLiveSlicesEligible(order:DuffelLiveOrderResult,selectedIds:string[],now=new Date()){

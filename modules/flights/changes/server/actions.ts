@@ -5,6 +5,7 @@ import { getActorContext } from "@/modules/auth/server"
 import { requireActiveAdmin } from "@/modules/flights/cancellations/server/admin-guard"
 import { flightChangeRequestTypes, type FlightChangeRequestType } from "@/modules/flights/changes/domain"
 import { createManualChangeRequest, searchItineraryChanges, selectChangeOffer, confirmZeroPriceChange, performAdminChangeAction } from "@/modules/flights/changes/server/service"
+import { captureFlightChangePayPalPayment, startFlightChangePayPalPayment } from "@/modules/flights/payments-adapter/change-payment-service"
 
 export async function createManualChangeRequestAction(formData:FormData){
   const actor=await getActorContext({ensureGuestSession:false})
@@ -21,6 +22,8 @@ export async function searchItineraryChangesAction(formData:FormData){
 }
 export async function selectChangeOfferAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),requestId=req(formData,"requestId");await selectChangeOffer({actor,requestId,offerId:req(formData,"offerId")});redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${requestId}/review`)}
 export async function confirmZeroPriceChangeAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),requestId=req(formData,"requestId");await confirmZeroPriceChange({actor,requestId});revalidatePath(`/booking/${bookingReference}`);redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${requestId}`)}
+export async function startFlightChangePayPalPaymentAction(input:{requestId:string}){const actor=await getActorContext({ensureGuestSession:false});return startFlightChangePayPalPayment({requestId:input.requestId,actor})}
+export async function captureFlightChangePayPalPaymentAction(input:{requestId:string;paypalOrderId:string;bookingReference:string}){const actor=await getActorContext({ensureGuestSession:false});const result=await captureFlightChangePayPalPayment({requestId:input.requestId,paypalOrderId:input.paypalOrderId,actor});revalidatePath(`/booking/${input.bookingReference}`);revalidatePath(`/booking/${input.bookingReference}/change/${input.requestId}`);return result}
 export async function adminChangeAction(formData:FormData){const admin=await requireActiveAdmin(),requestId=req(formData,"requestId");await performAdminChangeAction({admin,requestId,action:parseAdminAction(req(formData,"action")),reason:opt(formData,"reason"),externalReference:opt(formData,"externalReference"),customerMessage:opt(formData,"customerMessage")});revalidatePath("/admin/changes");revalidatePath(`/admin/changes/${requestId}`)}
 function req(data:FormData,key:string){const value=data.get(key);if(typeof value!=="string"||!value.trim())throw new Error(`${key} is required.`);return value.trim()}
 function opt(data:FormData,key:string){const value=data.get(key);return typeof value==="string"&&value.trim()?value.trim():undefined}
