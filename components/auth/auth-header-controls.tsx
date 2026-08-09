@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Show, UserButton } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs"
 
+import { CustomUserButton } from "@/components/auth/custom-user-button"
 import { Button } from "@/components/ui/button"
 
 export function AuthHeaderControls() {
@@ -25,7 +26,7 @@ export function AuthHeaderControls() {
         </Button>
       </Show>
       <Show when="signed-in">
-        <UserButton />
+        <CustomUserButton />
       </Show>
     </div>
   )

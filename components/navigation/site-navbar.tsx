@@ -1,12 +1,13 @@
 "use client"
 
-import { Show, UserButton } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs"
 import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useSyncExternalStore } from "react"
 
+import { CustomUserButton } from "@/components/auth/custom-user-button"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CurrencySelector } from "@/modules/currency/ui"
@@ -385,7 +386,7 @@ function AuthButtons({
         >
           Dashboard
         </Button>
-        <UserButton />
+        <CustomUserButton />
       </Show>
     </>
   )
