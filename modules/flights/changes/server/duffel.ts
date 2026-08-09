@@ -27,7 +27,7 @@ export const defaultDuffelChangeAdapter:DuffelChangeAdapter={
   async getPendingChange(id){return mapDuffelPendingChange((await getDuffelClient().orderChanges.get(id)).data as unknown as OrderChange)},
   async confirmPendingChange(id,input){const options=input.amount>0?{payment:{amount:input.amount.toFixed(2),currency:input.currency,type:"balance" as const}}:{};return mapDuffelPendingChange((await getDuffelClient().orderChanges.confirm(id,options)).data as unknown as OrderChange)},
   async getAvailableServices(orderId){return ((await (getDuffelClient().orders as unknown as {getAvailableServices:(id:string)=>Promise<{data:unknown[]}>}).getAvailableServices(orderId)).data)??[]},
-  async addServices(orderId,services){return (await (getDuffelClient().orders as unknown as {addServices:(id:string,payload:{services:Array<{id:string;quantity:number}>})=>Promise<{data:unknown}>}).addServices(orderId,{services})).data},
+  async addServices(orderId,services){return (await (getDuffelClient().orders as unknown as {addServices:(id:string,payload:{payment:{type:"balance"};add_services:Array<{service_id:string;quantity:number}>})=>Promise<{data:unknown}>}).addServices(orderId,{payment:{type:"balance"},add_services:services.map(({id,quantity})=>({service_id:id,quantity}))})).data},
 }
 
 export function assertLiveSlicesEligible(order:DuffelLiveOrderResult,selectedIds:string[],now=new Date()){

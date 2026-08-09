@@ -3,14 +3,15 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActorContext } from "@/modules/auth/server"
-import { getChangeBookingContext } from "@/modules/flights/changes/server"
+import { getBaggageOptions } from "@/modules/flights/changes/server"
+import { BaggageOptions } from "@/modules/flights/changes/ui/baggage-options"
 
 export default async function BaggagePage({ params }: { params: Promise<{ bookingReference: string }> }) {
   const [actor, { bookingReference }] = await Promise.all([
     getActorContext({ ensureGuestSession: false }),
     params,
   ])
-  const context = await getChangeBookingContext({ bookingReference, actor })
+  const context = await getBaggageOptions({ bookingReference, actor })
 
   return (
     <main className="min-h-svh py-8">
@@ -23,6 +24,7 @@ export default async function BaggagePage({ params }: { params: Promise<{ bookin
           <CardHeader><CardTitle>Live baggage options</CardTitle></CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>Baggage availability, eligibility, quantity, and price are checked with the airline before payment.</p>
+            {context.services.length ? <BaggageOptions bookingReference={context.booking.reference} services={context.services} /> : <p>No additional baggage is currently offered for this booking.</p>}
             <p>Service removal remains a manual support request.</p>
             <Button render={<Link href={`/booking/${encodeURIComponent(context.booking.reference)}/change`} />}>Back to change booking</Button>
           </CardContent>

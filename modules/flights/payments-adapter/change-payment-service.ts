@@ -9,6 +9,7 @@ import { defaultPaymentOutboxRepository, type PaymentOutboxRepository } from "@/
 import { createPaymentAttemptId, createPaymentEventId, createPaymentOutboxId } from "@/modules/payments/server/ids"
 import type { PaymentInternalOrderType, PaymentEventType } from "@/modules/payments/domain"
 import { capturePayPalOrder, createPayPalOrder, getPayPalCaptureFromOrder } from "@/modules/payments/server/providers/paypal"
+import { assertPendingChangeMatches, defaultDuffelChangeAdapter, type DuffelChangeAdapter } from "@/modules/flights/changes/server/duffel"
 
 type ChangePayableType = "flight_change" | "flight_post_booking_service"
 
@@ -19,14 +20,20 @@ interface Deps {
   outbox: PaymentOutboxRepository
   createProviderOrder: typeof createPayPalOrder
   captureProviderOrder: typeof capturePayPalOrder
+  duffel: Pick<DuffelChangeAdapter,"getPendingChange">
 }
 
-const defaultDeps: Deps = { changes: defaultChangeRepository, attempts: defaultPaymentAttemptsRepository, events: defaultPaymentEventsRepository, outbox: defaultPaymentOutboxRepository, createProviderOrder: createPayPalOrder, captureProviderOrder: capturePayPalOrder }
+const defaultDeps: Deps = { changes: defaultChangeRepository, attempts: defaultPaymentAttemptsRepository, events: defaultPaymentEventsRepository, outbox: defaultPaymentOutboxRepository, createProviderOrder: createPayPalOrder, captureProviderOrder: capturePayPalOrder, duffel: defaultDuffelChangeAdapter }
 
 export async function startFlightChangePayPalPayment(input:{requestId:string;actor:ActorContext},deps=defaultDeps){
   const status=await getChangeStatus({requestId:input.requestId,actor:input.actor})
   const request=await deps.changes.findRequestById(input.requestId)
   if(!request||request.status!=="payment_pending"||!request.additionalPaymentAmount||!request.currency)throw new Error("This change is not ready for payment.")
+  const detail=await deps.changes.getDetail(request.id)
+  if(!detail?.pendingChange)throw new Error("The final airline change quote is unavailable.")
+  const fresh=await deps.duffel.getPendingChange(detail.pendingChange.duffelOrderChangeId)
+  assertPendingChangeMatches({pending:fresh,expectedAmount:request.additionalPaymentAmount,expectedCurrency:request.currency})
+  await deps.changes.upsertPendingChange({...detail.pendingChange,expiresAt:fresh.expiresAt,confirmedAt:fresh.confirmedAt,rawPayload:fresh.rawPayload})
   const resourceType=resourceForRequest(request.requestType)
   const existing=request.paymentAttemptId?await deps.attempts.findById(request.paymentAttemptId):null
   if(existing?.providerOrderId)return {paymentAttemptId:existing.id,paypalOrderId:existing.providerOrderId,amount:existing.amount,currency:existing.currency}

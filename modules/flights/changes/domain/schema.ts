@@ -12,7 +12,6 @@ export const createFlightChangeRequestSchema = z.object({
 }).superRefine((value, ctx) => {
   if (value.requestType === "remove_passenger" && value.selectedPassengerIds.length === 0) ctx.addIssue({ code: "custom", path: ["selectedPassengerIds"], message: "Select at least one traveller." })
   if (value.requestType === "itinerary_change" && value.selectedSliceIds.length === 0) ctx.addIssue({ code: "custom", path: ["selectedSliceIds"], message: "Select at least one journey." })
-  if (value.requestType === "add_baggage") ctx.addIssue({ code: "custom", path: ["requestType"], message: "Post-booking baggage purchase is not available in Phase 1." })
 })
 
 export const flightChangeSearchSchema = z.object({
@@ -24,4 +23,3 @@ export const adminChangeActionSchema = z.object({ requestId: z.string().trim().m
 
 export type CreateFlightChangeRequestInput = z.infer<typeof createFlightChangeRequestSchema>
 export type FlightChangeSearchInput = z.infer<typeof flightChangeSearchSchema>
-

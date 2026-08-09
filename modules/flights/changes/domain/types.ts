@@ -20,7 +20,7 @@ const transitions: Record<FlightChangeStatus, readonly FlightChangeStatus[]> = {
   payment_processing: ["payment_captured","payment_pending","reconciliation_required","failed"],
   payment_captured: ["duffel_confirming","reconciliation_required","manual_processing"],
   admin_review_required: ["duffel_confirming","manual_processing","rejected","expired","failed"],
-  duffel_confirming: ["completed","reconciliation_required","manual_processing","failed"],
+  duffel_confirming: ["completed","refund_pending","reconciliation_required","manual_processing","failed"],
   refund_pending: ["completed","reconciliation_required","manual_processing","failed"],
   manual_processing: ["completed","rejected","reconciliation_required","failed"],
   reconciliation_required: ["manual_processing","duffel_confirming","completed","rejected"],
@@ -40,7 +40,7 @@ export function getPricingDirection(amount: number): FlightChangePricingDirectio
   return amount > 0 ? "additional_payment" : amount < 0 ? "customer_refund" : "no_difference"
 }
 export function getHandlingMode(type: FlightChangeRequestType): FlightChangeHandlingMode {
-  return type === "itinerary_change" ? "automatic" : "manual"
+  return type === "itinerary_change" || type === "add_baggage" ? "automatic" : "manual"
 }
 export function statusForPendingAmount(amount: number): FlightChangeStatus {
   const direction = getPricingDirection(amount)

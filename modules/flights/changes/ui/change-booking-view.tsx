@@ -125,13 +125,13 @@ export function ChangeBookingView({ context }: { context: any }) {
           />
         </div>
 
-        <Card className="opacity-70">
+        <Card>
           <CardHeader>
             <CardTitle>Add baggage</CardTitle>
-            <CardDescription>Post-booking baggage purchase is planned for a later phase.</CardDescription>
+            <CardDescription>See live airline baggage options and pay securely online.</CardDescription>
           </CardHeader>
           <CardFooter>
-            <Badge variant="secondary">Not available in Phase 1</Badge>
+            {context.canStart ? <Button render={<Link href={`/booking/${encodeURIComponent(context.booking.reference)}/baggage`} />}>Add baggage</Button> : <Button disabled>Unavailable</Button>}
           </CardFooter>
         </Card>
       </section>

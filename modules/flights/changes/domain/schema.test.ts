@@ -2,9 +2,9 @@ import { describe,expect,test } from "vitest"
 import { assertChangeStatusTransition, assertNoActiveBookingMutation, createFlightChangeRequestSchema, getPassengerRemovalWarnings, getPricingDirection, statusForPendingAmount } from "@/modules/flights/changes/domain"
 
 describe("flight change domain",()=>{
-  test("validates request-specific selections and excludes Phase 1 baggage purchase",()=>{
+  test("validates request-specific selections and permits baggage purchase",()=>{
     expect(()=>createFlightChangeRequestSchema.parse({bookingReference:"ABC123",requestType:"remove_passenger",customerReason:"Cannot travel",selectedPassengerIds:[],selectedSliceIds:[]})).toThrow(/traveller/i)
-    expect(()=>createFlightChangeRequestSchema.parse({bookingReference:"ABC123",requestType:"add_baggage",customerReason:"Need a bag",selectedPassengerIds:[],selectedSliceIds:[]})).toThrow(/Phase 1/i)
+    expect(createFlightChangeRequestSchema.parse({bookingReference:"ABC123",requestType:"add_baggage",customerReason:"Need a bag",selectedPassengerIds:[],selectedSliceIds:[]}).requestType).toBe("add_baggage")
   })
   test("routes final prices safely",()=>{
     expect(getPricingDirection(25)).toBe("additional_payment")
@@ -22,4 +22,3 @@ describe("flight change domain",()=>{
     expect(getPassengerRemovalWarnings({selectedPassengerIds:["adult"],passengers:[{id:"adult",typeLabel:"Adult"},{id:"infant",typeLabel:"Infant without seat"}]})).toHaveLength(1)
   })
 })
-
