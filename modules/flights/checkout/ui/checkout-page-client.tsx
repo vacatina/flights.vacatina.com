@@ -812,7 +812,7 @@ function ExpiredFareRecovery(input: {
         </div>
         {/* The refresh button is commented out/removed because expired PartialOfferRequests cannot be refreshed.
             We route the user back to the homepage to start a new search instead. */}
-        <Button className="h-10 shrink-0 px-4" render={<a href="/" />}>
+        <Button className="h-10 shrink-0 px-4" render={<Link href="/" />}>
           <RefreshCcwIcon data-icon="inline-start" />
           Start new search
         </Button>

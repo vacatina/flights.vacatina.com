@@ -64,6 +64,18 @@ export const notificationEventTypeEnum = pgEnum("notification_event_type", [
   "cancellation_completed",
   "cancellation_refund_completed",
   "cancellation_issue",
+  "change_request_received",
+  "change_offers_ready",
+  "change_payment_required",
+  "change_payment_received",
+  "change_admin_review",
+  "change_approved",
+  "change_rejected",
+  "change_manual_processing",
+  "change_completed",
+  "change_refund_approved",
+  "change_refund_completed",
+  "change_issue",
 ])
 
 export const flightCancellationStatusEnum = pgEnum(
@@ -100,6 +112,51 @@ export const flightRefundStatusEnum = pgEnum("flight_refund_status", [
 
 export const flightCancellationEventActorTypeEnum = pgEnum(
   "flight_cancellation_event_actor_type",
+  ["customer", "guest", "admin", "system"]
+)
+
+export const flightChangeRequestTypeEnum = pgEnum("flight_change_request_type", [
+  "itinerary_change",
+  "add_baggage",
+  "remove_passenger",
+  "seat_change",
+  "remove_service",
+  "traveller_details_change",
+  "other",
+])
+
+export const flightChangeHandlingModeEnum = pgEnum("flight_change_handling_mode", [
+  "automatic",
+  "admin_approval",
+  "manual",
+])
+
+export const flightChangePricingDirectionEnum = pgEnum(
+  "flight_change_pricing_direction",
+  ["unknown", "additional_payment", "no_difference", "customer_refund"]
+)
+
+export const flightChangeStatusEnum = pgEnum("flight_change_status", [
+  "requested",
+  "searching",
+  "offers_ready",
+  "pending_change_ready",
+  "payment_pending",
+  "payment_processing",
+  "payment_captured",
+  "admin_review_required",
+  "duffel_confirming",
+  "refund_pending",
+  "manual_processing",
+  "reconciliation_required",
+  "completed",
+  "rejected",
+  "expired",
+  "failed",
+])
+
+export const flightChangeEventActorTypeEnum = pgEnum(
+  "flight_change_event_actor_type",
   ["customer", "guest", "admin", "system"]
 )
 
@@ -1046,6 +1103,137 @@ export const flightCancellationEvents = pgTable(
   })
 )
 
+export const flightChangeRequests = pgTable(
+  "flight_change_requests",
+  {
+    id: text("id").primaryKey(),
+    flightOrderId: text("flight_order_id").notNull().references(() => flightOrders.id, { onDelete: "cascade" }),
+    bookingReference: text("booking_reference").notNull(),
+    duffelOrderId: text("duffel_order_id").notNull(),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    requestedByGuestId: text("requested_by_guest_id").references(() => guestSessions.id, { onDelete: "set null" }),
+    requestType: flightChangeRequestTypeEnum("request_type").notNull(),
+    handlingMode: flightChangeHandlingModeEnum("handling_mode").notNull(),
+    status: flightChangeStatusEnum("status").notNull().default("requested"),
+    customerReason: text("customer_reason").notNull(),
+    selectedPassengerIds: jsonb("selected_passenger_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    selectedSliceIds: jsonb("selected_slice_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    requestedChange: jsonb("requested_change"),
+    pricingDirection: flightChangePricingDirectionEnum("pricing_direction").notNull().default("unknown"),
+    additionalPaymentAmount: numeric("additional_payment_amount", { precision: 14, scale: 4 }),
+    customerRefundAmount: numeric("customer_refund_amount", { precision: 14, scale: 4 }),
+    currency: text("currency"),
+    paymentAttemptId: text("payment_attempt_id").references(() => paymentAttempts.id, { onDelete: "set null" }),
+    changeApprovedBy: text("change_approved_by").references(() => users.id, { onDelete: "set null" }),
+    changeApprovedAt: timestamp("change_approved_at", { withTimezone: true }),
+    refundApprovedBy: text("refund_approved_by").references(() => users.id, { onDelete: "set null" }),
+    refundApprovedAt: timestamp("refund_approved_at", { withTimezone: true }),
+    adminRejectionReason: text("admin_rejection_reason"),
+    customerMessage: text("customer_message"),
+    manualExternalReference: text("manual_external_reference"),
+    manualCompletionNotes: text("manual_completion_notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    orderLookupIdx: index("flight_change_requests_order_lookup_idx").on(table.flightOrderId, table.createdAt),
+    bookingLookupIdx: index("flight_change_requests_booking_lookup_idx").on(table.bookingReference, table.createdAt),
+    statusQueueIdx: index("flight_change_requests_status_queue_idx").on(table.status, table.updatedAt),
+    modeQueueIdx: index("flight_change_requests_mode_queue_idx").on(table.handlingMode, table.status, table.updatedAt),
+    requesterLookupIdx: index("flight_change_requests_requester_lookup_idx").on(table.requestedByUserId, table.requestedByGuestId, table.createdAt),
+    oneActiveOrderIdx: uniqueIndex("flight_change_requests_one_active_order_idx")
+      .on(table.flightOrderId)
+      .where(sql`${table.status} not in ('completed', 'rejected', 'expired')`),
+  })
+)
+
+export const flightChangeSearches = pgTable(
+  "flight_change_searches",
+  {
+    id: text("id").primaryKey(),
+    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    duffelOrderChangeRequestId: text("duffel_order_change_request_id").notNull(),
+    removedSliceIds: jsonb("removed_slice_ids").$type<string[]>().notNull(),
+    addCriteria: jsonb("add_criteria").notNull(),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    requestTimelineIdx: index("flight_change_searches_request_timeline_idx").on(table.changeRequestId, table.createdAt),
+    duffelRequestUniqueIdx: uniqueIndex("flight_change_searches_duffel_request_unique_idx").on(table.duffelOrderChangeRequestId),
+  })
+)
+
+export const flightChangeOffers = pgTable(
+  "flight_change_offers",
+  {
+    id: text("id").primaryKey(),
+    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    duffelOrderChangeOfferId: text("duffel_order_change_offer_id").notNull(),
+    changeTotalAmount: numeric("change_total_amount", { precision: 14, scale: 4 }).notNull(),
+    changeTotalCurrency: text("change_total_currency").notNull(),
+    newTotalAmount: numeric("new_total_amount", { precision: 14, scale: 4 }),
+    newTotalCurrency: text("new_total_currency"),
+    penaltyAmount: numeric("penalty_amount", { precision: 14, scale: 4 }),
+    penaltyCurrency: text("penalty_currency"),
+    refundTo: text("refund_to"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    selectedAt: timestamp("selected_at", { withTimezone: true }),
+    summarySnapshot: jsonb("summary_snapshot"),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    requestTimelineIdx: index("flight_change_offers_request_timeline_idx").on(table.changeRequestId, table.createdAt),
+    duffelOfferUniqueIdx: uniqueIndex("flight_change_offers_duffel_offer_unique_idx").on(table.duffelOrderChangeOfferId),
+  })
+)
+
+export const flightOrderChanges = pgTable(
+  "flight_order_changes",
+  {
+    id: text("id").primaryKey(),
+    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    duffelOrderChangeId: text("duffel_order_change_id").notNull(),
+    duffelOrderChangeOfferId: text("duffel_order_change_offer_id").notNull(),
+    changeTotalAmount: numeric("change_total_amount", { precision: 14, scale: 4 }).notNull(),
+    changeTotalCurrency: text("change_total_currency").notNull(),
+    newTotalAmount: numeric("new_total_amount", { precision: 14, scale: 4 }).notNull(),
+    newTotalCurrency: text("new_total_currency").notNull(),
+    penaltyTotalAmount: numeric("penalty_total_amount", { precision: 14, scale: 4 }),
+    penaltyTotalCurrency: text("penalty_total_currency"),
+    refundTo: text("refund_to"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    requestUniqueIdx: uniqueIndex("flight_order_changes_request_unique_idx").on(table.changeRequestId),
+    duffelChangeUniqueIdx: uniqueIndex("flight_order_changes_duffel_change_unique_idx").on(table.duffelOrderChangeId),
+  })
+)
+
+export const flightChangeEvents = pgTable(
+  "flight_change_events",
+  {
+    id: text("id").primaryKey(),
+    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    actorType: flightChangeEventActorTypeEnum("actor_type").notNull(),
+    actorId: text("actor_id"),
+    eventType: text("event_type").notNull(),
+    message: text("message"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    requestTimelineIdx: index("flight_change_events_request_timeline_idx").on(table.changeRequestId, table.createdAt),
+    eventTypeIdx: index("flight_change_events_type_idx").on(table.eventType, table.createdAt),
+  })
+)
+
 export const businessSettings = pgTable("business_settings", {
   id: text("id").primaryKey(),
   businessName: text("business_name").notNull(),
@@ -1153,6 +1341,17 @@ export type FlightCancellationEventRow =
   typeof flightCancellationEvents.$inferSelect
 export type NewFlightCancellationEventRow =
   typeof flightCancellationEvents.$inferInsert
+
+export type FlightChangeRequestRow = typeof flightChangeRequests.$inferSelect
+export type NewFlightChangeRequestRow = typeof flightChangeRequests.$inferInsert
+export type FlightChangeSearchRow = typeof flightChangeSearches.$inferSelect
+export type NewFlightChangeSearchRow = typeof flightChangeSearches.$inferInsert
+export type FlightChangeOfferRow = typeof flightChangeOffers.$inferSelect
+export type NewFlightChangeOfferRow = typeof flightChangeOffers.$inferInsert
+export type FlightOrderChangeRow = typeof flightOrderChanges.$inferSelect
+export type NewFlightOrderChangeRow = typeof flightOrderChanges.$inferInsert
+export type FlightChangeEventRow = typeof flightChangeEvents.$inferSelect
+export type NewFlightChangeEventRow = typeof flightChangeEvents.$inferInsert
 
 export type BusinessSettingsRow = typeof businessSettings.$inferSelect
 export type NewBusinessSettingsRow = typeof businessSettings.$inferInsert

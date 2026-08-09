@@ -144,6 +144,13 @@ export function AdminBookingDetail({
 
       {cancellation ? <CancellationCard cancellation={cancellation} /> : null}
 
+      {detail.changes.length > 0 ? (
+        <Card className="rounded-md border-primary/30 bg-primary/5">
+          <CardHeader><CardTitle>Flight change requests</CardTitle><CardDescription>Current and recent change activity linked to this booking.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">{detail.changes.map(change => <div key={change.requestId} className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3"><div><p className="font-medium">{humanize(change.requestType)}</p><p className="text-sm text-muted-foreground">{humanize(change.status)} · {change.updatedAtLabel}</p></div><Button size="sm" variant="outline" render={<Link href={`/admin/changes/${change.requestId}`} />}>Open change</Button></div>)}</CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.75fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <Card className="rounded-md">

@@ -20,6 +20,7 @@ export interface FlightOrderSnapshotLayover {
 }
 
 export interface FlightOrderSnapshotLeg {
+  sliceId?: string | null
   legIndex: number
   title: string
   ownerName: string

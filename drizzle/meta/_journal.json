@@ -36,6 +36,27 @@
       "when": 1785456000000,
       "tag": "0004_flight_cancellation_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785542400000,
+      "tag": "0004_global_display_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785628800000,
+      "tag": "0005_cancellation_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786406400000,
+      "tag": "0006_flight_change_foundation",
+      "breakpoints": true
     }
   ]
 }
