@@ -34,6 +34,8 @@ interface ProviderResponse {
   source: VisaDataSource
 }
 
+type VisaResponseValidator = (payload: unknown) => boolean
+
 function getBaseUrl(provider: VisaProvider) {
   switch (provider) {
     case "ivisa":
@@ -73,24 +75,26 @@ async function requestProvider(
   })
 }
 
-function shouldUseFallback(status: number) {
-  switch (status) {
-    case 429:
-    case 500:
-    case 501:
-    case 502:
-    case 503:
-    case 504:
-      return true
-    default:
-      return false
+function isMeaningfulValidationError(status: number) {
+  return status === 400 || status === 422
+}
+
+async function hasUsableResponseBody(
+  response: Response,
+  validate: VisaResponseValidator
+) {
+  try {
+    return validate(await response.clone().json())
+  } catch {
+    return false
   }
 }
 
 async function fetchWithVisaFallback(
   path: string,
   init?: RequestInit,
-  dependencies: VisaFetchDependencies = {}
+  dependencies: VisaFetchDependencies = {},
+  validate: VisaResponseValidator = () => true
 ): Promise<ProviderResponse> {
   try {
     const liveResponse = await requestProvider(
@@ -100,20 +104,35 @@ async function fetchWithVisaFallback(
       dependencies
     )
 
-    if (liveResponse.ok || !shouldUseFallback(liveResponse.status)) {
+    if (isMeaningfulValidationError(liveResponse.status)) {
+      return { response: liveResponse, source: "ivisa-live" }
+    }
+
+    if (
+      liveResponse.ok &&
+      (await hasUsableResponseBody(liveResponse, validate))
+    ) {
       return { response: liveResponse, source: "ivisa-live" }
     }
   } catch {
-    // Network failures and timeouts intentionally continue to the snapshot API.
+    // Network failures, timeouts, and malformed responses use the snapshot API.
   }
 
-  const fallbackResponse = await requestProvider(
-    "fallback",
-    path,
-    init,
-    dependencies
-  )
+  const fallbackResponse = await requestFallback(path, init, dependencies)
   return { response: fallbackResponse, source: "vacatina-snapshot" }
+}
+
+async function requestFallback(
+  path: string,
+  init: RequestInit | undefined,
+  dependencies: VisaFetchDependencies
+) {
+  try {
+    return await requestProvider("fallback", path, init, dependencies)
+  } catch {
+    // Retry once for a transient DNS, socket, or connection failure.
+    return requestProvider("fallback", path, init, dependencies)
+  }
 }
 
 async function readApiResult<T>(
@@ -151,7 +170,8 @@ export async function fetchVisaRequirements(
   const result = await fetchWithVisaFallback(
     `/visa/destination-requirements/${nationality}/${destination}`,
     undefined,
-    dependencies
+    dependencies,
+    isVisaRequirementsResponse
   )
   return readApiResult<VisaRequirementsResponse>(result)
 }
@@ -174,7 +194,28 @@ export async function fetchVisaProducts(
         destination_country_code: destination,
       }),
     },
-    dependencies
+    dependencies,
+    isVisaProductsResponse
   )
   return readApiResult<VisaProductsResponse>(result)
+}
+
+function isVisaRequirementsResponse(
+  payload: unknown
+): payload is VisaRequirementsResponse {
+  return (
+    isRecord(payload) &&
+    typeof payload.outcome === "string" &&
+    isRecord(payload.documents)
+  )
+}
+
+function isVisaProductsResponse(
+  payload: unknown
+): payload is VisaProductsResponse {
+  return isRecord(payload) && Array.isArray(payload.options)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

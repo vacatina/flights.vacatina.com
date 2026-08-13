@@ -88,12 +88,9 @@ export function VisaSearchForm({
           type="submit"
           className={cn("w-full", compact && "mt-7 lg:w-auto")}
         >
-          {compact ? (
-            <SearchIcon data-icon="inline-start" />
-          ) : (
-            <ArrowRightIcon data-icon="inline-end" />
-          )}
+          {compact ? <SearchIcon data-icon="inline-start" /> : null}
           {compact ? "Check again" : "Check visa requirements"}
+          {compact ? null : <ArrowRightIcon data-icon="inline-end" />}
         </Button>
       </FieldGroup>
     </form>

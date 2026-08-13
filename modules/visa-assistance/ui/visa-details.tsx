@@ -13,8 +13,9 @@ import {
   MoveRightIcon,
   NotebookTabsIcon,
   PlaneTakeoffIcon,
+  SearchIcon,
   ShieldCheckIcon,
-  TagIcon,
+  SparklesIcon,
   WalletCardsIcon,
 } from "lucide-react"
 
@@ -31,12 +32,10 @@ import { Separator } from "@/components/ui/separator"
 import {
   getVisaCountry,
   type VisaAssistanceResult,
-  type VisaDataSource,
   type VisaDocumentResult,
   type VisaProductOption,
   type VisaResponseMetadata,
 } from "@/modules/visa-assistance/domain"
-import { ApiDataAccordion } from "@/modules/visa-assistance/ui/api-data-accordion"
 import { VisaSearchForm } from "@/modules/visa-assistance/ui/visa-search-form"
 
 interface VisaDetailsProps {
@@ -45,23 +44,30 @@ interface VisaDetailsProps {
 
 const outcomeContent = {
   visa_supported: {
-    eyebrow: "Visa required",
-    title: "A visa is required for this trip",
+    label: "Visa required",
+    title: "You’ll need a visa for this trip",
+    description: "We found a visa option for this passport and destination.",
     icon: FileCheck2Icon,
   },
   document_not_required: {
-    eyebrow: "No additional document found",
-    title: "A visa is not required for this trip",
+    label: "Visa not required",
+    title: "You can travel without a visa",
+    description:
+      "No additional visa requirement was found for this passport and destination.",
     icon: CheckCircle2Icon,
   },
   document_unsupported: {
-    eyebrow: "Document required",
-    title: "A document is required, but no eligible product was found",
+    label: "Visa may be required",
+    title: "You may need to arrange your visa separately",
+    description:
+      "A travel document appears to be required, but an online visa option is not currently available here.",
     icon: AlertCircleIcon,
   },
   other_document_supported: {
-    eyebrow: "Travel document available",
-    title: "Another travel document may be needed",
+    label: "Travel document needed",
+    title: "You may need another travel document",
+    description:
+      "Review the document option below before you make your travel plans.",
     icon: FileQuestionIcon,
   },
 } as const
@@ -74,30 +80,27 @@ export function VisaDetails({ result }: VisaDetailsProps) {
       result.requirements.outcome as keyof typeof outcomeContent
     ] ?? outcomeContent.document_unsupported
   const OutcomeIcon = outcome.icon
-  const matchedProductIds = new Set(
-    result.eligibleDocuments.flatMap(({ product }) =>
-      product?.id === undefined ? [] : [String(product.id)]
-    )
-  )
-  const additionalProducts = (result.products.options ?? []).filter(
-    (product) =>
-      product.id === undefined || !matchedProductIds.has(String(product.id))
-  )
+  const latestMetadata = getLatestMetadata(result)
 
   return (
     <main className="bg-muted/40">
-      <section className="relative overflow-hidden bg-primary text-primary-foreground">
+      <section className="relative isolate overflow-hidden bg-primary text-primary-foreground">
         <div
-          className="absolute inset-0 [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:42px_42px] opacity-10"
+          className="absolute inset-0 [background-image:radial-gradient(circle_at_1px_1px,currentColor_1px,transparent_0)] [background-size:30px_30px] opacity-15"
           aria-hidden="true"
         />
+        <div
+          className="absolute -top-32 right-[-8rem] size-[28rem] rounded-full border border-primary-foreground/15"
+          aria-hidden="true"
+        />
+
         <div className="relative mx-auto w-full max-w-7xl px-5 py-12 md:px-8 md:py-16 lg:px-12">
           <div className="flex flex-wrap items-center gap-3 text-sm text-primary-foreground/75">
             <span className="inline-flex items-center gap-2">
               <span className="text-xl" aria-hidden="true">
                 {nationality?.emoji}
               </span>
-              {nationality?.name ?? result.nationality}
+              {nationality?.name ?? result.nationality} passport
             </span>
             <ArrowRightIcon className="size-4" />
             <span className="inline-flex items-center gap-2">
@@ -108,294 +111,201 @@ export function VisaDetails({ result }: VisaDetailsProps) {
             </span>
           </div>
 
-          <div className="mt-8 grid gap-7 lg:grid-cols-[auto_1fr] lg:items-start">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary-foreground text-primary shadow-lg">
-              <OutcomeIcon />
+          <div className="mt-8 grid max-w-5xl gap-6 md:grid-cols-[auto_1fr] md:items-start">
+            <span className="flex size-16 items-center justify-center rounded-2xl bg-primary-foreground text-primary shadow-lg">
+              <OutcomeIcon className="size-7" />
             </span>
-            <div className="max-w-4xl">
-              <p className="text-sm font-semibold tracking-[0.16em] text-primary-foreground/70 uppercase">
-                {outcome.eyebrow}
-              </p>
-              <h1 className="mt-2 font-heading text-4xl font-semibold tracking-[-0.035em] text-balance md:text-5xl">
+            <div>
+              <Badge variant="secondary" className="mb-4">
+                {outcome.label}
+              </Badge>
+              <h1 className="font-heading text-4xl leading-tight font-semibold tracking-[-0.035em] text-balance md:text-5xl">
                 {outcome.title}
               </h1>
-              {result.requirements.requirement_text ? (
-                <p className="mt-5 max-w-3xl text-lg leading-relaxed text-pretty text-primary-foreground/80">
-                  {result.requirements.requirement_text}
-                </p>
-              ) : null}
+              <p className="mt-4 max-w-3xl text-lg leading-relaxed text-pretty text-primary-foreground/80">
+                {result.requirements.requirement_text ?? outcome.description}
+              </p>
+              <FreshnessNote metadata={latestMetadata} />
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-10 md:px-8 md:py-14 lg:px-12">
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle>Check another trip</CardTitle>
-            <CardDescription>
-              Change either country to refresh the requirements.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <VisaSearchForm
-              compact
-              initialValues={{
-                nationality: result.nationality,
-                destination: result.destination,
-              }}
-            />
-          </CardContent>
-        </Card>
-
-        <section aria-labelledby="decision-overview-heading">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">
-                Decision overview
-              </p>
-              <h2
-                id="decision-overview-heading"
-                className="mt-1 font-heading text-2xl font-semibold tracking-tight"
-              >
-                What the API says
-              </h2>
-            </div>
-            <SourceSummary metadata={result.metadata.requirements} />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <DecisionCard
-              icon={NotebookTabsIcon}
-              label="Document required"
-              value={formatBoolean(result.requirements.requires_document)}
-            />
-            <DecisionCard
-              icon={PlaneTakeoffIcon}
-              label="Visa required"
-              value={formatBoolean(
-                result.requirements.visa_required_to_enter_destination
-              )}
-            />
-            <DecisionCard
-              icon={ShieldCheckIcon}
-              label="Visa available"
-              value={formatBoolean(result.requirements.visas_available)}
-            />
-            <DecisionCard
-              icon={TagIcon}
-              label="API outcome"
-              value={formatLabel(result.requirements.outcome)}
-            />
-          </div>
-        </section>
-
-        <Separator />
-
-        <section aria-labelledby="eligible-documents-heading">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">
-                Eligible documents
-              </p>
-              <h2
-                id="eligible-documents-heading"
-                className="mt-1 font-heading text-2xl font-semibold tracking-tight"
-              >
-                Visa options for this passport
-              </h2>
-            </div>
-            <SourceSummary metadata={result.metadata.products} />
-          </div>
-
+      <div className="mx-auto grid w-full max-w-7xl gap-8 px-5 py-10 md:px-8 md:py-14 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:px-12">
+        <div className="flex min-w-0 flex-col gap-8">
           {result.eligibleDocuments.length > 0 ? (
-            <div className="flex flex-col gap-5">
-              {result.eligibleDocuments.map((documentResult, index) => (
-                <EligibleDocumentCard
-                  key={`${documentResult.document.visa_type_id ?? index}`}
-                  documentResult={documentResult}
-                />
-              ))}
-            </div>
-          ) : (
-            <Alert>
-              <InfoIcon />
-              <AlertTitle>No eligible visa product returned</AlertTitle>
-              <AlertDescription>
-                The requirements endpoint did not return an eligible document
-                for this passport and destination combination.
-              </AlertDescription>
-            </Alert>
-          )}
-        </section>
+            <section aria-labelledby="visa-options-heading">
+              <div className="mb-5">
+                <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">
+                  Your visa option
+                </p>
+                <h2
+                  id="visa-options-heading"
+                  className="mt-1 font-heading text-2xl font-semibold tracking-tight md:text-3xl"
+                >
+                  What this visa includes
+                </h2>
+                <p className="mt-2 max-w-2xl text-muted-foreground">
+                  Review the stay rules and passport requirement before you
+                  continue planning.
+                </p>
+              </div>
 
-        {result.ineligibleDocuments.length > 0 ||
-        additionalProducts.length > 0 ? (
-          <section aria-labelledby="other-api-data-heading">
+              <div className="flex flex-col gap-5">
+                {result.eligibleDocuments.map((documentResult, index) => (
+                  <VisaOptionCard
+                    key={`${documentResult.document.visa_type_id ?? index}`}
+                    documentResult={documentResult}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : (
+            <NoVisaOption outcome={result.requirements.outcome} />
+          )}
+
+          <section aria-labelledby="next-steps-heading">
             <div className="mb-5">
               <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">
-                Other API results
+                Before you travel
               </p>
               <h2
-                id="other-api-data-heading"
+                id="next-steps-heading"
                 className="mt-1 font-heading text-2xl font-semibold tracking-tight"
               >
-                Returned, but not confirmed eligible
+                A few important next steps
               </h2>
             </div>
 
-            <Alert className="mb-5">
-              <InfoIcon />
-              <AlertTitle>Eligibility matters</AlertTitle>
-              <AlertDescription>
-                Product data alone does not prove eligibility. The items below
-                were returned by an API but were not matched to an eligible
-                document for this passport.
-              </AlertDescription>
-            </Alert>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {result.ineligibleDocuments.map((document, index) => (
-                <Card key={`ineligible-${document.visa_type_id ?? index}`}>
-                  <CardHeader>
-                    <Badge variant="outline" className="mb-2">
-                      Ineligible document
-                    </Badge>
-                    <CardTitle>{document.name ?? "Unnamed document"}</CardTitle>
-                    <CardDescription>
-                      {document.requirement_phrase ??
-                        formatLabel(document.classification ?? "document")}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
-              {additionalProducts.map((product, index) => (
-                <OtherProductCard
-                  key={`product-${product.id ?? index}`}
-                  product={product}
-                />
-              ))}
+            <div className="grid gap-4 md:grid-cols-3">
+              <NextStep
+                number="01"
+                icon={NotebookTabsIcon}
+                title="Check your passport"
+                description="Make sure it meets the validity rule shown for your visa."
+              />
+              <NextStep
+                number="02"
+                icon={FileCheck2Icon}
+                title="Confirm official rules"
+                description="Verify the latest entry requirements before booking."
+              />
+              <NextStep
+                number="03"
+                icon={PlaneTakeoffIcon}
+                title="Allow enough time"
+                description="Apply early enough for processing before departure."
+              />
             </div>
           </section>
-        ) : null}
 
-        <Separator />
+          <Alert>
+            <AlertCircleIcon />
+            <AlertTitle>Requirements can change</AlertTitle>
+            <AlertDescription>
+              Always confirm the latest rules with the destination’s embassy or
+              immigration authority before booking or departure. Final approval
+              to enter is made by border officials.
+            </AlertDescription>
+          </Alert>
+        </div>
 
-        <section aria-labelledby="complete-api-data-heading">
-          <div className="mb-5">
-            <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">
-              Complete API data
-            </p>
-            <h2
-              id="complete-api-data-heading"
-              className="mt-1 font-heading text-2xl font-semibold tracking-tight"
-            >
-              Every field returned by both endpoints
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Expand either response to inspect the original data without
-              presentation or calculation changes.
-            </p>
-          </div>
-          <ApiDataAccordion
-            requirements={result.requirements}
-            products={result.products}
-          />
-        </section>
+        <aside className="flex flex-col gap-5 lg:sticky lg:top-28">
+          <Card className="shadow-none">
+            <CardHeader>
+              <span className="mb-2 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <SearchIcon />
+              </span>
+              <CardTitle>Check another trip</CardTitle>
+              <CardDescription>
+                Change your passport country or destination.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VisaSearchForm
+                initialValues={{
+                  nationality: result.nationality,
+                  destination: result.destination,
+                }}
+              />
+            </CardContent>
+          </Card>
 
-        <Alert>
-          <AlertCircleIcon />
-          <AlertTitle>Confirm before you travel</AlertTitle>
-          <AlertDescription>
-            Visa requirements and prices can change without notice. Treat this
-            result as assistance and verify the latest rules with the relevant
-            embassy or immigration authority before booking or departure.
-          </AlertDescription>
-        </Alert>
+          <Card size="sm" className="bg-primary/5 shadow-none">
+            <CardHeader>
+              <div className="flex gap-3">
+                <ShieldCheckIcon className="mt-0.5 size-5 shrink-0 text-primary" />
+                <div>
+                  <CardTitle>Plan with confidence</CardTitle>
+                  <CardDescription className="mt-1 leading-relaxed">
+                    Eligibility, stay rules, passport needs, and available fees
+                    are organized into one clear travel summary.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        </aside>
       </div>
     </main>
   )
 }
 
-function DecisionCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof NotebookTabsIcon
-  label: string
-  value: string
-}) {
-  return (
-    <Card size="sm" className="shadow-none">
-      <CardHeader>
-        <span className="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon />
-        </span>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle>{value}</CardTitle>
-      </CardHeader>
-    </Card>
-  )
-}
-
-function EligibleDocumentCard({
+function VisaOptionCard({
   documentResult,
 }: {
   documentResult: VisaDocumentResult
 }) {
   const { document, product } = documentResult
   const validity = product?.validity ?? document.validity
+  const fees = getVisibleFees(product)
 
   return (
     <Card className="shadow-none">
-      <CardHeader className="border-b">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <CardHeader className="border-b bg-muted/35">
+        <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <div className="mb-3 flex flex-wrap gap-2">
               <Badge>{formatLabel(document.classification ?? "visa")}</Badge>
               {document.is_required ? (
-                <Badge variant="secondary">Required</Badge>
-              ) : null}
-              {product?.unlisted ? (
-                <Badge variant="outline">Unlisted</Badge>
+                <Badge variant="secondary">Required for entry</Badge>
               ) : null}
             </div>
-            <CardTitle className="text-xl">
-              {document.name ?? product?.product_name ?? "Visa document"}
+            <CardTitle className="text-xl md:text-2xl">
+              {document.name ?? product?.product_name ?? "Travel visa"}
             </CardTitle>
-            <CardDescription className="mt-2 max-w-3xl leading-relaxed">
-              {document.requirement_phrase}
-            </CardDescription>
+            {document.reasons_for_travel?.length ? (
+              <CardDescription className="mt-2">
+                Suitable for {formatReasons(document.reasons_for_travel)}
+              </CardDescription>
+            ) : null}
           </div>
-          {product?.product_name_short ? (
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <NotebookTabsIcon />
-            </span>
-          ) : null}
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <NotebookTabsIcon />
+          </span>
         </div>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-7">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <DetailTile
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <TravelDetail
             icon={CalendarClockIcon}
-            label="Visa validity"
+            label="Visa valid for"
             value={asDisplayValue(validity?.visa_validity)}
           />
-          <DetailTile
-            icon={DoorOpenIcon}
-            label="Entries"
-            value={asDisplayValue(validity?.num_entries)}
-          />
-          <DetailTile
+          <TravelDetail
             icon={Clock3Icon}
             label="Maximum stay"
             value={asDisplayValue(validity?.max_stay)}
           />
-          <DetailTile
+          <TravelDetail
+            icon={DoorOpenIcon}
+            label="Number of entries"
+            value={asDisplayValue(validity?.num_entries)}
+          />
+          <TravelDetail
             icon={MoveRightIcon}
-            label="Validity starts"
+            label="Starts"
             value={asDisplayValue(validity?.starts)}
           />
         </div>
@@ -403,103 +313,60 @@ function EligibleDocumentCard({
         {product ? (
           <>
             <Separator />
-            <div>
-              <h3 className="font-heading text-base font-medium">
-                Captured fees and passport rules
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Fee fields are shown separately exactly as supplied by the API.
-              </p>
-            </div>
-            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-              <LabeledValue
-                icon={WalletCardsIcon}
-                label="Base / service price"
-                value={formatBasePrice(product)}
-              />
-              <LabeledValue
-                icon={LandmarkIcon}
-                label="Government fee metadata"
-                value={asDisplayValue(product.validity?.gov_fee)}
-              />
-              <LabeledValue
-                icon={CircleDollarSignIcon}
-                label={product.pricing?.name ?? "Displayed visa cost"}
-                value={
-                  product.pricing?.visa_cost_pretty ??
-                  asDisplayValue(product.pricing?.visa_cost)
-                }
-              />
-              <LabeledValue
-                icon={NotebookTabsIcon}
-                label="Passport validity required"
-                value={formatPassportRequirement(product)}
-              />
-              <LabeledValue
-                icon={TagIcon}
-                label="Product ID"
-                value={asDisplayValue(product.product_id)}
-              />
-              <LabeledValue
-                icon={FileCheck2Icon}
-                label="Visa type ID"
-                value={asDisplayValue(product.id)}
-              />
+            <div className="grid gap-7 md:grid-cols-[1fr_1.2fr]">
+              <div>
+                <p className="text-sm font-medium">Passport requirement</p>
+                <div className="mt-3 flex items-start gap-3 rounded-xl bg-muted p-4">
+                  <NotebookTabsIcon className="mt-0.5 size-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-medium">
+                      {formatPassportRequirement(product)}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      Check the expiry date printed on your passport before you
+                      apply.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium">Estimated fees</p>
+                {fees.length > 0 ? (
+                  <div className="mt-3 flex flex-col gap-3">
+                    {fees.map((fee) => (
+                      <div
+                        key={fee.label}
+                        className="flex items-center justify-between gap-4 rounded-xl border bg-background px-4 py-3"
+                      >
+                        <span className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <fee.icon className="size-4" />
+                          {fee.label}
+                        </span>
+                        <span className="font-semibold">{fee.value}</span>
+                      </div>
+                    ))}
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Fees are shown separately and may not equal the final
+                      amount. Processing choices, travelers, taxes, or extras
+                      can change the total.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Fee information is not currently available.
+                  </p>
+                )}
+              </div>
             </div>
           </>
-        ) : (
-          <Alert>
-            <InfoIcon />
-            <AlertTitle>No matching product detail</AlertTitle>
-            <AlertDescription>
-              The eligibility response returned this document, but no product
-              option with the same visa type ID was found.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {document.reasons_for_travel?.length ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Travel reasons
-            </span>
-            {document.reasons_for_travel.map((reason) => (
-              <Badge key={reason} variant="outline">
-                {formatLabel(reason)}
-              </Badge>
-            ))}
-          </div>
         ) : null}
       </CardContent>
     </Card>
   )
 }
 
-function OtherProductCard({ product }: { product: VisaProductOption }) {
-  return (
-    <Card>
-      <CardHeader>
-        <Badge variant="outline" className="mb-2">
-          Unmatched product
-        </Badge>
-        <CardTitle>
-          {product.product_name ?? product.name ?? "Unnamed product"}
-        </CardTitle>
-        <CardDescription>
-          {[
-            product.validity?.visa_validity,
-            product.validity?.num_entries,
-            product.validity?.max_stay,
-          ]
-            .filter(Boolean)
-            .join(" · ") || "No summary details returned"}
-        </CardDescription>
-      </CardHeader>
-    </Card>
-  )
-}
-
-function DetailTile({
+function TravelDetail({
   icon: Icon,
   label,
   value,
@@ -519,57 +386,132 @@ function DetailTile({
   )
 }
 
-function LabeledValue({
+function NextStep({
+  number,
   icon: Icon,
-  label,
-  value,
+  title,
+  description,
 }: {
+  number: string
   icon: typeof NotebookTabsIcon
-  label: string
-  value: string
+  title: string
+  description: string
 }) {
   return (
-    <div className="flex gap-3">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-0.5 font-medium">{value}</p>
-      </div>
-    </div>
+    <Card size="sm" className="shadow-none">
+      <CardHeader>
+        <div className="mb-4 flex items-center justify-between">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Icon />
+          </span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {number}
+          </span>
+        </div>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription className="leading-relaxed">
+          {description}
+        </CardDescription>
+      </CardHeader>
+    </Card>
   )
 }
 
-function SourceSummary({ metadata }: { metadata: VisaResponseMetadata }) {
+function NoVisaOption({ outcome }: { outcome: string }) {
+  const visaNotRequired = outcome === "document_not_required"
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Badge variant="outline">{sourceLabel(metadata.source)}</Badge>
-      {metadata.capturedAt ? (
-        <span className="text-xs text-muted-foreground">
-          Captured {formatCapturedAt(metadata.capturedAt)}
+    <Card className="shadow-none">
+      <CardHeader className="items-center py-10 text-center md:py-14">
+        <span className="mb-3 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+          {visaNotRequired ? <CheckCircle2Icon /> : <InfoIcon />}
         </span>
-      ) : null}
-    </div>
+        <CardTitle className="text-xl">
+          {visaNotRequired
+            ? "No visa option is needed"
+            : "No online visa option is available here"}
+        </CardTitle>
+        <CardDescription className="max-w-lg leading-relaxed">
+          {visaNotRequired
+            ? "Keep checking official entry rules as your departure date gets closer."
+            : "Contact the destination’s embassy or immigration authority for the correct application route."}
+        </CardDescription>
+      </CardHeader>
+    </Card>
   )
 }
 
-function sourceLabel(source: VisaDataSource) {
-  return source === "ivisa-live" ? "Live iVisa data" : "Vacatina snapshot"
+function FreshnessNote({ metadata }: { metadata: VisaResponseMetadata }) {
+  if (!metadata.capturedAt) {
+    return (
+      <p className="mt-5 inline-flex items-center gap-2 text-sm text-primary-foreground/70">
+        <SparklesIcon className="size-4" /> Checked just now
+      </p>
+    )
+  }
+
+  return (
+    <p className="mt-5 inline-flex items-center gap-2 text-sm text-primary-foreground/70">
+      <Clock3Icon className="size-4" /> Information updated{" "}
+      {formatDate(metadata.capturedAt)}
+    </p>
+  )
 }
 
-function formatCapturedAt(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("en", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "UTC",
-      }).format(date) + " UTC"
+function getLatestMetadata(result: VisaAssistanceResult) {
+  const metadata = [result.metadata.requirements, result.metadata.products]
+  return metadata.find((entry) => entry.capturedAt) ?? metadata[0]
 }
 
-function formatBoolean(value: boolean | undefined) {
-  if (value === undefined) return "Not provided"
-  return value ? "Yes" : "No"
+function getVisibleFees(product: VisaProductOption | null) {
+  if (!product) return []
+
+  const fees: Array<{
+    label: string
+    value: string
+    icon: typeof WalletCardsIcon
+  }> = []
+  const basePrice = formatBasePrice(product)
+
+  if (basePrice) {
+    fees.push({
+      label: "Service fee",
+      value: basePrice,
+      icon: WalletCardsIcon,
+    })
+  }
+
+  const displayedVisaCost =
+    product.pricing?.visa_cost_pretty ??
+    formatMoneyValue(product.pricing?.visa_cost, undefined)
+
+  if (displayedVisaCost) {
+    fees.push({
+      label: product.pricing?.name ?? "Visa fee",
+      value: displayedVisaCost,
+      icon: CircleDollarSignIcon,
+    })
+  } else {
+    const governmentFee = formatMoneyValue(
+      product.validity?.gov_fee,
+      product.validity?.base_price?.currency
+    )
+    if (governmentFee) {
+      fees.push({
+        label: "Government fee",
+        value: governmentFee,
+        icon: LandmarkIcon,
+      })
+    }
+  }
+
+  return fees
+}
+
+function formatReasons(reasons: string[]) {
+  const labels = reasons.map(formatLabel)
+  if (labels.length <= 1) return labels[0]
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`
 }
 
 function formatLabel(value: string) {
@@ -580,23 +522,45 @@ function formatLabel(value: string) {
 
 function asDisplayValue(value: unknown) {
   if (value === null || value === undefined || value === "") {
-    return "Not provided"
+    return "Not specified"
   }
   return String(value)
 }
 
 function formatBasePrice(product: VisaProductOption) {
-  const price = product.validity?.base_price?.price
-  const currency = product.validity?.base_price?.currency
-  if (price === null || price === undefined) return "Not provided"
-  return currency ? `${currency} ${price}` : String(price)
+  return formatMoneyValue(
+    product.validity?.base_price?.price,
+    product.validity?.base_price?.currency
+  )
+}
+
+function formatMoneyValue(value: unknown, currency: string | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  return currency ? `${currency} ${value}` : String(value)
 }
 
 function formatPassportRequirement(product: VisaProductOption) {
   const requirement = product.validity?.passport_requirements
-  if (!requirement?.duration || !requirement.unit) return "Not provided"
-  const timing = requirement.exp_type
-    ? ` after ${formatLabel(requirement.exp_type)}`
-    : ""
-  return `${requirement.duration} ${requirement.unit}${timing}`
+  if (!requirement?.duration || !requirement.unit) {
+    return "No specific validity period provided"
+  }
+
+  const unit =
+    requirement.duration === 1
+      ? requirement.unit.replace(/s$/, "")
+      : requirement.unit
+  const timing =
+    requirement.exp_type === "arrival"
+      ? " after arrival"
+      : requirement.exp_type
+        ? ` after ${formatLabel(requirement.exp_type).toLowerCase()}`
+        : ""
+
+  return `Valid for at least ${requirement.duration} ${unit}${timing}`
+}
+
+function formatDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(date)
 }

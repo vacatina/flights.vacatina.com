@@ -57,10 +57,10 @@ export async function getVisaAssistanceResult(
     dependencies.fetchRequirements ?? fetchVisaRequirements
   const fetchProducts = dependencies.fetchProducts ?? fetchVisaProducts
 
-  const [requirementsResult, productsResult] = await Promise.all([
-    fetchRequirements(nationality, destination),
-    fetchProducts(nationality, destination),
-  ])
+  // Keep the two upstream operations sequential. When the primary provider is
+  // unavailable, this avoids opening competing connections to the fallback.
+  const requirementsResult = await fetchRequirements(nationality, destination)
+  const productsResult = await fetchProducts(nationality, destination)
 
   const eligibleDocuments = requirementsResult.data.documents?.eligible ?? []
   const products = productsResult.data.options ?? []

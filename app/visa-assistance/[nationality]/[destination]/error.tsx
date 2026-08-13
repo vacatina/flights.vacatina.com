@@ -22,8 +22,8 @@ export default function VisaDetailsError({ reset }: { reset: () => void }) {
           </EmptyMedia>
           <EmptyTitle>Visa details are temporarily unavailable</EmptyTitle>
           <EmptyDescription>
-            Both the live visa service and the Vacatina snapshot may be
-            unavailable. Please try the request again.
+            We couldn’t check this trip right now. Please wait a moment and try
+            again.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

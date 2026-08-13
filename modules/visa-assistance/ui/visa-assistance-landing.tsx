@@ -71,7 +71,7 @@ export function VisaAssistanceLanding() {
                 <Clock3Icon className="size-4" /> Fast country search
               </span>
               <span className="inline-flex items-center gap-2">
-                <ShieldCheckIcon className="size-4" /> Server-side API access
+                <ShieldCheckIcon className="size-4" /> Reliable visa information
               </span>
             </div>
           </div>
