@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { getActorContext } from "@/modules/auth/server"
 import { requireActiveAdmin } from "@/modules/flights/cancellations/server/admin-guard"
 import { flightChangeRequestTypes, type FlightChangeRequestType } from "@/modules/flights/changes/domain"
-import { createBaggageRequest, createManualChangeRequest, searchItineraryChanges, selectChangeOffer, confirmZeroPriceChange, performAdminChangeAction } from "@/modules/flights/changes/server/service"
+import { createBaggageRequest, createManualChangeRequest, getLatestChangeStatusForBooking, searchItineraryChanges, selectChangeOffer, confirmZeroPriceChange, performAdminChangeAction } from "@/modules/flights/changes/server/service"
 import { captureFlightChangePayPalPayment, startFlightChangePayPalPayment } from "@/modules/flights/payments-adapter/change-payment-service"
 
 export async function createManualChangeRequestAction(formData:FormData){
@@ -17,8 +17,16 @@ export async function createManualChangeRequestAction(formData:FormData){
 }
 export async function searchItineraryChangesAction(formData:FormData){
   const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),sliceId=req(formData,"sliceId")
-  const result=await searchItineraryChanges({actor,bookingReference,selectedSliceIds:[sliceId],criteria:[{origin:req(formData,"origin"),destination:req(formData,"destination"),departureDate:req(formData,"departureDate"),cabinClass:parseCabin(req(formData,"cabinClass"))}]})
-  redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${result.request.id}/${result.offers.length?"offers":""}`.replace(/\/$/,""))
+  try {
+    const result=await searchItineraryChanges({actor,bookingReference,selectedSliceIds:[sliceId],criteria:[{origin:req(formData,"origin"),destination:req(formData,"destination"),departureDate:req(formData,"departureDate"),cabinClass:parseCabin(req(formData,"cabinClass"))}]})
+    redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${result.request.id}/${result.offers.length?"offers":""}`.replace(/\/$/,""))
+  } catch (error) {
+    if (error instanceof Error && error.message === "Another flight change is already in progress for this booking.") {
+      const existing=await getLatestChangeStatusForBooking({actor,bookingReference})
+      if (existing) redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${existing.id}`)
+    }
+    throw error
+  }
 }
 export async function selectChangeOfferAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),requestId=req(formData,"requestId");await selectChangeOffer({actor,requestId,offerId:req(formData,"offerId")});redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${requestId}/review`)}
 export async function confirmZeroPriceChangeAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),requestId=req(formData,"requestId");await confirmZeroPriceChange({actor,requestId});revalidatePath(`/booking/${bookingReference}`);redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${requestId}`)}

@@ -12,9 +12,9 @@ import { PlaceAutocompleteField } from "@/modules/flights/search/ui/place-autoco
 import { cn } from "@/lib/utils"
 import { searchItineraryChangesAction } from "@/modules/flights/changes/server/actions"
 
-interface Props { bookingReference: string; sliceId: string; origin: string; destination: string; departureDate: string }
+interface Props { bookingReference: string; sliceId: string; origin: string; destination: string; departureDate: string; selectedJourneyLabel?: string }
 
-export function ChangeFlightSearchForm({ bookingReference, sliceId, origin, destination, departureDate }: Props) {
+export function ChangeFlightSearchForm({ bookingReference, sliceId, origin, destination, departureDate, selectedJourneyLabel }: Props) {
   const initialValues = useMemo<FlightSearchFormValues>(() => {
     const values = createDefaultFlightSearchValues()
     values.slices[0] = { origin: createPlace(origin), destination: createPlace(destination), departureDate, departureTime: null, arrivalTime: null }
@@ -29,7 +29,7 @@ export function ChangeFlightSearchForm({ bookingReference, sliceId, origin, dest
   const textFieldClassName = "h-14 rounded-xl border-input bg-background px-4 text-base font-medium text-foreground placeholder:text-muted-foreground"
   const dateFieldClassName = "h-14 rounded-xl border-input bg-background px-4 text-[15px] font-medium text-foreground hover:bg-background"
 
-  return <form action={searchItineraryChangesAction} className="flex w-full flex-col gap-8 rounded-[12px] border border-border bg-background p-4 shadow-xl md:p-8" onSubmit={(event) => {
+  return <form action={searchItineraryChangesAction} className="flex w-full flex-col gap-7 rounded-xl border border-border bg-card p-5 shadow-sm md:p-7" onSubmit={(event) => {
     if (!originValue || !destinationValue || !departureDateValue) {
       event.preventDefault()
       if (!originValue) form.setError("slices.0.origin", { message: "Choose an origin" })
@@ -43,10 +43,7 @@ export function ChangeFlightSearchForm({ bookingReference, sliceId, origin, dest
     <input type="hidden" name="destination" value={destinationValue?.iataCode ?? ""} />
     <input type="hidden" name="departureDate" value={departureDateValue ?? ""} />
     <input type="hidden" name="cabinClass" value={cabinClass} />
-    <div>
-      <p className="text-sm font-medium uppercase tracking-[0.08em] text-primary">Replacement journey</p>
-      <p className="mt-2 text-sm text-muted-foreground">Use the same airport, calendar, and cabin controls as the main flight search.</p>
-    </div>
+    <div><p className="text-sm font-medium uppercase tracking-[0.08em] text-primary">Replacement journey</p><p className="mt-2 text-sm text-muted-foreground">{selectedJourneyLabel ? `Replacing ${selectedJourneyLabel}. ` : ""}Choose where and when you would prefer to fly.</p></div>
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.85fr)]">
       <PlaceAutocompleteField control={form.control} name="slices.0.origin" label="FROM" placeholder="Select origin" helperText="Airport code, city, or country" labelClassName={fieldLabelClassName} inputClassName={textFieldClassName} />
       <PlaceAutocompleteField control={form.control} name="slices.0.destination" label="TO" placeholder="Select destination" helperText="Airport code, city, or country" labelClassName={fieldLabelClassName} inputClassName={textFieldClassName} />

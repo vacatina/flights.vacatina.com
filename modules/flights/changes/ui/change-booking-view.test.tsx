@@ -1,9 +1,5 @@
 import { render, screen } from "@testing-library/react"
-import { describe, expect, test, vi } from "vitest"
-
-vi.mock("@/modules/flights/orders/ui", () => ({
-  BookingJourneySummary: () => <div>Journey summary</div>,
-}))
+import { describe, expect, test } from "vitest"
 
 import { ChangeBookingView } from "@/modules/flights/changes/ui/change-booking-view"
 
@@ -15,30 +11,29 @@ function context(sliceId: string | null) {
     booking: {
       reference: "ABC123",
       routeLabel: "CMB → DXB",
-      legs: [{ legIndex: 0, sliceId }],
+      passengers: [{ id: "p_1" }],
+      legs: [{ legIndex: 0, sliceId, title: "Outbound", routeLabel: "CMB → DXB", departureLabel: "Fri, 5 Sep 2026" }],
     },
   }
 }
 
-describe("change booking options", () => {
-  test("promotes an eligible flight change to the automated path", () => {
+describe("change booking workspace", () => {
+  test("leads an eligible customer into the replacement-flight flow", () => {
     render(<ChangeBookingView context={context("sli_1")} />)
 
-    expect(screen.getByRole("heading", { name: "Available online" })).toBeTruthy()
-    expect(screen.getByText("Duffel-supported")).toBeTruthy()
-    expect(
-      screen
-        .getAllByRole("link", { name: "Continue" })
-        .some((link) => link.getAttribute("href") === "/booking/ABC123/change/flight"),
-    ).toBe(true)
-    expect(screen.getByRole("heading", { name: "Need another change?" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "What would you like to change?" })).toBeTruthy()
+    expect(screen.getByText("Available online")).toBeTruthy()
+    expect(screen.getByRole("link", { name: /search replacement flights/i }).getAttribute("href")).toBe(
+      "/booking/ABC123/change/flight",
+    )
+    expect(screen.getByRole("heading", { name: "Need help with something else?" })).toBeTruthy()
   })
 
-  test("offers manual help when no flight can be automated", () => {
+  test("routes an ineligible flight change to support", () => {
     render(<ChangeBookingView context={context(null)} />)
 
-    expect(screen.getByText("There are no automated flight options")).toBeTruthy()
-    expect(screen.getByRole("link", { name: "Request manual help" }).getAttribute("href")).toBe(
+    expect(screen.getByText("Support review")).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Ask flight support" }).getAttribute("href")).toBe(
       "/booking/ABC123/change/request?type=other",
     )
   })
