@@ -19,7 +19,7 @@ export const flightChangeSearchSchema = z.object({
   criteria: z.array(z.object({ origin: z.string().trim().length(3).transform(v => v.toUpperCase()), destination: z.string().trim().length(3).transform(v => v.toUpperCase()), departureDate: z.iso.date(), cabinClass: z.enum(["first","business","premium_economy","economy"]) })).min(1),
 })
 
-export const adminChangeActionSchema = z.object({ requestId: z.string().trim().min(1), action: z.enum(["approve","reject","manual","complete"]), reason: z.string().trim().max(2000).optional(), externalReference: z.string().trim().max(200).optional(), customerMessage: z.string().trim().max(2000).optional() }).superRefine((v,ctx)=>{ if(v.action === "reject" && !v.reason) ctx.addIssue({code:"custom",path:["reason"],message:"A rejection reason is required."}) })
+export const adminChangeActionSchema = z.object({ requestId: z.string().trim().min(1), action: z.enum(["approve","reject","manual","complete","update"]), reason: z.string().trim().max(2000).optional(), externalReference: z.string().trim().max(200).optional(), customerMessage: z.string().trim().max(2000).optional() }).superRefine((v,ctx)=>{ if(v.action === "reject" && !v.reason) ctx.addIssue({code:"custom",path:["reason"],message:"A rejection reason is required."}); if(v.action === "update" && !v.customerMessage) ctx.addIssue({code:"custom",path:["customerMessage"],message:"Write a customer update before sending it."}) })
 
 export type CreateFlightChangeRequestInput = z.infer<typeof createFlightChangeRequestSchema>
 export type FlightChangeSearchInput = z.infer<typeof flightChangeSearchSchema>

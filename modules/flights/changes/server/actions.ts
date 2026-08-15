@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { getActorContext } from "@/modules/auth/server"
 import { requireActiveAdmin } from "@/modules/flights/cancellations/server/admin-guard"
-import { flightChangeRequestTypes, type FlightChangeRequestType } from "@/modules/flights/changes/domain"
+import { adminChangeActionSchema, flightChangeRequestTypes, type FlightChangeRequestType } from "@/modules/flights/changes/domain"
 import { createBaggageRequest, createManualChangeRequest, getChangeStatus, getLatestChangeStatusForBooking, retryAutomatedItinerarySearch, searchItineraryChanges, selectChangeOffer, confirmZeroPriceChange, performAdminChangeAction } from "@/modules/flights/changes/server/service"
 import { captureFlightChangePayPalPayment, startFlightChangePayPalPayment } from "@/modules/flights/payments-adapter/change-payment-service"
 
@@ -35,9 +35,8 @@ export async function startFlightChangePayPalPaymentAction(input:{requestId:stri
 export async function captureFlightChangePayPalPaymentAction(input:{requestId:string;paypalOrderId:string;bookingReference:string}){const actor=await getActorContext({ensureGuestSession:false});const result=await captureFlightChangePayPalPayment({requestId:input.requestId,paypalOrderId:input.paypalOrderId,actor});revalidatePath(`/booking/${input.bookingReference}`);revalidatePath(`/booking/${input.bookingReference}/change/${input.requestId}`);return result}
 export async function getFlightChangePaymentStatusAction(input:{requestId:string}){const actor=await getActorContext({ensureGuestSession:false});const detail=await getChangeStatus({requestId:input.requestId,actor});return {status:detail.request.status,message:detail.request.customerMessage}}
 export async function createBaggageRequestAction(input:{bookingReference:string;services:Array<{id:string;quantity:number}>}){const actor=await getActorContext({ensureGuestSession:false});const result=await createBaggageRequest({bookingReference:input.bookingReference,services:input.services,actor});revalidatePath(`/booking/${input.bookingReference}`);return result}
-export async function adminChangeAction(formData:FormData){const admin=await requireActiveAdmin(),requestId=req(formData,"requestId");await performAdminChangeAction({admin,requestId,action:parseAdminAction(req(formData,"action")),reason:opt(formData,"reason"),externalReference:opt(formData,"externalReference"),customerMessage:opt(formData,"customerMessage")});revalidatePath("/admin/changes");revalidatePath(`/admin/changes/${requestId}`)}
+export async function adminChangeAction(formData:FormData){const admin=await requireActiveAdmin(),parsed=adminChangeActionSchema.parse({requestId:req(formData,"requestId"),action:req(formData,"action"),reason:opt(formData,"reason"),externalReference:opt(formData,"externalReference"),customerMessage:opt(formData,"customerMessage")});await performAdminChangeAction({admin,...parsed});revalidatePath("/admin/changes");revalidatePath(`/admin/changes/${parsed.requestId}`)}
 function req(data:FormData,key:string){const value=data.get(key);if(typeof value!=="string"||!value.trim())throw new Error(`${key} is required.`);return value.trim()}
 function opt(data:FormData,key:string){const value=data.get(key);return typeof value==="string"&&value.trim()?value.trim():undefined}
 function parseRequestType(value:string):FlightChangeRequestType{if(flightChangeRequestTypes.includes(value as FlightChangeRequestType))return value as FlightChangeRequestType;throw new Error("Invalid flight change request type.")}
 function parseCabin(value:string){if(value==="first"||value==="business"||value==="premium_economy"||value==="economy")return value;throw new Error("Invalid cabin class.")}
-function parseAdminAction(value:string){if(value==="approve"||value==="reject"||value==="manual"||value==="complete")return value;throw new Error("Invalid admin action.")}
