@@ -8,6 +8,9 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
+  // These routes authenticate QStash/job requests themselves. Clerk must not
+  // redirect machine-to-machine calls to a browser sign-in page.
+  "/api/jobs/payments/outbox(.*)",
 ])
 
 const clerkEnabled = Boolean(

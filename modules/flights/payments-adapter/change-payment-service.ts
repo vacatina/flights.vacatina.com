@@ -7,6 +7,8 @@ import { defaultPaymentAttemptsRepository, type PaymentAttemptsRepository } from
 import { defaultPaymentEventsRepository, type PaymentEventsRepository } from "@/modules/payments/server/events-repository"
 import { defaultPaymentOutboxRepository, type PaymentOutboxRepository } from "@/modules/payments/server/outbox-repository"
 import { createPaymentAttemptId, createPaymentEventId, createPaymentOutboxId } from "@/modules/payments/server/ids"
+import { publishPaymentFulfillmentTask } from "@/modules/payments/server/job-publisher"
+import { logFlightFlowError } from "@/lib/logging/flow-debug"
 import type { PaymentInternalOrderType, PaymentEventType } from "@/modules/payments/domain"
 import { capturePayPalOrder, createPayPalOrder, getPayPalCaptureFromOrder } from "@/modules/payments/server/providers/paypal"
 import { assertPendingChangeMatches, defaultDuffelChangeAdapter, type DuffelChangeAdapter } from "@/modules/flights/changes/server/duffel"
@@ -72,9 +74,15 @@ export async function captureFlightChangePayPalPayment(input:{requestId:string;p
   if(!capture?.id||capture.status!=="COMPLETED")throw new Error("PayPal did not complete the payment capture.")
   const updated=await deps.attempts.update(attempt.id,{status:"capture_completed",providerCaptureId:capture.id,providerStatus:capture.status,lastProviderPayload:captured})
   await appendEvent(deps,updated??attempt,"CAPTURE_COMPLETED")
-  await deps.outbox.enqueueUnique({id:createPaymentOutboxId(),taskType:"fulfill_paid_resource",uniqueKey:`fulfill_paid_resource:${attempt.id}`,paymentAttemptId:attempt.id,internalOrderType:attempt.internalOrderType,internalOrderId:request.id,payload:{provider:"paypal",providerPaymentId:capture.id,source:"flight_change_capture"}})
+  const outboxTask=await deps.outbox.enqueueUnique({id:createPaymentOutboxId(),taskType:"fulfill_paid_resource",uniqueKey:`fulfill_paid_resource:${attempt.id}`,paymentAttemptId:attempt.id,internalOrderType:attempt.internalOrderType,internalOrderId:request.id,payload:{provider:"paypal",providerPaymentId:capture.id,source:"flight_change_capture"}})
+  // The outbox remains the sole fulfillment authority. This merely wakes its
+  // existing worker after a successful capture, matching checkout payments.
+  await publishPaymentFulfillmentTask({paymentAttemptId:outboxTask.paymentAttemptId,checkoutSessionId:request.id})
+  if (flightChangeOutboxFallbackEnabled()) await tryProcessFlightChangeFulfillment(outboxTask.paymentAttemptId)
   return {status:"processing" as const,paymentAttemptId:attempt.id}
 }
 
 function resourceForRequest(type:string):ChangePayableType { if(type==="itinerary_change")return "flight_change"; if(type==="add_baggage")return "flight_post_booking_service"; throw new Error("This change type cannot be paid automatically.") }
 async function appendEvent(deps:Deps,attempt:Awaited<ReturnType<PaymentAttemptsRepository["findById"]>> extends infer T?Exclude<T,null>:never,eventType:PaymentEventType){const events=await deps.events.listByAttemptId(attempt.id);if(events.some(event=>event.eventType===eventType))return;await deps.events.append({id:createPaymentEventId(),paymentAttemptId:attempt.id,eventType,provider:attempt.provider,providerOrderId:attempt.providerOrderId,providerCaptureId:attempt.providerCaptureId,amount:attempt.amount,currency:attempt.currency})}
+async function tryProcessFlightChangeFulfillment(paymentAttemptId:string){try{await import("@/modules/flights/payments-adapter/register");const {processPaymentOutboxByPaymentAttemptId}=await import("@/modules/payments/server/workers/outbox-worker");await processPaymentOutboxByPaymentAttemptId({paymentAttemptId})}catch(error){logFlightFlowError("flightChange.payment","opportunistic_fulfillment_failed",error,{paymentAttemptId})}}
+function flightChangeOutboxFallbackEnabled(){return process.env.FLIGHT_CHANGE_OUTBOX_FALLBACK_ENABLED?.trim().toLowerCase()!=="false"}

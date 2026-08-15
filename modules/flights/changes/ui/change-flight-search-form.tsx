@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useFormStatus } from "react-dom"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -50,8 +51,22 @@ export function ChangeFlightSearchForm({ bookingReference, sliceId, origin, dest
       <DatePickerField control={form.control} name="slices.0.departureDate" label="DEPART" labelClassName={fieldLabelClassName} triggerClassName={dateFieldClassName} />
       <Controller control={form.control} name="cabinClass" render={({ field, fieldState }) => <Field data-invalid={fieldState.invalid || undefined}><FieldLabel className={fieldLabelClassName}>Cabin class</FieldLabel><Select value={field.value} onValueChange={(value) => field.onChange(value as CabinClass)}><SelectTrigger size="lg" className={cn(dateFieldClassName, "w-full rounded-xl px-4 text-[15px] font-normal")}><SelectValue>{CABIN_CLASS_LABELS[field.value]}</SelectValue></SelectTrigger><SelectContent align="start" className="rounded-[10px]"><SelectGroup>{Object.entries(CABIN_CLASS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent></Select><FieldError>{fieldState.error?.message}</FieldError></Field>} />
     </div>
-    <LoadingButton type="submit" className="h-14 w-full rounded-[10px] text-[16px] font-medium md:w-fit md:min-w-72">Search replacement flights</LoadingButton>
+    <SearchReplacementFlightsButton />
   </form>
+}
+
+function SearchReplacementFlightsButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <LoadingButton
+      type="submit"
+      isLoading={pending}
+      className="h-14 w-full rounded-[10px] text-[16px] font-medium md:w-fit md:min-w-72"
+    >
+      Search replacement flights
+    </LoadingButton>
+  )
 }
 
 function createPlace(iataCode: string): PlaceSuggestionOption {
