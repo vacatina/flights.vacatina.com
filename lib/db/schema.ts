@@ -139,6 +139,8 @@ export const flightChangePricingDirectionEnum = pgEnum(
 export const flightChangeStatusEnum = pgEnum("flight_change_status", [
   "requested",
   "searching",
+  "quote_ready",
+  "quote_unavailable",
   "offers_ready",
   "pending_change_ready",
   "payment_pending",
@@ -1143,7 +1145,7 @@ export const flightChangeRequests = pgTable(
     requesterLookupIdx: index("flight_change_requests_requester_lookup_idx").on(table.requestedByUserId, table.requestedByGuestId, table.createdAt),
     oneActiveOrderIdx: uniqueIndex("flight_change_requests_one_active_order_idx")
       .on(table.flightOrderId)
-      .where(sql`${table.status} not in ('completed', 'rejected', 'expired')`),
+      .where(sql`${table.status} not in ('quote_ready', 'quote_unavailable', 'completed', 'rejected', 'expired')`),
   })
 )
 

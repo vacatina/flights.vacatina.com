@@ -57,6 +57,20 @@
       "when": 1786406400000,
       "tag": "0006_flight_change_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786492800000,
+      "tag": "0007_change_quote_states",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786579200000,
+      "tag": "0008_release_change_quote_searches",
+      "breakpoints": true
     }
   ]
 }

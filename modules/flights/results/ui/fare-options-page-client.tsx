@@ -68,6 +68,7 @@ import {
   OfferSessionTimer,
   useOfferSessionExpiry,
 } from "@/modules/flights/results/ui/offer-session-timer"
+import { FlightResultSummary } from "@/modules/flights/results/ui/flight-result-summary"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
 import { cn } from "@/lib/utils"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
@@ -443,7 +444,8 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                     <AccordionItem value={offer.id} className="border-none">
                       <CardHeader className="p-0">
                         <AccordionTrigger className="w-full px-6 py-5 no-underline hover:no-underline md:px-8 md:py-5">
-                          <div className="grid w-full gap-8 text-left md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                          <FlightResultSummary carrierName={offer.ownerName} carrierCode={offer.ownerCode} carrierLogoUrl={offer.ownerLogoSymbolUrl} flightNumbersLabel={offer.flightNumbersLabel} departureTimeLabel={offer.departureTimeLabel} arrivalTimeLabel={offer.arrivalTimeLabel} arrivalDayOffset={offer.arrivalDayOffset} durationLabel={offer.durationLabel} routeLabel={offer.routeLabel} stopsLabel={offer.stopsLabel} stopsDetails={offer.stopsDetails} />
+                          <div className="hidden">
                             <div className="flex items-center gap-5">
                               <div className="flex size-18 items-center justify-center rounded-lg border bg-muted/50 font-semibold text-primary">
                                 {offer.ownerLogoSymbolUrl ? (

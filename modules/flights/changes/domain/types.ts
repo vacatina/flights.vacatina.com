@@ -1,7 +1,7 @@
 export const flightChangeRequestTypes = ["itinerary_change","add_baggage","remove_passenger","seat_change","remove_service","traveller_details_change","other"] as const
 export const flightChangeHandlingModes = ["automatic","admin_approval","manual"] as const
 export const flightChangePricingDirections = ["unknown","additional_payment","no_difference","customer_refund"] as const
-export const flightChangeStatuses = ["requested","searching","offers_ready","pending_change_ready","payment_pending","payment_processing","payment_captured","admin_review_required","duffel_confirming","refund_pending","manual_processing","reconciliation_required","completed","rejected","expired","failed"] as const
+export const flightChangeStatuses = ["requested","searching","quote_ready","quote_unavailable","offers_ready","pending_change_ready","payment_pending","payment_processing","payment_captured","admin_review_required","duffel_confirming","refund_pending","manual_processing","reconciliation_required","completed","rejected","expired","failed"] as const
 export const flightChangeActorTypes = ["customer","guest","admin","system"] as const
 
 export type FlightChangeRequestType = (typeof flightChangeRequestTypes)[number]
@@ -10,10 +10,13 @@ export type FlightChangePricingDirection = (typeof flightChangePricingDirections
 export type FlightChangeStatus = (typeof flightChangeStatuses)[number]
 export type FlightChangeActorType = (typeof flightChangeActorTypes)[number]
 
-const terminal = new Set<FlightChangeStatus>(["completed", "rejected", "expired"])
+// Quote searches are not submitted change requests and must not lock a booking.
+const terminal = new Set<FlightChangeStatus>(["quote_ready", "quote_unavailable", "completed", "rejected", "expired"])
 const transitions: Record<FlightChangeStatus, readonly FlightChangeStatus[]> = {
   requested: ["searching","manual_processing","admin_review_required","rejected","expired","failed"],
-  searching: ["offers_ready","manual_processing","expired","failed"],
+  searching: ["quote_ready","quote_unavailable","offers_ready","manual_processing","expired","failed"],
+  quote_ready: ["pending_change_ready","payment_pending","admin_review_required","expired","failed"],
+  quote_unavailable: ["searching"],
   offers_ready: ["pending_change_ready","searching","manual_processing","expired","failed"],
   pending_change_ready: ["payment_pending","admin_review_required","duffel_confirming","manual_processing","expired","failed"],
   payment_pending: ["payment_processing","expired","manual_processing","failed"],

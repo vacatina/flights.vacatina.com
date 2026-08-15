@@ -12,6 +12,7 @@ export function ChangeBookingView({ context }: { context: any }) {
   const liveEligibleSliceIds = new Set<string>(context.automatedSliceIds ?? context.booking.legs.filter((leg: any) => Boolean(leg.sliceId)).map((leg: any) => leg.sliceId))
   const eligibleLegs = context.booking.legs.filter((leg: any) => Boolean(leg.sliceId) && liveEligibleSliceIds.has(leg.sliceId))
   const canChangeFlight = context.canStart && eligibleLegs.length > 0
+  const latestIsQuote = context.latestChange?.status === "quote_ready"
 
   return (
     <div className="space-y-8 pb-8">
@@ -108,11 +109,11 @@ export function ChangeBookingView({ context }: { context: any }) {
       {context.latestChange ? (
         <Card className="border-primary/20 bg-primary/[0.03]">
           <CardHeader>
-            <CardTitle>Active change request</CardTitle>
+            <CardTitle>{latestIsQuote ? "Your latest flight quotes" : "Active change request"}</CardTitle>
             <CardDescription>{context.latestChange.statusLabel}</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">{context.latestChange.customerMessage}</CardContent>
-          <CardFooter><Button variant="outline" render={<Link href={`${base}/${context.latestChange.id}`} />}>View request status</Button></CardFooter>
+          <CardFooter><Button variant="outline" render={<Link href={`${base}/${context.latestChange.id}${latestIsQuote ? "/offers" : ""}`} />}>{latestIsQuote ? "View replacement flights" : "View request status"}</Button></CardFooter>
         </Card>
       ) : null}
     </div>
