@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 export function ChangeBookingView({ context }: { context: any }) {
   const base = `/booking/${encodeURIComponent(context.booking.reference)}/change`
-  const eligibleLegs = context.booking.legs.filter((leg: any) => Boolean(leg.sliceId))
+  const liveEligibleSliceIds = new Set<string>(context.automatedSliceIds ?? context.booking.legs.filter((leg: any) => Boolean(leg.sliceId)).map((leg: any) => leg.sliceId))
+  const eligibleLegs = context.booking.legs.filter((leg: any) => Boolean(leg.sliceId) && liveEligibleSliceIds.has(leg.sliceId))
   const canChangeFlight = context.canStart && eligibleLegs.length > 0
 
   return (
@@ -71,7 +72,7 @@ export function ChangeBookingView({ context }: { context: any }) {
                   </div>
                   <span className="hidden text-xs font-medium text-teal-800 sm:block">Eligible to search</span>
                 </div>
-              )) : <p className="rounded-xl border border-dashed bg-white/70 p-4 text-sm text-muted-foreground">The airline has not made an online change available for this trip.</p>}
+              )) : <p className="rounded-xl border border-dashed bg-white/70 p-4 text-sm text-muted-foreground">{context.liveEligibilityUnavailable ? "We could not verify live airline change availability right now. Flight support can help with the next steps." : "The airline has not made an online change available for this trip."}</p>}
             </CardContent>
             <CardFooter className="pt-2">
               {canChangeFlight ? <Button className="group" render={<Link href={`${base}/flight`} />}>Search replacement flights <ArrowRightIcon className="transition-transform group-hover:translate-x-0.5" /></Button> : <Button variant="outline" render={<Link href={`${base}/request?type=other`} />}>Ask flight support</Button>}

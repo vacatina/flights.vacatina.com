@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils"
 import { ChangeFlightSearchForm } from "@/modules/flights/changes/ui/change-flight-search-form"
 
 export function ChangeFlightFlow({ context }: { context: any }) {
-  const eligibleLegs = useMemo(() => context.booking.legs.filter((leg: any) => Boolean(leg.sliceId)), [context.booking.legs])
+  const eligibleLegs = useMemo(() => {
+    const liveEligibleSliceIds = new Set<string>(context.automatedSliceIds ?? context.booking.legs.filter((leg: any) => Boolean(leg.sliceId)).map((leg: any) => leg.sliceId))
+    return context.booking.legs.filter((leg: any) => Boolean(leg.sliceId) && liveEligibleSliceIds.has(leg.sliceId))
+  }, [context.automatedSliceIds, context.booking.legs])
   const [selectedSliceId, setSelectedSliceId] = useState<string | null>(eligibleLegs[0]?.sliceId ?? null)
   const selectedLeg = eligibleLegs.find((leg: any) => leg.sliceId === selectedSliceId) ?? null
 

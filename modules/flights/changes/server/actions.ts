@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { getActorContext } from "@/modules/auth/server"
 import { requireActiveAdmin } from "@/modules/flights/cancellations/server/admin-guard"
 import { flightChangeRequestTypes, type FlightChangeRequestType } from "@/modules/flights/changes/domain"
-import { createBaggageRequest, createManualChangeRequest, getLatestChangeStatusForBooking, searchItineraryChanges, selectChangeOffer, confirmZeroPriceChange, performAdminChangeAction } from "@/modules/flights/changes/server/service"
+import { createBaggageRequest, createManualChangeRequest, getLatestChangeStatusForBooking, retryAutomatedItinerarySearch, searchItineraryChanges, selectChangeOffer, confirmZeroPriceChange, performAdminChangeAction } from "@/modules/flights/changes/server/service"
 import { captureFlightChangePayPalPayment, startFlightChangePayPalPayment } from "@/modules/flights/payments-adapter/change-payment-service"
 
 export async function createManualChangeRequestAction(formData:FormData){
@@ -28,6 +28,7 @@ export async function searchItineraryChangesAction(formData:FormData){
     throw error
   }
 }
+export async function retryAutomaticChangeSearchAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),requestId=req(formData,"requestId"),bookingReference=req(formData,"bookingReference"),result=await retryAutomatedItinerarySearch({requestId,actor});redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${result.request.id}/${result.offers.length?"offers":""}`.replace(/\/$/,""))}
 export async function selectChangeOfferAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),requestId=req(formData,"requestId");await selectChangeOffer({actor,requestId,offerId:req(formData,"offerId")});redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${requestId}/review`)}
 export async function confirmZeroPriceChangeAction(formData:FormData){const actor=await getActorContext({ensureGuestSession:false}),bookingReference=req(formData,"bookingReference"),requestId=req(formData,"requestId");await confirmZeroPriceChange({actor,requestId});revalidatePath(`/booking/${bookingReference}`);redirect(`/booking/${encodeURIComponent(bookingReference)}/change/${requestId}`)}
 export async function startFlightChangePayPalPaymentAction(input:{requestId:string}){const actor=await getActorContext({ensureGuestSession:false});return startFlightChangePayPalPayment({requestId:input.requestId,actor})}
