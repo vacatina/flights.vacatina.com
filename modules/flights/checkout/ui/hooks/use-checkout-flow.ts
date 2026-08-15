@@ -172,7 +172,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
           setSubmitSuccess(success)
           setPaymentProcessingMessage(null)
           onSuccess?.(success)
-          onPayNowResolved?.(resolution)
+          window.setTimeout(() => onPayNowResolved?.(resolution), 0)
           return
         }
 
@@ -193,7 +193,7 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
             )
           )
           setPaymentProcessingMessage(null)
-          onPayNowResolved?.(resolution)
+          window.setTimeout(() => onPayNowResolved?.(resolution), 0)
           return
         }
 
@@ -377,7 +377,19 @@ export function useCheckoutFlow(input: UseCheckoutFlowInput) {
 
     setPaymentProcessingMessage("Payment is processing. Waiting for confirmation...")
     onPayNowResolved?.(resolution)
+    // Keep the PayPal approval session open until the airline order is confirmed.
+    logFlightFlow("CheckoutPageClient", "paypal_approval_wait_started", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      checkoutSessionId,
+      paypalOrderId,
+      initialStatus: resolution.status,
+    })
     await pollCheckoutCompletion(checkoutSessionId)
+    logFlightFlow("CheckoutPageClient", "paypal_approval_wait_finished", {
+      partialOfferRequestId: data.partialOfferRequestId,
+      checkoutSessionId,
+      paypalOrderId,
+    })
     return resolution
   }, [
     data.quote.fareSellAmountLabel,

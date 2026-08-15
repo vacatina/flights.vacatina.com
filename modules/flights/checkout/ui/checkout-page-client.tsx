@@ -168,13 +168,20 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
         navigateToBookingDetail(resolution.bookingReference)
         return
       }
-      router.replace(
-        buildCheckoutHref({
-          step: "pay",
-          status: mapResolutionStatusToQueryStatus(resolution.status),
-          sessionId: resolution.sessionId,
-        })
-      )
+      const href = buildCheckoutHref({
+        step: "pay",
+        status: mapResolutionStatusToQueryStatus(resolution.status),
+        sessionId: resolution.sessionId,
+      })
+
+      if (resolution.status === "processing") {
+        // Preserve a recoverable URL without unmounting the PayPal SDK while
+        // its approval promise is still awaiting airline confirmation.
+        window.history.replaceState(window.history.state, "", href)
+        return
+      }
+
+      router.replace(href)
     },
   })
   const {
