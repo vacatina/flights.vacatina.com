@@ -1622,7 +1622,7 @@ async function tryDispatchOrderNotification(input: {
   statusLabel: string
 }) {
   try {
-    await enqueueNotification({
+    const notification = await enqueueNotification({
       eventType: input.eventType,
       flightOrderId: input.flightOrder.id,
       checkoutSessionId: input.checkoutSessionId,
@@ -1639,7 +1639,10 @@ async function tryDispatchOrderNotification(input: {
         statusLabel: input.statusLabel,
       },
     })
-    await dispatchPendingNotifications({ limit: 1 })
+    await dispatchPendingNotifications({
+      limit: 1,
+      outboxIds: [notification.id],
+    })
   } catch (error) {
     logFlightFlowError("checkout.notifications", "dispatch_failed", error, {
       checkoutSessionId: input.checkoutSessionId,
@@ -1663,7 +1666,7 @@ async function queueReconciliationNotificationForSession(
   }
 
   try {
-    await enqueueNotification({
+    const notification = await enqueueNotification({
       eventType: "reconciliation_required",
       flightOrderId: null,
       checkoutSessionId: session.id,
@@ -1677,7 +1680,10 @@ async function queueReconciliationNotificationForSession(
         statusLabel: "Manual reconciliation required",
       },
     })
-    await dispatchPendingNotifications({ limit: 1 })
+    await dispatchPendingNotifications({
+      limit: 1,
+      outboxIds: [notification.id],
+    })
   } catch (error) {
     logFlightFlowError("checkout.notifications", "reconciliation_dispatch_failed", error, {
       checkoutSessionId: session.id,

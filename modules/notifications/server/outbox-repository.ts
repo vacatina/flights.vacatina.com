@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, desc, eq, lte } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, lte } from "drizzle-orm"
 
 import { getDbClient, notificationOutbox } from "@/lib/db"
 import type {
@@ -40,7 +40,11 @@ interface CreateOutboxRecordInput {
 
 export interface NotificationOutboxRepository {
   create(input: CreateOutboxRecordInput): Promise<NotificationOutboxRecord>
-  findPending(now: Date, limit: number): Promise<NotificationOutboxRecord[]>
+  findPending(
+    now: Date,
+    limit: number,
+    outboxIds?: string[]
+  ): Promise<NotificationOutboxRecord[]>
   listRecentByFlightOrderId(input: {
     flightOrderId: string
     limit: number
@@ -100,12 +104,22 @@ export const defaultNotificationOutboxRepository: NotificationOutboxRepository =
 
     return toRecord(row)
   },
-  async findPending(now, limit) {
+  async findPending(now, limit, outboxIds) {
     const db = getDbClient()
+    const ids = outboxIds?.filter(Boolean)
+
+    if (ids?.length === 0) {
+      return []
+    }
 
     if (!db) {
       return Array.from(inMemoryOutbox.values())
-        .filter((record) => record.status === "pending" && record.nextAttemptAt <= now)
+        .filter(
+          (record) =>
+            record.status === "pending" &&
+            record.nextAttemptAt <= now &&
+            (!ids || ids.includes(record.id))
+        )
         .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
         .slice(0, limit)
     }
@@ -113,7 +127,8 @@ export const defaultNotificationOutboxRepository: NotificationOutboxRepository =
     const rows = await db.query.notificationOutbox.findMany({
       where: and(
         eq(notificationOutbox.status, "pending"),
-        lte(notificationOutbox.nextAttemptAt, now)
+        lte(notificationOutbox.nextAttemptAt, now),
+        ids ? inArray(notificationOutbox.id, ids) : undefined
       ),
       orderBy: [asc(notificationOutbox.createdAt)],
       limit,
