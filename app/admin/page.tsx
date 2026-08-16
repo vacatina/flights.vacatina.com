@@ -2,7 +2,8 @@ import {
   listAdminCancellationRequests,
   requireActiveAdmin,
 } from "@/modules/flights/cancellations/server"
-import { AdminDashboard, AdminPanelShell } from "@/modules/flights/cancellations/ui"
+import { AdminDashboard } from "@/modules/flights/cancellations/ui"
+import { AdminPanelShell } from "@/modules/admin/ui/admin-panel-shell"
 
 export default async function AdminDashboardPage() {
   const admin = await requireActiveAdmin()
