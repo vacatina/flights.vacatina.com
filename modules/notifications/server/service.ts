@@ -194,6 +194,22 @@ function toNotificationContent(
     }
   }
 
+  if (eventType.startsWith("change_")) {
+    const businessName = safePayload.businessName ?? "Vacatina"
+    const subject = safePayload.recipientRole === "admin"
+      ? `Flight change attention - ${safePayload.bookingReference}`
+      : `${safePayload.statusLabel} - ${safePayload.bookingReference}`
+    const lines = [
+      `Booking: ${safePayload.bookingReference}`,
+      `Route: ${safePayload.routeLabel}`,
+      `Status: ${safePayload.statusLabel}`,
+      `Amount: ${safePayload.amountLabel}`,
+      safePayload.customerMessage ? `Message: ${safePayload.customerMessage}` : null,
+      safePayload.supportEmail ? `Support: ${safePayload.supportEmail}` : null,
+    ].filter((line): line is string => Boolean(line))
+    return { subject, text: [`${businessName} flight change update`, ...lines].join("\n"), html: wrapHtml({ title: `${businessName} flight change update`, body: lines.map(escapeHtml) }) }
+  }
+
   const subject = `Booking needs manual review - ${safePayload.bookingReference}`
   const text = [
     `Payment was received for booking ${safePayload.bookingReference}, but manual reconciliation is required.`,

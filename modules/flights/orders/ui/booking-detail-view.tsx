@@ -5,7 +5,6 @@ import {
   BaggageClaimIcon,
   BriefcaseIcon,
   CheckCircle2Icon,
-  ChevronDownIcon,
   CopyIcon,
   FileDownIcon,
   PlaneTakeoffIcon,
@@ -39,6 +38,7 @@ interface BookingDetailViewProps {
   detail: BookingDetailModel
   refreshHref?: string
   cancellationStatus?: CancellationStatusSummary | null
+  changeStatus?: { id:string; status:string; statusLabel:string; customerMessage:string|null } | null
 }
 
 interface DisplayTimelineEvent {
@@ -62,6 +62,7 @@ export function BookingDetailView({
   detail,
   refreshHref,
   cancellationStatus = null,
+  changeStatus = null,
 }: BookingDetailViewProps) {
   const firstLeg = detail.snapshot.legs[0] ?? null
   const passengers = getPassengersForDisplay(detail)
@@ -153,14 +154,14 @@ export function BookingDetailView({
                 Cancellation details
               </Button>
             ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-11 px-5 text-base"
-              >
-                Manage this order
-                <ChevronDownIcon data-icon="inline-end" />
-              </Button>
+              <>
+                <Button variant="secondary" className="h-11 px-5 text-base" render={<Link href={`/booking/${encodeURIComponent(detail.bookingReference)}/change`} />}>
+                  Change booking
+                </Button>
+                <Button variant="outline" className="h-11 px-5 text-base" disabled={Boolean(changeStatus && !["completed","rejected","expired"].includes(changeStatus.status))} render={changeStatus && !["completed","rejected","expired"].includes(changeStatus.status) ? undefined : <Link href={`/booking/${encodeURIComponent(detail.bookingReference)}/cancel`} />}>
+                  Cancel booking
+                </Button>
+              </>
             )}
           </div>
         </header>
@@ -613,6 +614,15 @@ export function BookingDetailView({
             bookingReference={detail.bookingReference}
             status={cancellationStatus}
           />
+
+          {changeStatus ? (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="font-semibold">Flight change: {changeStatus.statusLabel}</p>{changeStatus.customerMessage ? <p className="mt-1 text-sm text-muted-foreground">{changeStatus.customerMessage}</p> : null}</div>
+                <Button size="sm" variant="outline" render={<Link href={`/booking/${encodeURIComponent(detail.bookingReference)}/change/${changeStatus.id}`} />}>View change</Button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             {notifications.map((item) => (

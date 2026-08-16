@@ -1525,9 +1525,11 @@ async function prepareCheckoutForSubmission(input: {
   }
 
   const offer = await input.deps.getOfferById(input.payload.offerId)
+  const seatMaps = await input.deps.getSeatMapsByOfferId(input.payload.offerId)
   const ancillarySelection = normalizeAncillarySelection(input.payload.ancillarySelection)
   const ancillaryPricing = computeAncillaryPricing({
     offer,
+    seatMaps,
     selectedServices: ancillarySelection.services,
     expectedCurrency: quoteValidation.quote.currency,
     markup: {

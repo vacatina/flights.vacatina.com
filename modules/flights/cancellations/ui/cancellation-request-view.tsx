@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { PendingSubmitButton } from "@/modules/flights/cancellations/ui/pending-submit-button"
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button"
 
 interface CancellationRequestViewProps {
   context: CancellationEligibilityContext

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { PendingSubmitButton } from "@/modules/flights/cancellations/ui/pending-submit-button"
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button"
 
 interface AdminCancellationDetailProps {
   detail: AdminCancellationDetailModel

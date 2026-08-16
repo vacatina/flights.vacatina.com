@@ -3,10 +3,8 @@ import {
   getCurrentBusinessSettings,
   requireActiveAdmin,
 } from "@/modules/flights/cancellations/server"
-import {
-  AdminPanelShell,
-  BusinessSettingsForm,
-} from "@/modules/flights/cancellations/ui"
+import { BusinessSettingsForm } from "@/modules/flights/cancellations/ui"
+import { AdminPanelShell } from "@/modules/admin/ui/admin-panel-shell"
 
 export default async function AdminSettingsPage() {
   const admin = await requireActiveAdmin()
