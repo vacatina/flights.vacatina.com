@@ -69,6 +69,12 @@
       "sourceType": "github",
       "computedHash": "b8f05af44f862a0df87f9029228108a14ac7a7c0b6aeed80634e4ea1d14b3983"
     },
+    "executing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/executing-plans/SKILL.md",
+      "computedHash": "78a07800ee99a5861ae10be59d79fad085fdca10444e8aaeb2691597e357cff8"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",

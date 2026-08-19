@@ -23,7 +23,7 @@ type NavLinkItem = {
 const primaryNavItems: NavLinkItem[] = [
   { href: "/", label: "Home" },
   { href: "#", label: "Flights" },
-  { href: "#", label: "Hotels" },
+  { href: "/hotels", label: "Hotels" },
   { href: "#", label: "Cars" },
   { href: "#", label: "Rails" },
   { href: "#", label: "Cruises" },
