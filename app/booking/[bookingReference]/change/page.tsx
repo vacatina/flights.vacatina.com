@@ -1,0 +1,5 @@
+import { getActorContext } from "@/modules/auth/server"
+import { getChangeBookingContext } from "@/modules/flights/changes/server"
+import { ChangeBookingView } from "@/modules/flights/changes/ui"
+export default async function Page({params}:{params:Promise<{bookingReference:string}>}){const [actor,{bookingReference}]=await Promise.all([getActorContext({ensureGuestSession:false}),params]);const context=await getChangeBookingContext({bookingReference,actor});return <main className="min-h-svh bg-background py-8"><div className="mx-auto max-w-5xl px-4"><ChangeBookingView context={context}/></div></main>}
+

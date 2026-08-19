@@ -2,7 +2,7 @@ import {
   listAdminCancellationRequests,
   requireActiveAdmin,
 } from "@/modules/flights/cancellations/server"
-import { AdminPanelShell } from "@/modules/flights/cancellations/ui"
+import { AdminPanelShell } from "@/modules/admin/ui/admin-panel-shell"
 import { parseAdminBookingListQuery } from "@/modules/flights/orders/domain"
 import { listAdminBookings } from "@/modules/flights/orders/server"
 import { AdminBookingsTable } from "@/modules/flights/orders/ui"

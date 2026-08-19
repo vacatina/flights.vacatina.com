@@ -1,12 +1,13 @@
 "use client"
 
-import { Show, UserButton } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs"
 import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useSyncExternalStore } from "react"
 
+import { CustomUserButton } from "@/components/auth/custom-user-button"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CurrencySelector } from "@/modules/currency/ui"
@@ -319,7 +320,7 @@ function AuthButtons({
     mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
   )
   const signUpClassName = cn(
-    "border-primary-foreground/45 bg-transparent text-primary-foreground hover:bg-primary-foreground/10",
+    "border-primary-foreground/45 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground",
     mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
   )
   const dashboardClassName = cn(
@@ -335,6 +336,7 @@ function AuthButtons({
           size={size}
           className={signInClassName}
           render={<Link href="/sign-in" />}
+          nativeButton={false}
         >
           Sign In
         </Button>
@@ -343,6 +345,7 @@ function AuthButtons({
           size={size}
           className={signUpClassName}
           render={<Link href="/sign-up" />}
+          nativeButton={false}
         >
           Sign Up for Free
         </Button>
@@ -358,6 +361,7 @@ function AuthButtons({
           size={size}
           className={signInClassName}
           render={<Link href="/sign-in" />}
+          nativeButton={false}
         >
           Sign In
         </Button>
@@ -366,6 +370,7 @@ function AuthButtons({
           size={size}
           className={signUpClassName}
           render={<Link href="/sign-up" />}
+          nativeButton={false}
         >
           Sign Up for Free
         </Button>
@@ -377,10 +382,11 @@ function AuthButtons({
           size={size}
           className={dashboardClassName}
           render={<Link href="/bookings" />}
+          nativeButton={false}
         >
           Dashboard
         </Button>
-        <UserButton />
+        <CustomUserButton />
       </Show>
     </>
   )

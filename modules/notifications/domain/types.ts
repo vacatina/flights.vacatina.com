@@ -10,6 +10,18 @@ export type NotificationEventType =
   | "cancellation_completed"
   | "cancellation_refund_completed"
   | "cancellation_issue"
+  | "change_request_received"
+  | "change_offers_ready"
+  | "change_payment_required"
+  | "change_payment_received"
+  | "change_admin_review"
+  | "change_approved"
+  | "change_rejected"
+  | "change_manual_processing"
+  | "change_completed"
+  | "change_refund_approved"
+  | "change_refund_completed"
+  | "change_issue"
 
 export type NotificationOutboxStatus = "pending" | "sent" | "failed"
 

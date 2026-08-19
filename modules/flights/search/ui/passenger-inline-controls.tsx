@@ -97,24 +97,20 @@ export function PassengerInlineControls({
         />
 
         <div className="flex flex-col gap-2 relative">
-          <Popover 
-            open={isAgesPopoverOpen} 
+          <Popover
+            open={isAgesPopoverOpen}
             onOpenChange={(open) => {
               if (open && value.children === 0) return
               setIsAgesPopoverOpen(open)
             }}
           >
-            <PopoverTrigger
-              render={
-                <div
-                  className="cursor-pointer"
-                  onClick={() => {
-                    if (value.children > 0) setIsAgesPopoverOpen(true)
-                  }}
-                />
-              }
-              nativeButton={false}
-            >
+            <PopoverTrigger render={<div />} nativeButton={false}>
+              <div
+                className="cursor-pointer"
+                onClick={() => {
+                  if (value.children > 0) setIsAgesPopoverOpen(true)
+                }}
+              >
                 <PassengerStepper
                   label="Children (2-17)"
                   value={value.children}
@@ -123,6 +119,7 @@ export function PassengerInlineControls({
                   onDecrease={() => update(value.adults, value.children - 1, true)}
                   onIncrease={() => update(value.adults, value.children + 1, true)}
                 />
+              </div>
             </PopoverTrigger>
 
             {value.children > 0 && (

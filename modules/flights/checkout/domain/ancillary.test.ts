@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import type { Offer } from "@duffel/api/types"
+import type { Offer, SeatMap } from "@duffel/api/types"
 
 import {
   computeAncillaryPricing,
@@ -53,4 +53,65 @@ test("computeAncillaryPricing calculates net and sell totals", () => {
   expect(result.netTotal).toBe(70)
   expect(result.sellTotal).toBe(80)
   expect(result.lines).toHaveLength(2)
+})
+
+test("computeAncillaryPricing rejects a selected service that is no longer live", () => {
+  expect(() =>
+    computeAncillaryPricing({
+      offer: offerFixture,
+      expectedCurrency: "USD",
+      selectedServices: [{ id: "ase_removed_bag", quantity: 1 }],
+    })
+  ).toThrow("A selected extra is no longer available")
+})
+
+test("computeAncillaryPricing prices valid seat services from live seat maps", () => {
+  const seatMaps = [
+    {
+      id: "smap_1",
+      slice_id: "sli_1",
+      segment_id: "seg_1",
+      cabins: [
+        {
+          deck: 0,
+          cabin_class: "economy",
+          wings: null,
+          aisles: 1,
+          rows: [
+            {
+              sections: [
+                {
+                  elements: [
+                    {
+                      type: "seat",
+                      designator: "12A",
+                      disclosures: [],
+                      available_services: [
+                        {
+                          id: "ase_seat_live_1",
+                          passenger_id: "pas_1",
+                          total_amount: "18.00",
+                          total_currency: "USD",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ] as unknown as SeatMap[]
+
+  const result = computeAncillaryPricing({
+    offer: offerFixture,
+    seatMaps,
+    expectedCurrency: "USD",
+    selectedServices: [{ id: "ase_seat_live_1", quantity: 1 }],
+  })
+
+  expect(result.netTotal).toBe(18)
+  expect(result.lines).toEqual([expect.objectContaining({ id: "ase_seat_live_1" })])
 })

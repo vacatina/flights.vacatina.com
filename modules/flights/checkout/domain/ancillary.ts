@@ -1,4 +1,4 @@
-import type { CreateOrderService, Offer } from "@duffel/api/types"
+import type { CreateOrderService, Offer, SeatMap } from "@duffel/api/types"
 
 import { currencyMinorUnit } from "@/modules/flights/pricing/domain"
 import { toNumeric } from "@/lib/shared/number"
@@ -69,12 +69,16 @@ export function extractServicesFromAncillariesPayload(payload: unknown) {
 
 export function computeAncillaryPricing(input: {
   offer: Offer
+  seatMaps?: SeatMap[]
   selectedServices: CreateOrderService[]
   expectedCurrency: string
   markup?: AncillaryMarkupConfig
 }): CheckoutAncillaryPricing {
   const serviceIndex = new Map(
-    input.offer.available_services.map((service) => [service.id, service] as const)
+    [
+      ...input.offer.available_services,
+      ...getSeatMapAvailableServices(input.seatMaps ?? []),
+    ].map((service) => [service.id, service] as const)
   )
   const lines: CheckoutAncillaryPricing["lines"] = []
   let netTotal = 0
@@ -87,7 +91,9 @@ export function computeAncillaryPricing(input: {
     const service = serviceIndex.get(selectedService.id)
 
     if (!service) {
-      continue
+      throw new Error(
+        "A selected extra is no longer available. Please refresh checkout and choose your extras again."
+      )
     }
 
     if (service.total_currency.trim().toUpperCase() !== currency) {
@@ -127,6 +133,22 @@ export function computeAncillaryPricing(input: {
     sellTotal: roundByCurrency(sellTotal, currency),
     currency,
   }
+}
+
+function getSeatMapAvailableServices(seatMaps: SeatMap[]) {
+  return seatMaps.flatMap((seatMap) =>
+    seatMap.cabins.flatMap((cabin) =>
+      cabin.rows.flatMap((row) =>
+        row.sections.flatMap((section) =>
+          section.elements.flatMap((element) =>
+            element.type === "seat" || element.type === "restricted_seat_general"
+              ? element.available_services
+              : []
+          )
+        )
+      )
+    )
+  )
 }
 
 function normalizeQuantity(value: number) {
