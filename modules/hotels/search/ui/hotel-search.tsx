@@ -1,101 +1,35 @@
 "use client"
 
-import * as React from "react"
-import { useState } from "react"
-import { searchHotelDestinationsAction, submitHotelSearchAction } from "@/modules/hotels/search/server/actions"
-import type { HotelPlaceSuggestion } from "@/modules/hotels/search/server/places"
+import { HotelSearchForm } from "@/modules/hotels/search/ui/hotel-search-form"
+import type { HotelSearchFormValues } from "@/modules/hotels/search/domain"
 
-export function HotelSearch() {
-  const [query, setQuery] = useState("")
-  const [suggestions, setSuggestions] = useState<HotelPlaceSuggestion[]>([])
-  const [selectedDestination, setSelectedDestination] = useState<HotelPlaceSuggestion | null>(null)
-  
-  const [checkIn, setCheckIn] = useState("")
-  const [checkOut, setCheckOut] = useState("")
-  const [adults, setAdults] = useState(2)
+interface HotelSearchProps {
+  initialValues?: HotelSearchFormValues
+}
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedDestination) return
-
-    const result = await submitHotelSearchAction({
-      destinationId: selectedDestination.id,
-      destinationName: selectedDestination.name,
-      checkInDate: checkIn,
-      checkOutDate: checkOut,
-      guests: {
-        adults,
-        children: 0,
-      },
-      rooms: 1
-    })
-
-    if (result.ok) {
-      console.log("Hotel search command:", result.data.command)
-      // window.location.href = `/hotels/results?cityId=${result.data.command.cityId}...`
-    } else {
-      console.error("Search failed:", result.error)
-    }
-  }
-
+export function HotelSearch({ initialValues }: HotelSearchProps) {
   return (
-    <div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">
-      <h2 className="text-xl font-semibold mb-4">Search Hotels</h2>
-      <form onSubmit={handleSearch} className="flex flex-col gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Destination</label>
-          <input 
-            type="text" 
-            value={query}
-            onChange={async (e) => {
-              setQuery(e.target.value)
-              if (e.target.value.length > 2) {
-                const res = await searchHotelDestinationsAction({ query: e.target.value })
-                if (res.ok) setSuggestions(res.data)
-              }
-            }}
-            placeholder="City or Hotel Name"
-            className="w-full p-2 border rounded"
-          />
-          {suggestions.length > 0 && !selectedDestination && (
-            <ul className="mt-2 border rounded shadow-sm">
-              {suggestions.map(s => (
-                <li 
-                  key={s.id} 
-                  className="p-2 hover:bg-slate-50 cursor-pointer"
-                  onClick={() => {
-                    setSelectedDestination(s)
-                    setQuery(s.name)
-                    setSuggestions([])
-                  }}
-                >
-                  {s.name} ({s.countryCode})
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">Check-in</label>
-            <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="w-full p-2 border rounded" />
+    <main className="bg-muted">
+      <section className="relative isolate -mt-[90px] flex h-fit min-h-[100dvh] md:h-[100dvh] md:min-h-[700px] flex-col overflow-hidden pb-10 pt-[90px]">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#5f83a8] via-[#e8a878] via-55% to-[#1a2a3d]" />
+        <div className="absolute inset-0 bg-[url('/img/hero-hotels.webp')] bg-cover bg-center bg-no-repeat" />
+        <div className="absolute inset-0 bg-[#05103680]" />
+
+        <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center px-4 md:px-8 lg:px-12">
+          <div className="mx-auto max-w-4xl shrink-0 text-center text-white">
+            <h1 className="text-[54px] font-semibold tracking-[-0.02em] leading-14 text-balance md:text-[56px]">
+              Find Your Perfect Stay
+            </h1>
+            <p className="mt-4 text-[18px] text-balance text-white/85 md:text-[19px]">
+              Search thousands of hotels and book with ease.
+            </p>
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">Check-out</label>
-            <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} className="w-full p-2 border rounded" />
+
+          <div className="mx-auto mt-8 flex w-full max-w-7xl flex-col md:mt-10">
+            <HotelSearchForm initialValues={initialValues} />
           </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Adults</label>
-          <input type="number" min="1" value={adults} onChange={e => setAdults(Number(e.target.value))} className="w-full p-2 border rounded" />
-        </div>
-
-        <button type="submit" className="bg-blue-600 text-white p-2 rounded font-medium hover:bg-blue-700">
-          Search
-        </button>
-      </form>
-    </div>
+      </section>
+    </main>
   )
 }

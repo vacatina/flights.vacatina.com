@@ -6,25 +6,6 @@ import type { ActorContext } from "@/modules/auth/types"
 import { actionFailure, actionSuccess, type ActionResult, type ActionFieldErrors } from "@/modules/hotels/shared/server/types"
 import { logHotelFlow, logHotelFlowError } from "@/modules/hotels/shared/server/actions-logger"
 import { parseHotelSearchInput, toHotelSearchCommand, type HotelSearchFormValues, type HotelSearchCommand } from "@/modules/hotels/search/domain"
-import { searchHotelDestinations, type HotelPlaceSuggestion } from "@/modules/hotels/search/server/places"
-
-interface HotelSearchDeps {
-  searchPlaces: (query: string) => Promise<HotelPlaceSuggestion[]>
-  getActorContext?: () => Promise<ActorContext>
-}
-
-export async function searchHotelDestinationsAction(
-  input: { query: string },
-  deps: HotelSearchDeps = { searchPlaces: searchHotelDestinations }
-): Promise<ActionResult<HotelPlaceSuggestion[]>> {
-  try {
-    const suggestions = await deps.searchPlaces(input.query)
-    return actionSuccess(suggestions)
-  } catch (error) {
-    logHotelFlowError("searchHotelDestinationsAction", "search_failed", error)
-    return actionFailure("UPSTREAM_ERROR", "Could not search destinations right now.")
-  }
-}
 
 export async function submitHotelSearchAction(
   input: unknown,
@@ -53,12 +34,13 @@ export async function submitHotelSearchAction(
   const command = toHotelSearchCommand(parsed.data)
   
   logHotelFlow("submitHotelSearchAction", "mapped_command", {
-    destinationId: command.cityId,
+    placeId: command.placeId,
     checkin: command.checkin,
     checkout: command.checkout,
+    occupancies: command.occupancies,
   })
 
-  // Normally, we'd store the search session or redirect. For now, we return the command to the client so it can redirect.
+  // We return the command to the client so it can redirect with search params
   return actionSuccess({ command })
 }
 

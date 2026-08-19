@@ -1,40 +1,27 @@
+"use server"
+
 import { getLiteApiClient } from "@/lib/liteapi"
+import { actionFailure, actionSuccess, type ActionResult } from "@/modules/hotels/shared/server/types"
+import { logHotelFlow, logHotelFlowError } from "@/modules/hotels/shared/server/actions-logger"
 
 export interface HotelPlaceSuggestion {
-  id: string
-  name: string
-  countryCode: string
-  type: "city" | "hotel"
+  placeId: string
+  displayName: string
+  formattedAddress: string
 }
 
-export async function searchHotelDestinations(
-  query: string
-): Promise<HotelPlaceSuggestion[]> {
-  if (query.length < 2) {
-    return []
-  }
-
+export async function searchHotelDestinations(query: string): Promise<ActionResult<HotelPlaceSuggestion[]>> {
+  logHotelFlow("searchHotelDestinations", "started", { query })
   const client = getLiteApiClient()
-  
-  // LiteAPI has a /data/cities endpoint. We can search cities by country code, 
-  // but for a global text search, we might need to rely on a generic search if available,
-  // or fetch a static list and filter. For this infrastructure phase, we'll mock the response 
-  // or use a placeholder assuming LiteAPI has a suitable lookup.
-  // 
-  // Let's assume a `/data/cities` endpoint takes a `cityName` or `keyword` parameter in the LiteAPI wrapper.
+
   try {
-    // Example: GET /data/cities?countryCode=US (Real implementation would filter by text)
-    // For now, returning a mock until exact LiteAPI search endpoint is refined.
+    const response = await client.get<{ data: HotelPlaceSuggestion[] }>(`/data/places?textQuery=${encodeURIComponent(query)}&type=locality,airport,hotel`)
+    const suggestions = response.data || []
     
-    // const response = await client.get<{ data: any[] }>("/data/cities")
-    
-    return [
-      { id: "LON", name: "London", countryCode: "GB", type: "city" as const },
-      { id: "PAR", name: "Paris", countryCode: "FR", type: "city" as const },
-      { id: "NYC", name: "New York", countryCode: "US", type: "city" as const },
-    ].filter(place => place.name.toLowerCase().includes(query.toLowerCase()))
+    logHotelFlow("searchHotelDestinations", "success", { count: suggestions.length })
+    return actionSuccess(suggestions)
   } catch (error) {
-    console.error("Failed to search hotel destinations", error)
-    return []
+    logHotelFlowError("searchHotelDestinations", "failed", error)
+    return actionFailure("UPSTREAM_ERROR", "Failed to retrieve hotel destinations from LiteAPI.")
   }
 }
