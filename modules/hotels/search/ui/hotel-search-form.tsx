@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { HotelPlaceAutocompleteField } from "@/modules/hotels/search/ui/hotel-place-autocomplete-field"
 import { HotelDatePickerField } from "@/modules/hotels/search/ui/hotel-date-picker-field"
 import { HotelGuestInlineControls, PassengerStepper } from "@/modules/hotels/search/ui/hotel-guest-inline-controls"
+import { Building2 } from "lucide-react"
 
 interface HotelSearchFormProps {
   initialValues?: HotelSearchFormValues
@@ -30,6 +31,8 @@ export function HotelSearchForm({ initialValues }: HotelSearchFormProps) {
   const [isSubmitting, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const [destinationName, setDestinationName] = useState("")
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false)
+  const [progressStarted, setProgressStarted] = useState(false)
 
   const defaultValues = useMemo<Partial<HotelSearchFormValues>>(() => ({
     placeId: "",
@@ -112,7 +115,14 @@ export function HotelSearchForm({ initialValues }: HotelSearchFormProps) {
     searchParams.set("checkout", result.data.command.checkout)
     searchParams.set("occupancies", JSON.stringify(result.data.command.occupancies))
     
-    router.push(`/hotels/results?${searchParams.toString()}`)
+    setShowLoadingOverlay(true)
+    setTimeout(() => setProgressStarted(true), 50)
+
+    setTimeout(() => {
+      startTransition(() => {
+        router.push(`/hotels/results?${searchParams.toString()}`)
+      })
+    }, 1500)
   }
 
   const fieldLabelClassName =
@@ -192,6 +202,32 @@ export function HotelSearchForm({ initialValues }: HotelSearchFormProps) {
 
       {serverError && (
         <p className="text-base text-destructive">{serverError}</p>
+      )}
+
+      {showLoadingOverlay && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
+          <div className="flex w-full max-w-sm flex-col items-center gap-8 px-6">
+            <p className="text-xl font-medium text-foreground">
+              Finding the best hotels...
+            </p>
+            <div className="relative h-1.5 w-full rounded-full bg-muted">
+              <div
+                className={cn(
+                  "absolute inset-y-0 left-0 rounded-full bg-primary",
+                  progressStarted ? "w-[95%] duration-[4000ms] ease-[cubic-bezier(0,0.5,0.05,1)]" : "w-0 duration-0"
+                )}
+                style={{ transitionProperty: "width" }}
+              >
+                <div className="absolute right-0 top-1/2 flex items-center justify-center">
+                  <Building2 
+                    fill="currentColor"
+                    className="size-6 -translate-y-1/2 translate-x-1/2 animate-pulse text-primary drop-shadow-md"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </form>
   )

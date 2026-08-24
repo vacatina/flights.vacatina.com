@@ -2,9 +2,11 @@ import { getActorContext } from "@/modules/auth/server"
 import { logFlowPageFailure } from "@/modules/flights/shared/server"
 import { logHotelFlow } from "@/modules/hotels/shared/server/actions-logger"
 import { FlowPageErrorState } from "@/modules/flights/shared/ui"
-import { fetchHotelRatesAction } from "@/modules/hotels/results/server/actions"
+import { format } from "date-fns"
+import { Suspense } from "react"
 import type { HotelSearchCommand, HotelRoomOccupancy } from "@/modules/hotels/search/domain"
-import { HotelResultsClient } from "@/modules/hotels/results/ui/hotel-results-client"
+import { HotelResultsData } from "@/modules/hotels/results/ui/hotel-results-data"
+import { HotelResultsSkeleton } from "@/modules/hotels/results/ui/hotel-results-skeleton"
 
 interface HotelResultsPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -24,6 +26,9 @@ export default async function HotelResultsPage({ searchParams }: HotelResultsPag
   const checkin = resolvedSearchParams.checkin as string
   const checkout = resolvedSearchParams.checkout as string
   const destinationName = (resolvedSearchParams.destinationName as string) || "Destination"
+  const limit = resolvedSearchParams.limit ? parseInt(resolvedSearchParams.limit as string) : 10
+  const offset = resolvedSearchParams.offset ? parseInt(resolvedSearchParams.offset as string) : 0
+  const sortBy = (resolvedSearchParams.sortBy as string) || undefined
   
   let occupancies: HotelRoomOccupancy[] = []
   try {
@@ -50,34 +55,33 @@ export default async function HotelResultsPage({ searchParams }: HotelResultsPag
     occupancies,
     guestNationality: "US", // Default
     currency: "USD", // Default
+    limit,
+    offset,
+    sortBy,
   }
 
-  const result = await fetchHotelRatesAction(command)
+  const guestsCount = occupancies.reduce(
+    (acc, occ) => acc + occ.adults + (occ.children?.length ?? 0),
+    0
+  )
 
-  if (!result.ok) {
-    logFlowPageFailure({
-      scope: "HotelResultsPage",
-      step: "fetch_failed",
-      error: result.error,
-      metadata: { placeId, checkin, checkout },
-    })
+  return (
+    <div className="min-h-screen bg-muted/30 pb-20 pt-8">
+      <div className="mx-auto max-w-7xl px-4 md:px-8 lg:px-12">
+        {/* Header Summary */}
+        <div className="mb-8 flex flex-col gap-2 rounded-xl bg-white p-6 shadow-sm ring-1 ring-border">
+          <h1 className="text-2xl font-semibold text-foreground">
+            Hotels in {destinationName}
+          </h1>
+          <p className="text-sm font-medium text-muted-foreground">
+            {format(new Date(checkin), "MMM d")} - {format(new Date(checkout), "MMM d")} • {guestsCount} guest{guestsCount !== 1 ? "s" : ""} • {occupancies.length} room{occupancies.length !== 1 ? "s" : ""}
+          </p>
+        </div>
 
-    return (
-      <FlowPageErrorState
-        title="Unable to find hotels"
-        message="We couldn't fetch hotel availability right now. Please try again."
-        backHref="/hotels"
-        backLabel="Back to search"
-      />
-    )
-  }
-
-  const renderKey = [
-    placeId,
-    checkin,
-    checkout,
-    occupancies.length,
-  ].join("|")
-
-  return <HotelResultsClient key={renderKey} response={result.data} command={command} destinationName={destinationName} />
+        <Suspense fallback={<HotelResultsSkeleton />}>
+          <HotelResultsData command={command} />
+        </Suspense>
+      </div>
+    </div>
+  )
 }

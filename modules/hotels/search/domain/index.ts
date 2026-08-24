@@ -39,6 +39,9 @@ export interface HotelSearchCommand {
   currency: string
   sessionId?: string
   clientIp?: string
+  limit?: number
+  offset?: number
+  sortBy?: string
 }
 
 export function toHotelSearchCommand(

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "liteapi": {
+      "serverUrl": "https://mcp.liteapi.travel/api/mcp?apiKey=sand_fd2b41ec-45e0-4dc2-bc46-01ded98091f6"
+    }
+  }
+}

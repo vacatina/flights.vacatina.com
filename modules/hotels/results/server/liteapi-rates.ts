@@ -54,7 +54,7 @@ export async function searchLiteApiRates(
 ): Promise<LiteApiRatesSearchResponse> {
   const client = getLiteApiClient()
 
-  const payload = {
+  const payload: any = {
     occupancies: command.occupancies,
     currency: command.currency,
     guestNationality: command.guestNationality,
@@ -64,7 +64,19 @@ export async function searchLiteApiRates(
     roomMapping: true,
     includeHotelData: true,
     placeId: command.placeId,
+    limit: command.limit,
+    offset: command.offset,
+  }
+  
+  if (command.sortBy === "price_asc") {
+    payload.sort = [{ field: "price", direction: "ascending" }];
+  } else if (command.sortBy === "price_desc") {
+    payload.sort = [{ field: "price", direction: "descending" }];
+  } else {
+    payload.sort = [{ field: "top_picks", direction: "descending" }];
   }
 
-  return client.post<LiteApiRatesSearchResponse>("/hotels/rates", payload)
+  const endpoint = "/hotels/rates"
+
+  return client.post<LiteApiRatesSearchResponse>(endpoint, payload)
 }

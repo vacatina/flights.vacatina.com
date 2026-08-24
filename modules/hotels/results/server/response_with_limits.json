@@ -1,0 +1,1216 @@
+{
+  "data": [
+    {
+      "hotelId": "lpa9363",
+      "roomTypes": [
+        {
+          "roomTypeId": "HE3DQLJWHEZTAOJRPRJEMTT4GIYDENRQHAZDMMJUGAYHYML4KIYTAMJYPQYTIMBWGU3DENA",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gEHR01ZVEVNQldNSTNEU05URkdZM1RFTUJXR0kzREtOUlVQUVlTR01SUUdJM0RBT0JTRzU2REVNQlNHWVlEUU1SWlBSU1c0WDJWS042RktVMzRKUkZWRTdCU0lFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RRTlpWRzRZVEFPSlpHTTREUVIyWU1GU1NHTlJaR01ZRFNNSkRIRTNEUUxKV0hFWlRBT0pSUFJKRU1UVDRHSVlERU5SUUhBWkRNTUpVR0FZSFlNTDRLSVlUQU1KWVBRWVRJTUJXR1UzREVOQkRLSkhTR1VTR0pZUlRFTUJTR1lXVEFPQk5HSTNDQU1KVUhJWURBSVmjcHJjy0EBK4HrhR64pW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZLMyMDI2LTA4LTI2IDE0OjAwOjAwonJ0oKNicmSiUk-kbXJpZM4APmYAo21ybqlLaW5nIFJvb22jaGRwwKNmcm6go3NybqoxIEtJTkcgQkVEo29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkYWhdLMyMDI2LTA4LTI2IDE0OjAwOjAwoWHLQQErgeuFHrihY6NMS1KidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKY2OTMwOTGjc2lkAqNoaWSnbHBhOTM2M6NvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKtib29raW5nLmNvbaNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJGEoWnDoWSldGF4ZXOhYctA07Nyj1wo9qFjo0xLUqJscMCjYmt0AQ==",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5GVSVCFJVBFOTKJGNCFGTSUIZDVSM2UIVGUEV2HJEZUIS2OKJKVAUKZKNDU2USRI5ETGRCBJ5BFGRZVGZCEKTKCKNDVSWKEKFGVEWSQKJJVONCYGJLEWTRWIZFVKMZUJJJEMVSFG5BFGSKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRIU4WSWI42FSVCBJ5FFUR2NGRCFCURSLFGUMU2TI5HFEWSHJVMUIU2NJJCEQRJTIRIUYSSXJBCVUVCBJ5FFEUCSJJCU2VCUGRDUSWKEIVHFEUKIIFNEITKNJJKUOQKZJBMU2TBUJNEVSVCBJVFFSUCRLFKESTKCK5DVKM2EIVHEERCLJJEFGR2VKNDUUWKSKRCU2QSTI5MVOVCBJ5BE4R2JGNBUCTKKKVEESWKEIFEVS7BRGQYDMNJWFYZDI7BSGAZDMLJQHAWTENRAGE2DUMBQHIYDA7CSJ56DIMBYHEZTIND4PR6DCICLJFHEOICCIVCHYMBOGAYHYMBOGAYHYS3JNZTSAUTPN5WXYMBOGAYHYMBOGAYA",
+              "occupancyNumber": 1,
+              "name": "1 KING BED",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 140656.24,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 143328.71,
+                    "currency": "LKR",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 140656.24,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "taxes",
+                    "amount": 20173.79,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-08-26 14:00:00",
+                    "amount": 140656.24,
+                    "currency": "LKR",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "mappedRoomId": 4089344,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null,
+              "rateCode": "OD23PG"
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 140656.24,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 143328.71,
+            "currency": "LKR",
+            "source": "booking.com"
+          },
+          "offerInitialPrice": {
+            "amount": 140656.24,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "package",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp6556b4da",
+      "roomTypes": [
+        {
+          "roomTypeId": "GYZTALJRG4YDAMJYGEZDCMD4JZJEMTT4GIYDENRQHAZDGMRRGMYXYNL4KIYTENRTPQYTINJVGIYTCOA",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gEqRzRaRE1aUldNWTNHSU1UREdJWURHTUpTR0EzR0VOUlpHWlNUTU5aU0dBM0RFTlJWR1kySFlNSkRHSVlERU5SUUhBWkRPN0JTR0FaRE1NQllHSTRYWVpMT0w1S1ZHN0NWS042RVlTMlNQUVpFQ01DRFBRMkRLTVJaUFJVVkFaMlZKQjZEQ05aWUc0MlRPTUpRSEU0VEdPQllJNU1HQ1pKREdFM1RBTUJSSEFZVEVNSlFFTTNER01CTkdFM1RBTUJSSEFZVEVNSlFQUkhGRVJTT1BRWkRBTVJXR0E0REVNWlNHRVpUQzdCVlBSSkRDTVJXR042RENOQlZHVVpEQ01KWUVOSkU2STJPS0pERTRJWlNHQVpETUxKUUhBV1RFTVpBR0lZVFVNWlJFTaNwcmPLQQHDiXCj1wqlb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkoKJydKCjYnJkolJPpG1yaWTOAE79r6Ntcm6pS2luZyBSb29to2hkcMCjZnJuoKNzcm6wUm9vbSwgMSBLaW5nIEJlZKNvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkqjE3MDAxODEyMTCjc2lkAqNoaWSqbHA2NTU2YjRkYaNvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKtib29raW5nLmNvbaNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJSEoWnDoWSqUmVzb3J0IGZlZaFhy0DXyI1wo9cKoWOjTEtShKFpwqFkqENpdHkgdGF4oWHLQKH_j1wo9cOhY6NMS1KEoWnCoWSjVEFYoWHLQNT2F64UeuGhY6NMS1KEoWnCoWSrVG91cmlzbSBmZWWhYctAdPsKPXCj16Fjo0xLUqJscMCjYmt0Aw==",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I42FURCNLJJFOTKZGNDUSTKUIRDUSWKEI5GUUU2HIEZUORKOKJNEOWSTKRGU4WSTI5ATGRCFJZJFMR2ZGJEFSTKKIRDUSWKEIVHFEUKIIFNEITZXIJJUOQK2IRGU2QSZI5ETIWCZLJGE6TBVJNLEON2DKZFU4NSFLFJTEU2QKFNEKQ2NINCFAUJSIRFU2US2KBJFKVSBLIZFMSSCGZCEGTS2LFDTIMSUJ5GUUUKIIU2FIR2PIJMUSNKNI5BVUSSEI5CTGVCBJVBFESCBLFKEKTKKKFCU2M2EI5GUETSHIUZVIQKNIJJEQQKZKRCU2SSRKBJEQRSFKJJU6UCRLJCECTKSK5DUCNCEIVGVUU2HIVNFIQZXIJLFAUSKIRBU2USXI5HDMRCDJZBFMR2VLJCEGTKKLFCU4SSFGZETET2LJJCEKNCJLJJUOQK2IRGUYSSRJBAVOVCFJVNECR2JLFKFKTK2KJCU27BRGQ2TKMRRFYYTQ7D4KJHXYNJRG43DONJRPR6HYUTPN5WSYIBREBFWS3THEBBGKZD4GAXDAMD4GAXDAMD4JNUW4ZZAKJXW63L4GAXDAMD4GAXDAMA",
+              "occupancyNumber": 1,
+              "name": "Room, 1 King Bed",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 145521.18,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 183793.25,
+                    "currency": "LKR",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 145521.18,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Resort fee",
+                    "amount": 24354.21,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "City tax",
+                    "amount": 2303.78,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "TAX",
+                    "amount": 21464.37,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "Tourism fee",
+                    "amount": 335.69,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "mappedRoomId": 5176751,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 145521.18,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 183793.25,
+            "currency": "LKR",
+            "source": "booking.com"
+          },
+          "offerInitialPrice": {
+            "amount": 145521.18,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp65581c57",
+      "roomTypes": [
+        {
+          "roomTypeId": "GEYTCNZNGE3TAMBSG4ZTEMZZPRJEMTT4GIYDENRQHAZDKMBUGAYHYML4KIYTCNJQPQYTKMZXGY4TQOI",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gGYR1pSRE1PSldNVTNET01SUUc0WkRNWlJXTVkzR0lNUlFHNDNUTU9KWEdRM0RRTVJRRzRaRE1aUldNTTNHR01URUdZNFRNWkpTR0EzVEdOUllHWlRET05aV0dVM1RFTVJRR0pTREVNQldNUTNHTU5SU0dZNFRNWVpXSEUzVElOWlpHSVlETU1KV0dNM0RHTlJWRzRaVE9NWldIRTNERU5UREdZMlhZTUpER0lZREVOUlFIQVpETzdCU0dBWkRNTUJZR0k0WFlaTE9MNUtWRzdDVktONkVZUzJTUFFaRUNNQ0RQUTJES01SWlBSVVZBWjJWSkI2RENOWllHNDJUT01KUUhFNFRHT0JZSTVNR0NaSkRHRTNUQU1CU0c0WlRFTVpaRU1ZVENNSlhGVVlUT01CUUdJM1RHTVJUSEY2RkVSU09QUVpEQU1SV0dBNERFTkpRR1FZREE3QlJQUkpEQ01KVkdCNkRDTkpURzQzRFNPQlpFTkpFNkkyU0laSENHTVJRR0kzQzJNQllGVVpES0lCUUdRNURBTUJEo3ByY8tBAsVPHrhR7KVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0wOC0yNSAwNDowMDowMKJydKCjYnJkolJPpG1yaWTOVwp02qNtcm7ZM0tpbmcgUm9vbSB3aXRoIFJvbGwtSW4gU2hvd2VyIC0gTW9iaWxpdHkgQWNjZXNzaWJsZaNoZHDAo2ZybqCjc3Ju2TNLaW5nIFJvb20gd2l0aCBSb2xsLWluIFNob3dlciAtIE1vYmlsaXR5IEFjY2Vzc2libGWjb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCRhaF0szIwMjYtMDgtMjUgMDQ6MDA6MDChYctA8KT89cKPXKFjo0xLUqJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkqjE3MDAyNzMyMzmjc2lkAqNoaWSqbHA2NTU4MWM1N6NvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKCjaWZtwqVpZmNocsKjaWZywqVzZWFpZKCibmuxbGl0ZWFwaW9uYm9hcmRpbmeidHiRhKFpwqFksE11bmljaXBhbGl0eSBGZWWhYctA1oNz1wo9caFjo0xLUqJscMCjYmt0Bw==",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5NFERCNJ5FFOTKVGNCE6TKSKFDTIWSEJVNFEV2NLEZUOSKNKJIUONBTKRGU6SSYI5ITGRCRJVJFCRZULJCE2WSSK5GU2M2HI5GVIRKHLE2FITK2JJJUOQJTKRDU4USZI5NFIRCPJZNFOR2VGNKEKTKSKFDUUU2EIVGUEV2NKEZUOTKOKJJUOWJUKRGVSWSXJBCTGVCJJZNFUR2JLFCE2TKKK5DU2M2EI5HFEVSHGRNFIT2NLJLUQRJTIRCU4VCEI5MTEWCZJVFEIR2JLFCEKTSSKFEECWSEJ43UEU2HIFNEITKNIJMUOSJULBMVUTCPJQ2UWVSHG5BVMS2OGZCVSUZSKNIFCWSFINGUGRCQKEZEIS2NKJNFAUSVKZAVUMSWJJBDMRCDJZNFSRZUGJKE6TKKKFEEKNCUI5HUEWKJGVGUOQ22JJCEORJTKRAU2QSTI42FUVCFJVNFURKNLFKEGTKKLBDFKWKUJ5GUEUKHJEZVIR2NKJKEQRRWIZCVEU2PKBIVURCBJVJFOR2BGRCEKTSKKFDVCWKEIE3UEUSQKJFEIQ2NJJLEOQRWIRBU4SSUI42DGRCTJ5BFURKOJJCTMSJSKNEVUSCDI5GVEUKHJEZUGMSNIJMUMVK2IRFUSQSRI5ITKRCBJVBEI7BRGUZTONRZFY4DS7BSGAZDMLJQHAWTENJAGA2DUMBQHIYDA7CSJ56DCNBWGAZTAMZQGY3HY7D4JNUW4ZZAKJXW63JAO5UXI2BAKJXWY3BNNFXCAU3IN53WK4RAFUQE233CNFWGS5DZEBAWGY3FONZWSYTMMV6DALRQGB6DALRQGB6EW2LOM4QFE33PNUQHO2LUNAQFE33MNQWUS3RAKNUG653FOIQC2ICNN5RGS3DJOR4SAQLDMNSXG43JMJWGK7BQFYYDA7BQFYYDA",
+              "occupancyNumber": 1,
+              "name": "King Room with Roll-in Shower - Mobility Accessible",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 153769.89,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 176835.37,
+                    "currency": "LKR",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 153769.89,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": false,
+                    "description": "Municipality Fee",
+                    "amount": 23053.81,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-08-25 04:00:00",
+                    "amount": 68175.81,
+                    "currency": "LKR",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "mappedRoomId": 1460303066,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 153769.89,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 176835.37,
+            "currency": "LKR",
+            "source": ""
+          },
+          "offerInitialPrice": {
+            "amount": 153769.89,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "package",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp65571c01",
+      "roomTypes": [
+        {
+          "roomTypeId": "GEZDKMZNGE3TAMBSGA3TMMJXPRHFERSOPQZDAMRWGA4DEMRRGAYDA7BRPRJDCMJTHB6DCNRWGYZTSMJR",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gFCR1kzRE1ZWldHVTNUUU1SUUc0WkRNWlJXTVkzR0lNUlFHNDNUTU9KWEdRM0RRTVJRRzQzVE1NSldNTTNHR01SUUdZWkRNTkpXR1I2RENJWlNHQVpETU1CWUdJM1hZTVJRR0kzREFPQlNIRjZHSzNTN0tWSlhZVktUUFJHRVdVVDRHSkFUQVEzNEdRMlRFT0w0TkZJR09WS0lQUVlUT09CWEdVM1RDTUJaSEVaVFFPQ0hMQlFXS0laUkc0WURBTVJRRzQzRENOWkRHRVpES01aTkdFM1RBTUJTR0EzVE1NSlhQUkhGRVJTT1BRWkRBTVJXR0E0REVNUlJHQVlEQTdCUlBSSkRDTUpUSEI2RENOUldHWVpUU01KUkVOSkU2STJPS0pERTRJWlNHQVpETUxKUUhBV1RFTVJBR0VZRFVNQlFFTaNwcmPLQQRXeMzMzM2lb3JfcHLLAAAAAAAAAAClb3JfY23Lv4R64UeuFHuiY23Lv4R64UeuFHujcGNkoKJydKCjYnJkolJPpG1yaWTOAFIpVaNtcm63RmxleCBSb29tIHdpdGggV2FsbCBCZWSjaGRwwKNmcm6go3NybrdGTEVYIFJPT00gV0lUSCBXQUxMIEJFRKNvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkqjE3MDAyMDc2MTejc2lkAqNoaWSqbHA2NTU3MWMwMaNvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKtib29raW5nLmNvbaNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJOEoWnDoWSqUmVzb3J0IGZlZaFhy0DTSKmZmZmaoWOjTEtShKFpwqFkqENpdHkgdGF4oWHLQKH_j1wo9cOhY6NMS1KEoWnCoWSjVEFYoWHLQNgA0UeuFHuhY6NMS1KibHDAo2JrdAQ=",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5MTGRCNLFNFOR2VGNKFCTKSKFDTIWSEJVNFEV2NLEZUOSKNKJIUONBTKRGU6SSYI5ITGRCRJVJFCRZUGNKE2TKKK5GU2M2HI5GVEUKHLFNEITKOJJLUOURWIRBUSWSTI5AVURCNJVBFSR2JGNMFSTKSKFDUSM2EIFHUEU2IIY3EOSZTKM3UWVSKLBMVMS2UKBJEORKXKVKDIR2KIFKECUJTGRDVCMSUIVHUYNCOIZEUOT2WJNEVAUKZKRHU6QSYI5KTGVCDJVBFUSCFLJKFCT2DJBGEEUKXJNEVUUSHGRMUIQKNKJIUONBTIRBU4WSEI5CVURCLJVNE4R2FGNKECTKCKNDUCM2UJVGUUWCQKJEEMRKSKNHVAUK2IRAU2USXI5ATIRCFJVJFER2BLFCECN2CKJIFESSEINGUUVCIII3EIQ2OKJLUOWK2KRJU2SSSIVHEURJWJEZE6S2KIRCTISK2KNDUCWSEJVGEUUKIIFLVIRKNKJAUORKZIRKU2QSRIVGXYMJWGY3DGOJOGEYHY7CSJ56DKMZYGQ2TGM34PR6EMTCFLAQFET2PJUQFOSKUJAQFOQKMJQQEERKEPQYC4MBQPQWTALRQGF6EM3DFPAQFE33PNUQHO2LUNAQFOYLMNQQEEZLEPQWTALRQGF6DALRQGA",
+              "occupancyNumber": 1,
+              "name": "FLEX ROOM WITH WALL BED",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": -0.01,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 166639.1,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 189635.31,
+                    "currency": "LKR",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 166639.1,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Resort fee",
+                    "amount": 19746.65,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "City tax",
+                    "amount": 2303.78,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "TAX",
+                    "amount": 24579.27,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "mappedRoomId": 5384533,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 166639.1,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 189635.31,
+            "currency": "LKR",
+            "source": "booking.com"
+          },
+          "offerInitialPrice": {
+            "amount": 166639.1,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "package",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp65570808",
+      "roomTypes": [
+        {
+          "roomTypeId": "GIYDMOJNGE3TAMBSGAZDKMBUPRHFERSOPQZDAMRWGA4DENBQGQYDA7BRPRJDCMJWGZ6DCNRYGM4TGOJS",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gGFRzRaVE9OQldHRTNHS05SVUdZWVRPTVJXR1FaREFOWlNHWlRETVpSV01RWkdHTVJRR01ZVEVNQlhHRTNUS05SVkdZMlRNWkpTR0EzREVOUlZHWTJERU1CU0hBM0RNTlRER1pURE1aUlhHSTNUR01SUUdNNERPTkJXSEFaR0lNWlJHTTJET05CV0hBWkRTN0JSRU1aREFNUldHQTRERU4zNEdJWURFTlJRSEFaRFM3REZOWlBWS1UzNEtWSlhZVENMS0o2REVRSlFJTjZESU5KU0hGNkdTVURIS1ZFSFlNSlhIQTNUS05aUkdBNFRTTVpZSEJEVlFZTEZFTVlUT01CUUdJWURFTkpRR1FSVEVNQldIRVdUQ05aUUdBWkRBTVJWR0EySFlUU1NJWkhIWU1SUUdJM0RBT0JTR1FZRElNQlFQUVlYWVVSUkdFM0RNN0JSR1k0REdPSlRIRVpDR1VTUEVOSEZFUlNPRU1aREFNUldGVVlEUUxKU0dRUURBTkIyR0FZQ0ejcHJjy0EEjk9cKPXDpW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZKCicnSgo2JyZKJST6RtcmlkzgBPSlujbXJuu1N0YW5kYXJkIFJvb20gb25lIHF1ZWVuIEJlZKNoZHDAo2ZybqCjc3Ju2SxTdGFuZGFyZCBSb29tLCAxIFF1ZWVuIEJlZCAoRmxvb3JzIDh0aC0xNHRoKaNvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkqjE3MDAyMDI1MDSjc2lkAqNoaWSqbHA2NTU3MDgwOKNvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKtib29raW5nLmNvbaNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJOEoWnDoWSqUmVzb3J0IGZlZaFhy0DgDcXCj1wpoWOjTEtShKFpwqFkqENpdHkgdGF4oWHLQKH_j1wo9cOhY6NMS1KEoWnCoWSjVEFYoWHLQNhBhmZmZmahY6NMS1KibHDAo2JrdAM=",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I42FUVCPJZBFOR2FGNDUWTSSKVDVSWKUJ5GVEV2HKFNEIQKOLJJUOWSUIRGVUUSXJVIVUR2HJVJFCR2NLFKEKTKCLBDUKM2UJNHFEVSHLEZFITK2JJJUOQJTIRCU4USWI5MTERCFJVBFGSCBGNCE2TSUIRDVUVCEJVNFEWCHJEZVIR2NKJIUOTJUIRHU4QSXJBAVUR2JJVNFER2NGJCE6TSCK5EECWSEKM3UEUSFJVNEIQKNKJLUOQJUIRCU4MZUI5EVSRCFJZJFCSCBLJCFGN2EIZHFUUCWJNKTGNCLKZFFQWKUINGEWSRWIRCVCSSRJFHDMRCJJZFFGSCGGZDVGVKEJBFVMRKILFGUUWCIIEZVIS2OLJJEOQJUKRJU2WSZJBBEIVSRLFGEMRKNLFKE6TKCKFDUSWKEIVHEUUKHKFJFIRKNIJLUQRKXKRBU4WSRI5AVURCBJVJFMR2BGJEFSVCTKNEVUSCILFGVEUKHJEZUIQKPIJJUOUKZIREU2QSRKBIVSWCZKVJFER2FGNCE2N2CKJDVSNCEI5HUUVCIIVNEGR2VKNIEKTSIIZCVEU2PIVGVURCBJVJFORSVLFCFCTCKKNDVCUKEIFHEEMSHIFMUGR34GE3DQMZZGMXDSMT4PRJE67BVGE4TMMZXHF6HY7CTORQW4ZDBOJSCAUTPN5WSYIBREBIXKZLFNYQEEZLEEAUEM3DPN5ZHGIBYORUC2MJUORUCS7BQFYYDA7BQFYYDA7CTORQW4ZDBOJSCAUTPN5WSA33OMUQHC5LFMVXCAQTFMR6DALRQGB6DALRQGA",
+              "occupancyNumber": 1,
+              "name": "Standard Room, 1 Queen Bed (Floors 8th-14th)",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 168393.92,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 196347.30999999997,
+                    "currency": "LKR",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 168393.92,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Resort fee",
+                    "amount": 32878.18,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "City tax",
+                    "amount": 2303.78,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "TAX",
+                    "amount": 24838.1,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "mappedRoomId": 5196379,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 168393.92,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 196347.3,
+            "currency": "LKR",
+            "source": "booking.com"
+          },
+          "offerInitialPrice": {
+            "amount": 168393.92,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "package",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp65579ff9",
+      "roomTypes": [
+        {
+          "roomTypeId": "HA2DALJRG4YDAMRUGE2DAML4JZJEMTT4GIYDENRQHAZDGMRRGMYXYML4KIZDANZTII4TQMKOGBKTA7BRG42DKMJRG44Q",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gEqR1laVE1ZWldHRTNUR05aVEdZNFRNTVpTR0EzR0VOUlpHWlNUTU4zNEdFUlRFTUJTR1lZRFFNUlhQUVpEQU1SV0dBNERFT0w0TVZYRjZWS1RQUktWRzdDTUpOSkhZTVNCR0JCWFlOQlZHSTRYWTJLUU01S1VRN0JSRzQ0RE9OSlhHRVlEU09KVEhBNEVPV0RCTVVSVENOWlFHQVpESU1KVUdBWVNHT0JVR0FXVENOWlFHQVpESU1KVUdBWVhZVFNTSVpISFlNUlFHSTNEQU9CU0dNWkRDTVpSUFFZWFlVUlNHQTNUR1FSWkhBWVU0TUNWR0I2RENOWlVHVVlUQ05aWkVOSkU2STJPS0pERTRJWlNHQVpETUxKUUhBV1RFTVpBR0lZVFVNWlJFTaNwcmPLQQVNflHrhR-lb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkoKJydKCjYnJkolJPpG1yaWTOVwi5vqNtcm6xQ2xhc3NpYyBLaW5nIFJvb22jaGRwwKNmcm6go3NybqxDbGFzc2ljIEtpbmejb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCQonJ0pE5SRk6kc2hpZKoxNzAwMjQxNDAxo3NpZAKjaGlkqmxwNjU1NzlmZjmjb2NjkYGhYQKjY3Vyo0xLUqJnbqJVU6JjaaoyMDI2LTA4LTI3omNvqjIwMjYtMDgtMjmjZ2lkoKJjcssAAAAAAAAAAKRzc2lk2TBzZXNzaW9uXzAxYTAzMzhhNTZkMFpFUk5MZjFSQlpGa2pNS1haSXluZVRwbVpMY3ejaXNowqNzc3CrYm9va2luZy5jb22jaWZtwqVpZmNocsKjaWZywqVzZWFpZKCibmuxbGl0ZWFwaW9uYm9hcmRpbmeidHiRhKFpw6Fko1RheKFhy0DLgB1wo9cKoWOjTEtSomxwwKNia3QC",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5MVUVCNLFNFOR2FGNKEOTS2KRDVSNCUJVGVUU2HIEZUORKOKJNEOWSTKRGU4MZUI5CVEVCFJVBFGR2ZLFCFCTKSLBIFCWSEIFGVEV2HIE2EIRKPJQ2E2VSYIY3FMS2UKBJEWVSHG5BU2SSOJJEFSTKTIJDUEQSYLFHEEVSHJE2FQWJSJNIU2NKLKVITOQSSI42DIRCPJZFFQR2FLFCFGT2KKREECNCFJ5LUIQSNKVJFIQ2OLJIUOQK2IREU2SSVI5AVSU2HJ5BFKR2BK5KEGTS2KFDUCWSEJFGUUVKHIFMVQWKUKNJUSWSIJBMU2USRI5ETGRCBJ5BFGR2NLJCEGTK2KJIFCWKYLFKVEU2HIEZVIR2RKJNEQQKZKU2E2Q2WI5BDMRCDJZNFKR2VLFKEGTS2LJCU4SSFGZETET2LJJCEKNCJLJJUOQK2IRGUYSSRJBAVOVCFJVNECR2JLFKFKTK2KJCU27BRG42DKMJRFY3TS7D4KJHXYMJUGYYDCOBZGYZTA7D4PRBWYYLTONUWGICLNFXGO7BQFYYDA7BQFYYDA7CDNRQXG43JMMQEW2LOM4QFE33PNV6DALRQGB6DALRQGA",
+              "occupancyNumber": 1,
+              "name": "Classic King",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 174511.79,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 368769.57,
+                    "currency": "LKR",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 174511.79,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Tax",
+                    "amount": 14080.23,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "mappedRoomId": 1460189630,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 174511.79,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 368769.57,
+            "currency": "LKR",
+            "source": "booking.com"
+          },
+          "offerInitialPrice": {
+            "amount": 174511.79,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp7141e",
+      "roomTypes": [
+        {
+          "roomTypeId": "GE2DEOBNGQ3DGOJQGJ6E4USGJZ6DEMBSGYYDQMRUGAYDAMD4GF6FEMJRGUYHYMJZGQ2DGOJQGY",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gEIR1pSRE1PSldNVTNET01SUUc0WkRNWlJXTVkzR0k3QlJFTVpEQU1SV0dBNERFTjM0R0lZREVOUlFIQVpEUzdERk5aUFZLVTM0S1ZKWFlUQ0xLSjZERVFKUUlONkRJTkpTSEY2R1NVREhLVkVIWU1KWEhBM1RLTlpSR0E0VFNNWllIQkRWUVlMRkVNMkRNTVpaR0FaQ0dNSlVHSTRDMk5CV0dNNFRBTVQ0SlpKRU1UVDRHSVlERU5SUUhBWkRJTUJRR0FZSFlNTDRLSVlUQ05KUVBRWVRTTkJVR000VEFOUkRLSkhTR1RTU0laSENHTVJRR0kzQzJNQllGVVpESUlCUUdBNURBTUJEo3ByY8tBB7w4euFHrqVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SgonJ0oKNicmSiUk-kbXJpZM4ANkeMo21ybqlLaW5nIFJvb22jaGRwwKNmcm6go3NybqlLaW5nIFJvb22jb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCQonJ0pE5SRk6kc2hpZKY0NjM5MDKjc2lkAqNoaWSnbHA3MTQxZaNvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKCjaWZtwqVpZmNocsKjaWZywqVzZWFpZKCibmuxbGl0ZWFwaW9uYm9hcmRpbmeidHiRhKFpw6Fko1RheKFhy0DboPFHrhR7oWOjTEtSomxwwKNia3QG",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5NFERCNJ5FFOTKVGNCE6TKSKFDTIWSEJVNFEV2NLEZUOSJXIJJEKTK2IRAU2USXI5ATIRCFJYZTIR2JLFCEKTSSKFEECWSEKM3UIRSOLJIFMS2VGM2EWVSKLBMVIQ2MJNFDMRCFKFFFCSKOGZCESTSKKNEEMNSHKNKUISCLKZCUQWKNJJMEQQJTKRFU4WSSI5ATIVCTJVNFSSCCIRLFCWKMIZCU2MSEJVGVUWSHIFNEGR2NJJKUOSJUIMZE4QSXI5GTIVCBJVKDISS2JJCU2VCUGRDUSWKEIVHFEUKIIFNEISKNIJIUOQKZJBMU2TBUJNEVSVCDJZFFCUCRLFKFGTSCKVDU2NCUIFHFERCLJJEFGR2UKNJUSWSIINDU2USRI5ETGQZSJVBFSRSVLJCESSKCKFDUCNKEIFGUERD4GE4TINBTHEXDANT4PRJE67BTGU2TOMRWGB6HY7CLNFXGOICSN5XW27BQFYYDA7BQFYYDA7CLNFXGOICSN5XW27BQFYYDA7BQFYYDA",
+              "occupancyNumber": 1,
+              "name": "King Room",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 194439.06,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 223604.91,
+                    "currency": "LKR",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 194439.06,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Tax",
+                    "amount": 28291.77,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "mappedRoomId": 3557260,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 194439.06,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 223604.91,
+            "currency": "LKR",
+            "source": ""
+          },
+          "offerInitialPrice": {
+            "amount": 194439.06,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lpa80aa",
+      "roomTypes": [
+        {
+          "roomTypeId": "GQ2TOLJWHA4DEOJYPRJEMTT4GIYDENRQHAZDKMBVGAYHYML4KIYTCNJQPQZDIMRRGA4DSMQ",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gFXRzQyVE9NUldHSTNEQ05URkdJWURNWVJXSEUzR0tOUlhHSVlERVpCU0dBM0RDTlJVR1lZVEVNQldNUTNHTU5SU0dZNFRNWVpXSEUzVElOWlpHSVlERVlSU0dBM0RRTlJWR1lZVE9NUldIRTNHS05SWFBRWVNHTVJRR0kzREFPQlNHNTZERU1CU0dZWURRTVJaUFJTVzRYMlZLTjZGS1UzNEpSRlZFN0JTSUVZRUc3QlVHVVpEUzdESktCVFZLU0Q0R0UzVFFOWlZHNFlUQU9KWkdNNERRUjJZTUZTU0dOUllIQVpEU09CREdRMlRPTEpXSEE0REVPSllQUkpFTVRUNEdJWURFTlJRSEFaREtNQlZHQVlIWU1MNEtJWVRDTkpRUFFaRElNUlJHQTREU01SREtKSFNHVVNHSllSVEVNQlNHWVdUQU9CTkdJMlNBTUJWSElZREFJWaNwcmPLQQ2N51wo9cOlb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDgtMjUgMDU6MDA6MDCicnSgo2JyZKJST6RtcmlkzgA5gVGjbXJu2ThVcmJhbiBLaW5nIFJvb20gd2l0aCBSb2xsLUluIFNob3dlciAtIEFEQSBIZWFyaW5nL1Zpc3VhbKNoZHDAo2ZybqCjc3Ju2SNVcmJhbiBLaW5nIC0gQURBIE1vYmlsaXR5ICsgSGVhcmluZ6NvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJGFoXSzMjAyNi0wOC0yNSAwNTowMDowMKFhy0D4nAUeuFHsoWOjTEtSonR5pmFtb3VudKJ0eqNHTVSicnSjUkZOpHNoaWSmNjg4Mjk4o3NpZAKjaGlkp2xwYTgwYWGjb2NjkYGhYQKjY3Vyo0xLUqJnbqJVU6JjaaoyMDI2LTA4LTI3omNvqjIwMjYtMDgtMjmjZ2lkoKJjcssAAAAAAAAAAKRzc2lk2TBzZXNzaW9uXzAxYTAzMzhhNTZkMFpFUk5MZjFSQlpGa2pNS1haSXluZVRwbVpMY3ejaXNowqNzc3Cgo2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSgom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4lIShacOhZK5Db252ZW50aW9uIFRheKFhy0CQGDMzMzMzoWOjTEtShKFpw6FkskNpdHkgT2NjdXBhbmN5IFRheKFhy0CVdY9cKPXDoWOjTEtShKFpw6Fkr1N0YXRlIFNhbGVzIFRheKFhy0DSGzUeuFHsoWOjTEtShKFpw6FkrkNpdHkgU2FsZXMgVGF4oWHLQMf3o9cKPXGhY6NMS1KibHDAo2JrdAU=",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I42DEVCPJVJFOR2JGNCEGTSUIZDUSWKEJVMVEV2IIUZUOS2OKJMEOSKZIRCVUQSTI5ATGRCDJZJFKR2ZLFKEKTKCK5GVCM2HJVHFEU2HLE2FITKZLJLUQRJTKREU4WS2I5EVSRCFLFJFGR2BGNCFCTSSKZDVSWKUJ5GVEV2IIUZUOS2OKJMFAUKZKNDU2USRI5ETGRCBJ5BFGRZVGZCEKTKCKNDVSWKEKFGVEWSQKJJVONCYGJLEWTRWIZFVKMZUJJJEMVSFG5BFGSKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRIU4WSWI42FSVCBJ5FFUR2NGRCFCURSLFGUMU2TI5HFEWKIIFNEIU2PIJCEOUJSKRHUYSSXJBATIRCFJ5FFSUCSJJCU2VCUGRDUSWKEIVHFEUKIIFNEIS2NIJLEOQKZJBMU2TBUJNEVSVCDJZFFCUCRLJCESTKSKJDUCNCEKNGVERCLJJEFGR2VKNDUUWKSKRCU2QSTI5MVOVCBJ5BE4R2JGJJUCTKCKZEESWKEIFEVS7BSGQZDCMBYFY4TE7BSGAZDMLJQHAWTENJAGA2TUMBQHIYDA7CSJ56DGNZWHA3DKN34PR6FK4TCMFXCAS3JNZTSALJAIFCECICNN5RGS3DJOR4SAKZAJBSWC4TJNZTXYMBOGAYHYMBOGAYHYVLSMJQW4ICLNFXGOICSN5XW2IDXNF2GQICSN5WGYLKJNYQFG2DPO5SXEIBNEBAUIQJAJBSWC4TJNZTS6VTJON2WC3D4GAXDAMD4GAXDAMA",
+              "occupancyNumber": 1,
+              "name": "Urban King - ADA Mobility + Hearing",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 242108.92,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 278425.26,
+                    "currency": "LKR",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 242108.92,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Convention Tax",
+                    "amount": 1030.05,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": true,
+                    "description": "City Occupancy Tax",
+                    "amount": 1373.39,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": true,
+                    "description": "State Sales Tax",
+                    "amount": 18540.83,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": true,
+                    "description": "City Sales Tax",
+                    "amount": 12271.28,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-08-25 05:00:00",
+                    "amount": 100800.32,
+                    "currency": "LKR",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "mappedRoomId": 3768657,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 242108.92,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 278425.26,
+            "currency": "LKR",
+            "source": ""
+          },
+          "offerInitialPrice": {
+            "amount": 242108.92,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lpe0493",
+      "roomTypes": [
+        {
+          "roomTypeId": "GEZDONJNHEYTQNRXGV6E4USGJZ6DEMBSGYYDQMRTGIYTEMT4GF6FEMJRGUYHYMRUGI2DKNJZGM",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2gFMR01ZVEVNQldNSTNEU05URkdZM1RFTUJXR0kzREtOUlVHSlJURU1CV0hBM0RLTlJSRzRaRE1PSldNVTNET01SUUdZWVRNTVpXR00zREtOWlRHNFpUTU9KV0dJM0dHTlJWUFFZU0dNUlFHSTNEQU9CU0c1NkRFTUJTR1lZRFFNUlpQUlNXNFgyVktONkZLVTM0SlJGVkU3QlNJRVlFRzdCVUdVWkRTN0RKS0JUVktTRDRHRTNUUU5aVkc0WVRBT0paR000RFFSMllNRlNTR09KUkhBM0RPTkpER0VaRE9OSk5IRVlUUU5SWEdWNkU0VVNHSlo2REVNQlNHWVlEUU1SVEdJWVRFTVQ0R0Y2RkVNSlJHVVlIWU1SVUdJMkRLTkpaR01SVkVUWkRKWkpFTVRSREdJWURFTlJOR0E0QzJNUlRFQVpEQ09SU0dJUlGjcHJjy0ENmL9wo9cKpW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZKCicnSgo2JyZKJST6RtcmlkzlcIckujbXJuvktpbmcgUm9vbSAtIEhlYXJpbmcgQWNjZXNzaWJsZaNoZHDAo2ZybqCjc3JuvjEgS2luZyBCZWQsIEhlYXJpbmcgQWNjZXNzaWJsZaNvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkpjkxODY3NaNzaWQCo2hpZKdscGUwNDkzo29jY5GBoWECo2N1cqNMS1KiZ26iVVOiY2mqMjAyNi0wOC0yN6Jjb6oyMDI2LTA4LTI5o2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwMzM4YTU2ZDBaRVJOTGYxUkJaRmtqTUtYWkl5bmVUcG1aTGN3o2lzaMKjc3NwoKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJOEoWnDoWSqUmVzb3J0IGZlZaFhy0DWf3Cj1wo9oWOjTEtShKFpwqFkqENpdHkgdGF4oWHLQKH_j1wo9cOhY6NMS1KEoWnCoWSjVEFYoWHLQOF2SAAAAAChY6NMS1KibHDAo2JrdAA=",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5GVSVCFJVBFOTKJGNCFGTSUIZDVSM2UIVGUEV2HJEZUIS2OKJKUOSSSKRCU2QSXJBATGRCLJZJFERZULJCE2T2KK5GVKM2EJ5GVEUKHLFMVITKNLJLUOTJTIRFU4WSUI42FUVCNJ5FFOR2JGNDUOTSSKZIFCWKTI5GVEUKHJEZUIQKPIJJUONJWIRCU2QSTI5MVSRCRJVJFUUCSKNLTIWBSKZFU4NSGJNKTGNCKKJDFMRJXIJJUSRKZIVDTOQSVI5KVURCTG5CEUS2CKRLEWU2EGRDUKM2UKFHFUVSHGRMVIQKPJJNEOTJUIRIVEMSZJVDFGU2HJ5FFESCBGNCE6TSKIRDUKWSEJ5HEUTSIIVMVIUKOKJMEOVRWIU2FKU2HJJNDMRCFJVBFGR2ZLFCFCTKSKRDUSWKUIVGVINCHIY3EMRKNJJJEOVKZJBMU2USVI5ETERCLJZFFUR2NKJLEKVC2IRFFUSSFJVKFERCHJFMUIRKOKJHEOQJUIMZE2USUIVAVURCDJ5JFGR2JKJIXYMRUGI2DKNJOHEZXY7CSJ56DCNBWGAYTOMJTGM4XY7D4GEQEW2LOM4QEEZLEFQQEQZLBOJUW4ZZAIFRWGZLTONUWE3DFPQYC4MBQPQYC4MBQPRFWS3THEBJG633NEAWSASDFMFZGS3THEBAWGY3FONZWSYTMMV6DALRQGB6DALRQGA",
+              "occupancyNumber": 1,
+              "name": "1 King Bed, Hearing Accessible",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 242455.93,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 278824.32,
+                    "currency": "LKR",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 242455.93,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Resort fee",
+                    "amount": 23037.76,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "City tax",
+                    "amount": 2303.78,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "TAX",
+                    "amount": 35762.25,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "mappedRoomId": 1460171339,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 242455.93,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 278824.32,
+            "currency": "LKR",
+            "source": ""
+          },
+          "offerInitialPrice": {
+            "amount": 242455.93,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lpa5464",
+      "roomTypes": [
+        {
+          "roomTypeId": "GEZDINZNGY3TMOJWGR6FERSOPQZDAMRWGA4DENRQGEYDA7BSPRJDCMJRGZ6DENJTGA4TSMJX",
+          "offerId": "3gAWonJzkd4AEaRzcmlk2f9HWVpUTVlaV0dFM1RHTlpUR1k0VE1NMzRHRVJURU1CU0dZWURRTVJYUFFaREFNUldHQTRERU9MNE1WWEY2VktUUFJLVkc3Q01KTkpIWU1TQkdCQlhZTkJWR0k0WFkyS1FNNUtVUTdCUkc0NERPTkpYR0VZRFNPSlRIQTRFT1dEQk1VUlRNTlpXSEUzRElJWlJHSTJET0xKV0c0M0RTTlJVUFJKRU1UVDRHSVlERU5SUUhBWkRNTUJSR0FZSFlNVDRLSVlUQ01KV1BRWkRLTVpRSEU0VENOWkRLSkhTR1VTR0pZUlRFTUJTR1lXVEFPQk5HSTNDQU1CUkhJWURBSVmjcHJjy0EO5VlcKPXDpW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZLMyMDI2LTA4LTI3IDAxOjAwOjAwonJ0oKNicmSiUk-kbXJpZM4AOfd8o21ybqxDbGFzc2ljIFJvb22jaGRwwKNmcm6go3NybqdDTEFTU0lDo29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkoWhdLMyMDI2LTA4LTI2IDAxOjAwOjAwoWHLQP7lWR64UeyhY6NMS1KidHmmYW1vdW50onR6o0dNVIWhdLMyMDI2LTA4LTI3IDAxOjAwOjAwoWHLQQ7lWVwo9cOhY6NMS1KidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKY2NzY5NjSjc2lkAqNoaWSnbHBhNTQ2NKNvY2ORgaFhAqNjdXKjTEtSomduolVTomNpqjIwMjYtMDgtMjeiY2-qMjAyNi0wOC0yOaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMDMzOGE1NmQwWkVSTkxmMVJCWkZrak1LWFpJeW5lVHBtWkxjd6Npc2jCo3NzcKtib29raW5nLmNvbaNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSgoWHLQNW1ZmZmZmahY6NMS1KEoWnCoWS3UHJvcGVydHkgU2VydmljZSBDaGFyZ2WhYctA1oNz1wo9caFjo0xLUqJscMCjYmt0Ag==",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5MVUVCNLFNFOR2FGNKEOTS2KRDVSNCUJVGTGNCHIVJFIRKNIJJUOWKZIRIU2USYKBIVURCBJVJFOR2BGRCEKT2MGRGVMWCGGZLEWVCQKJFVMRZXINGUUTSKJBMU2U2CI5BEEWCZJZBFMR2JGRMFSMSLKFGTKS2VKE3UEUSHGQ2EIT2OJJMEORKZIRJU6SSUJBATIRKPK5CEETKVKJKE2TS2K5EEKM2EJFEVUUSHJEZEIT2MJJLUONBTIRJU4USVKBJEURKNKRKDIR2JLFCEKTSSKFEECWSEJVGUEUSHIFMUQWKNKQ2EWSKZKRBU2SSXKBIVURCLJVNFCSCFGRKEGTS2IRFUUSCTI5KVGR2KLFJFIRKNIJJUOWKXKRAU6QSOI5ETGQ2BJVBFESCJLFCECSKZPQZDKMZQHE4S4MJXPQZDAMRWFUYDQLJSG4QDAMJ2GAYDUMBQPRJE67BTG44TQOJQHB6HY7CDJRAVGU2JIN6DALRQGB6DALRQGB6EG3DBONZWSYZAKJXW63L4GAXDAMD4GAXDAMA",
+              "occupancyNumber": 1,
+              "name": "CLASSIC",
+              "maxOccupancy": 2,
+              "adultCount": 2,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "LKR"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 253099.17,
+                    "currency": "LKR"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 282458.68,
+                    "currency": "LKR",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 253099.17,
+                    "currency": "LKR"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "",
+                    "amount": 22229.6,
+                    "currency": "LKR"
+                  },
+                  {
+                    "included": false,
+                    "description": "Property Service Charge",
+                    "amount": 23053.81,
+                    "currency": "LKR"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-08-26 01:00:00",
+                    "amount": 126549.57,
+                    "currency": "LKR",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  },
+                  {
+                    "cancelTime": "2026-08-27 01:00:00",
+                    "amount": 253099.17,
+                    "currency": "LKR",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "mappedRoomId": 3798908,
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 253099.17,
+            "currency": "LKR"
+          },
+          "suggestedSellingPrice": {
+            "amount": 282458.68,
+            "currency": "LKR",
+            "source": "booking.com"
+          },
+          "offerInitialPrice": {
+            "amount": 253099.17,
+            "currency": "LKR"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ]
+        }
+      ],
+      "et": 10800
+    }
+  ],
+  "guestLevel": 0,
+  "sandbox": true,
+  "hotels": [
+    {
+      "id": "lp65571c01",
+      "name": "Motto by Hilton New York City Chelsea",
+      "main_photo": "https://static.cupid.travel/hotels/599791912.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/599791912.jpg",
+      "address": "113 West 24th Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.744227,
+      "longitude": -73.992989,
+      "rating": 10,
+      "stars": 4,
+      "review_count": 4159
+    },
+    {
+      "id": "lp6556b4da",
+      "name": "Arlo Midtown",
+      "main_photo": "https://static.cupid.travel/hotels/404668075.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/404668075.jpg",
+      "address": "351 West 38th Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.755763,
+      "longitude": -73.993859,
+      "rating": 9.4,
+      "stars": 4,
+      "review_count": 7418
+    },
+    {
+      "id": "lp65570808",
+      "name": "Margaritaville Resort Times Square",
+      "main_photo": "https://static.cupid.travel/hotels/312889835.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/312889835.jpg",
+      "address": "560 7th Avenue",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.755045,
+      "longitude": -73.988031,
+      "rating": 9.2,
+      "stars": 4,
+      "review_count": 6627
+    },
+    {
+      "id": "lpa80aa",
+      "name": "LUMA Hotel - Times Square",
+      "main_photo": "https://static.cupid.travel/hotels/592213664.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/592213664.jpg",
+      "address": "120 West 41st Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.754546,
+      "longitude": -73.985705,
+      "rating": 10,
+      "stars": 4,
+      "review_count": 5213
+    },
+    {
+      "id": "lpa9363",
+      "name": "Hilton Garden Inn NYC Financial Center/Manhattan Downtown",
+      "main_photo": "https://static.cupid.travel/hotels/484656765.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/484656765.jpg",
+      "address": "6 Water Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.702828,
+      "longitude": -74.012179,
+      "rating": 9.2,
+      "stars": 3,
+      "review_count": 6120
+    },
+    {
+      "id": "lpe0493",
+      "name": "Moxy NYC Chelsea",
+      "main_photo": "https://static.cupid.travel/hotels/617911516.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/617911516.jpg",
+      "address": "105 West 28th Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.746336,
+      "longitude": -73.991064,
+      "rating": 9.4,
+      "stars": 3,
+      "review_count": 3867
+    },
+    {
+      "id": "lp65581c57",
+      "name": "Moxy NYC Lower East Side",
+      "main_photo": "https://static.cupid.travel/hotels/448694373.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/448694373.jpg",
+      "address": "145 Bowery",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.71902,
+      "longitude": -73.994235,
+      "rating": 9.6,
+      "stars": 3,
+      "review_count": 2567
+    },
+    {
+      "id": "lpa5464",
+      "name": "Park Terrace Hotel",
+      "main_photo": "https://static.cupid.travel/hotels/163517812.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/163517812.jpg",
+      "address": "18 West 40th Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.752494,
+      "longitude": -73.983108,
+      "rating": 9.6,
+      "stars": 4,
+      "review_count": 4067
+    },
+    {
+      "id": "lp65579ff9",
+      "name": "Hard Rock Hotel New York - Partner of ALL Accor",
+      "main_photo": "https://static.cupid.travel/hotels/352461363.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/352461363.jpg",
+      "address": "159 West 48th Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.759561,
+      "longitude": -73.983339,
+      "rating": 9.2,
+      "stars": 4,
+      "review_count": 3827
+    },
+    {
+      "id": "lp7141e",
+      "name": "citizenM New York Times Square",
+      "main_photo": "https://static.cupid.travel/hotels/254043994.jpg",
+      "thumbnail": "https://static.cupid.travel/hotels/thumbnail/254043994.jpg",
+      "address": "218 West 50th Street",
+      "country_code": "us",
+      "city_name": "New York",
+      "latitude": 40.761573,
+      "longitude": -73.985022,
+      "rating": 9.2,
+      "stars": 4,
+      "review_count": 4903
+    }
+  ]
+}
