@@ -2,22 +2,23 @@
 
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowRightIcon, SearchIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { cn } from "@/lib/utils"
 import {
   visaSearchSchema,
   type VisaSearchValues,
 } from "@/modules/visa-assistance/domain"
 import { CountrySearchField } from "@/modules/visa-assistance/ui/country-search-field"
-import { cn } from "@/lib/utils"
 
 interface VisaSearchFormProps {
   initialValues?: Partial<VisaSearchValues>
@@ -45,23 +46,43 @@ export function VisaSearchForm({
     <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup
         className={cn(
-          "gap-5",
+          "gap-7",
           compact &&
-            "lg:grid lg:grid-cols-[1fr_1fr_auto] lg:items-start lg:gap-3"
+            "lg:grid lg:grid-cols-[1fr_1fr_auto] lg:items-start lg:gap-3",
+          !compact &&
+            "md:grid md:grid-cols-2 md:items-start md:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem] xl:items-end"
         )}
       >
         <Controller
           name="nationality"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid} className="gap-2">
-              <FieldLabel>Your passport country</FieldLabel>
+            <Field
+              data-invalid={fieldState.invalid}
+              className={cn("gap-2", !compact && "gap-1")}
+            >
+              <FieldLabel
+                className={cn(
+                  !compact &&
+                    "text-[13px] font-medium tracking-[0.08em] text-muted-foreground uppercase"
+                )}
+              >
+                {compact ? "Your passport country" : "My passport"}
+              </FieldLabel>
               <CountrySearchField
                 value={field.value}
                 onChange={field.onChange}
-                placeholder="Select passport country"
+                placeholder={
+                  compact ? "Select passport country" : "Select passport"
+                }
                 invalid={fieldState.invalid}
+                appearance={compact ? "default" : "hero"}
               />
+              {!compact ? (
+                <FieldDescription className="text-sm">
+                  Your citizenship country
+                </FieldDescription>
+              ) : null}
               <FieldError errors={[fieldState.error]} />
             </Field>
           )}
@@ -71,14 +92,30 @@ export function VisaSearchForm({
           name="destination"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid} className="gap-2">
-              <FieldLabel>Where are you going?</FieldLabel>
+            <Field
+              data-invalid={fieldState.invalid}
+              className={cn("gap-2", !compact && "gap-1")}
+            >
+              <FieldLabel
+                className={cn(
+                  !compact &&
+                    "text-[13px] font-medium tracking-[0.08em] text-muted-foreground uppercase"
+                )}
+              >
+                {compact ? "Where are you going?" : "My destination"}
+              </FieldLabel>
               <CountrySearchField
                 value={field.value}
                 onChange={field.onChange}
                 placeholder="Select destination"
                 invalid={fieldState.invalid}
+                appearance={compact ? "default" : "hero"}
               />
+              {!compact ? (
+                <FieldDescription className="text-sm">
+                  Where you&apos;re traveling to
+                </FieldDescription>
+              ) : null}
               <FieldError errors={[fieldState.error]} />
             </Field>
           )}
@@ -86,11 +123,15 @@ export function VisaSearchForm({
 
         <Button
           type="submit"
-          className={cn("w-full", compact && "mt-7 lg:w-auto")}
+          className={cn(
+            "w-full",
+            compact && "mt-7 lg:w-auto",
+            !compact &&
+              "h-14 rounded-[10px] px-6 text-[16px] font-medium md:col-span-2 xl:col-span-1"
+          )}
         >
           {compact ? <SearchIcon data-icon="inline-start" /> : null}
-          {compact ? "Check again" : "Check visa requirements"}
-          {compact ? null : <ArrowRightIcon data-icon="inline-end" />}
+          {compact ? "Check again" : "Check Visa Requirements"}
         </Button>
       </FieldGroup>
     </form>

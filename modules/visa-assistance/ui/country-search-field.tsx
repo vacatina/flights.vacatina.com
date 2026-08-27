@@ -17,11 +17,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import {
   visaCountries,
   type VisaCountry,
 } from "@/modules/visa-assistance/domain"
-import { cn } from "@/lib/utils"
 
 interface CountrySearchFieldProps {
   value?: string
@@ -29,6 +29,7 @@ interface CountrySearchFieldProps {
   placeholder: string
   disabled?: boolean
   invalid?: boolean
+  appearance?: "default" | "hero"
 }
 
 export function CountrySearchField({
@@ -37,6 +38,7 @@ export function CountrySearchField({
   placeholder,
   disabled = false,
   invalid = false,
+  appearance = "default",
 }: CountrySearchFieldProps) {
   const [open, setOpen] = useState(false)
   const selectedCountry = useMemo(
@@ -60,7 +62,11 @@ export function CountrySearchField({
             aria-expanded={open}
             aria-invalid={invalid}
             disabled={disabled}
-            className="h-14 w-full justify-between px-4 text-left font-normal"
+            className={cn(
+              "h-14 w-full justify-between px-4 text-left font-normal",
+              appearance === "hero" &&
+                "h-14 rounded-xl border-input bg-background px-4 text-base font-medium text-foreground shadow-xs hover:bg-background aria-expanded:bg-background"
+            )}
           />
         }
       >
@@ -69,9 +75,9 @@ export function CountrySearchField({
             <span className="text-xl leading-none" aria-hidden="true">
               {selectedCountry.emoji}
             </span>
-          ) : (
+          ) : appearance === "default" ? (
             <Globe2Icon data-icon="inline-start" />
-          )}
+          ) : null}
           <span
             className={cn(
               "truncate",
@@ -81,7 +87,10 @@ export function CountrySearchField({
             {selectedCountry?.name ?? placeholder}
           </span>
         </span>
-        <ChevronsUpDownIcon data-icon="inline-end" />
+        <ChevronsUpDownIcon
+          className={cn(appearance === "hero" && "text-muted-foreground")}
+          data-icon="inline-end"
+        />
       </PopoverTrigger>
 
       <PopoverContent
