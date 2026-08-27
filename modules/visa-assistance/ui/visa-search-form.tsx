@@ -50,7 +50,7 @@ export function VisaSearchForm({
           compact &&
             "lg:grid lg:grid-cols-[1fr_1fr_auto] lg:items-start lg:gap-3",
           !compact &&
-            "md:grid md:grid-cols-2 md:items-start md:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem] xl:items-end"
+            "md:grid md:grid-cols-2 md:items-start md:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]"
         )}
       >
         <Controller
@@ -127,7 +127,7 @@ export function VisaSearchForm({
             "w-full",
             compact && "mt-7 lg:w-auto",
             !compact &&
-              "h-14 rounded-[10px] px-6 text-[16px] font-medium md:col-span-2 xl:col-span-1"
+              "h-16 rounded-[10px] px-6 text-[16px] font-medium md:col-span-2 xl:col-span-1 xl:mt-[22px]"
           )}
         >
           {compact ? <SearchIcon data-icon="inline-start" /> : null}

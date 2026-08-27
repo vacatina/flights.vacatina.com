@@ -63,16 +63,16 @@ export function CountrySearchField({
             aria-invalid={invalid}
             disabled={disabled}
             className={cn(
-              "h-14 w-full justify-between px-4 text-left font-normal",
+              "h-16 w-full justify-between px-5 text-left font-normal",
               appearance === "hero" &&
-                "h-14 rounded-xl border-input bg-background px-4 text-base font-medium text-foreground shadow-xs hover:bg-background aria-expanded:bg-background"
+                "h-16 rounded-xl border-transparent bg-muted/70 px-5 text-base font-medium text-foreground shadow-none hover:bg-muted focus-visible:border-primary/20 focus-visible:ring-primary/10 aria-expanded:bg-muted"
             )}
           />
         }
       >
         <span className="flex min-w-0 items-center gap-3">
           {selectedCountry ? (
-            <span className="text-xl leading-none" aria-hidden="true">
+            <span className="text-2xl leading-none" aria-hidden="true">
               {selectedCountry.emoji}
             </span>
           ) : appearance === "default" ? (
