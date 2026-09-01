@@ -29,6 +29,9 @@ export default async function HotelResultsPage({ searchParams }: HotelResultsPag
   const limit = resolvedSearchParams.limit ? parseInt(resolvedSearchParams.limit as string) : 10
   const offset = resolvedSearchParams.offset ? parseInt(resolvedSearchParams.offset as string) : 0
   const sortBy = (resolvedSearchParams.sortBy as string) || undefined
+  const priceMin = resolvedSearchParams.priceMin ? parseFloat(resolvedSearchParams.priceMin as string) : undefined
+  const priceMax = resolvedSearchParams.priceMax ? parseFloat(resolvedSearchParams.priceMax as string) : undefined
+  const stars = resolvedSearchParams.stars ? (resolvedSearchParams.stars as string).split(',').map(s => parseInt(s)) : undefined
   
   let occupancies: HotelRoomOccupancy[] = []
   try {
@@ -58,6 +61,9 @@ export default async function HotelResultsPage({ searchParams }: HotelResultsPag
     limit,
     offset,
     sortBy,
+    priceMin,
+    priceMax,
+    stars,
   }
 
   const guestsCount = occupancies.reduce(

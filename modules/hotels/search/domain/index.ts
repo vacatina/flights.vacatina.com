@@ -42,6 +42,9 @@ export interface HotelSearchCommand {
   limit?: number
   offset?: number
   sortBy?: string
+  priceMin?: number
+  priceMax?: number
+  stars?: number[]
 }
 
 export function toHotelSearchCommand(

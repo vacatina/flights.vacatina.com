@@ -1,73 +1,76 @@
 "use server"
 
-import { getLiteApiClient } from "@/lib/liteapi"
+import { z } from "zod"
+import { resolveActionActorContext } from "@/modules/auth/server"
 import { actionFailure, actionSuccess, type ActionResult } from "@/modules/hotels/shared/server/types"
 import { logHotelFlow, logHotelFlowError } from "@/modules/hotels/shared/server/actions-logger"
-import { hotelCheckoutSessionRepository } from "@/modules/hotels/checkout/server/session-repository"
-import { defaultHotelOrderRepository } from "@/modules/hotels/checkout/server/order-repository"
-import { createEmailHash } from "@/modules/flights/orders/server/identity"
 
-export async function createHotelBookingAction(
-  checkoutSessionId: string,
-  paymentIntentId: string
-): Promise<ActionResult<{ bookingReference: string }>> {
-  logHotelFlow("createHotelBookingAction", "started", { checkoutSessionId })
-  
-  const session = await hotelCheckoutSessionRepository.findById(checkoutSessionId)
-  if (!session) {
-    return actionFailure("VALIDATION_ERROR", "Checkout session not found.")
+const voucherSchema = z.object({
+  bookingReference: z.string().min(1),
+})
+
+export async function generateHotelVoucherAction(
+  input: unknown
+): Promise<ActionResult<{ voucherUrl: string }>> {
+  let actor
+  try {
+    actor = await resolveActionActorContext({
+      scope: "hotels.orders.actions",
+    })
+  } catch (error) {
+    logHotelFlowError("generateHotelVoucherAction", "actor_resolution_failed", error, {
+      inputType: typeof input,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not verify the current session. Please refresh and try again."
+    )
   }
 
-  const client = getLiteApiClient()
+  logHotelFlow("generateHotelVoucherAction", "received_input", {
+    inputType: typeof input,
+    actorType: actor.type,
+  })
+
+  const parsed = voucherSchema.safeParse(input)
+
+  if (!parsed.success) {
+    logHotelFlow("generateHotelVoucherAction", "validation_failed", {
+      issueCount: parsed.error.issues.length,
+      firstIssue: parsed.error.issues[0]?.message,
+    })
+    return actionFailure("VALIDATION_ERROR", "Invalid voucher request")
+  }
+
+  const { bookingReference } = parsed.data
 
   try {
-    // 1. LiteAPI Prebook (assuming it creates a booking hold)
-    const prebookResponse = await client.post<any>("/rates/prebook", { rateId: session.rateId })
-    const prebookId = prebookResponse.data?.prebookId
-
-    // 2. LiteAPI Book (confirming the booking)
-    const bookResponse = await client.post<any>("/rates/book", {
-      prebookId: prebookId || session.rateId,
-      guests: session.guests || [{
-        title: "Mr",
-        firstName: "Test",
-        lastName: "Guest",
-        email: session.primaryGuestEmail || "test@example.com"
-      }]
-    })
-
-    const liteapiOrderId = bookResponse.data?.bookingId || `liteapi_mock_${Date.now()}`
-    const bookingReference = `HTL${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-    
-    const email = session.primaryGuestEmail || "test@example.com"
-    
-    // 3. Persist to Postgres database via repository
-    await defaultHotelOrderRepository.create({
-      id: `ho_${Date.now()}`,
+    logHotelFlow("generateHotelVoucherAction", "generation_started", {
       bookingReference,
-      checkoutSessionId: session.id,
-      liteapiOrderId,
-      hotelId: session.hotelId,
-      roomId: session.roomId,
-      selectedRates: [session.rateId],
-      contactEmail: email,
-      contactEmailHash: createEmailHash(email),
-      paymentMode: "pay_now",
-      netAmount: session.netAmount,
-      sellAmount: session.sellAmount,
-      liteapiTotalAmount: session.netAmount,
-      liteapiTotalCurrency: session.currency,
-      currency: session.currency,
-      paymentAwaiting: false,
-      orderSnapshot: { hotelName: "Test Hotel" }
     })
 
-    await hotelCheckoutSessionRepository.update(checkoutSessionId, { status: "completed" })
+    // Simulated voucher generation delay
+    await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    logHotelFlow("createHotelBookingAction", "success", { bookingReference, liteapiOrderId })
-    return actionSuccess({ bookingReference })
+    // In a real application, we would call a PDF generation microservice
+    // or retrieve the voucherUrl directly from the LiteAPI booking object.
+    const mockVoucherUrl = `/api/hotels/vouchers/${bookingReference}/download.pdf`
+
+    logHotelFlow("generateHotelVoucherAction", "generation_succeeded", {
+      bookingReference,
+      voucherUrl: mockVoucherUrl,
+    })
+
+    return actionSuccess({
+      voucherUrl: mockVoucherUrl,
+    })
   } catch (error) {
-    logHotelFlowError("createHotelBookingAction", "failed", error)
-    return actionFailure("UPSTREAM_ERROR", "Failed to finalize hotel booking.")
+    logHotelFlowError("generateHotelVoucherAction", "generation_failed", error, {
+      bookingReference: parsed.data.bookingReference,
+    })
+    return actionFailure(
+      "UPSTREAM_ERROR",
+      "Could not generate your voucher right now. Please try again."
+    )
   }
 }

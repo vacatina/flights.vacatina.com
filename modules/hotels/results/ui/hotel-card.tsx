@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 import { StarIcon, MapPinIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { LiteApiHotelInfo, LiteApiRateResponseItem } from "@/modules/hotels/results/server/liteapi-rates"
@@ -9,9 +10,10 @@ interface HotelCardProps {
   ratesData?: LiteApiRateResponseItem
   lowestPrice?: number
   currency?: string
+  searchQuery: string
 }
 
-export function HotelCard({ hotel, ratesData, lowestPrice: preCalcPrice, currency: preCalcCurrency }: HotelCardProps) {
+export function HotelCard({ hotel, ratesData, lowestPrice: preCalcPrice, currency: preCalcCurrency, searchQuery }: HotelCardProps) {
   // Find the cheapest rate among all rooms and rates
   let lowestPrice = preCalcPrice !== undefined ? preCalcPrice : Infinity
   let currency = preCalcCurrency || "USD"
@@ -95,9 +97,15 @@ export function HotelCard({ hotel, ratesData, lowestPrice: preCalcPrice, currenc
             ))}
           </div>
           
-          <Button disabled={!hasRates}>
-            View Rooms
-          </Button>
+          {hasRates ? (
+            <Button render={<Link href={`/hotels/results/${hotel.id}?${searchQuery}`} />}>
+              View Rooms
+            </Button>
+          ) : (
+            <Button disabled>
+              View Rooms
+            </Button>
+          )}
         </div>
       </div>
     </div>
