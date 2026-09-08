@@ -1,0 +1,252 @@
+{
+  "info": {
+    "_postman_id": "f06e6e49-84c2-4d59-a823-8115f752ea01",
+    "name": "Vacatina - Duffel Flight Changes",
+    "description": "Sandbox-first collection for the Duffel order-change and post-booking baggage flows used by Vacatina. Replace `duffel_access_token` and `order_id` with a real sandbox order. Requests that confirm an order change or add a service mutate the supplier order; run them only against a sandbox booking you can change.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "duffel_base_url", "value": "https://api.duffel.com" },
+    { "key": "duffel_version", "value": "v2" },
+    { "key": "duffel_access_token", "value": "REPLACE_WITH_DUFFEL_SANDBOX_TOKEN", "type": "string" },
+    { "key": "order_id", "value": "ord_REPLACE_WITH_REAL_SANDBOX_ORDER" },
+    { "key": "slice_id", "value": "sli_REPLACE_WITH_CHANGEABLE_SLICE" },
+    { "key": "change_request_id", "value": "ocr_REPLACED_AFTER_CREATE" },
+    { "key": "change_offer_id", "value": "oco_REPLACED_AFTER_CREATE" },
+    { "key": "order_change_id", "value": "oce_REPLACED_AFTER_CREATE" },
+    { "key": "zero_or_negative_order_change_id", "value": "oce_REPLACE_WITH_A_SEPARATE_ZERO_OR_NEGATIVE_PENDING_CHANGE" },
+    { "key": "service_id", "value": "ase_REPLACE_WITH_AVAILABLE_SERVICE" },
+    { "key": "change_origin", "value": "CMB" },
+    { "key": "change_destination", "value": "SIN" },
+    { "key": "change_departure_date", "value": "2026-12-15" },
+    { "key": "cabin_class", "value": "economy" },
+    { "key": "change_payment_amount", "value": "25.00" },
+    { "key": "service_payment_amount", "value": "30.00" },
+    { "key": "currency", "value": "USD" }
+  ],
+  "item": [
+    {
+      "name": "Order changes",
+      "item": [
+        {
+          "name": "1. Get existing order and changeable slices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{duffel_base_url}}/air/orders/{{order_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Order request succeeded', () => pm.expect(pm.response.code).to.equal(200));",
+                  "const body = pm.response.json();",
+                  "const firstChangeableSlice = body.data?.slices?.find((slice) => slice.changeable === true);",
+                  "if (firstChangeableSlice?.id) pm.collectionVariables.set('slice_id', firstChangeableSlice.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Create order change request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"order_id\": \"{{order_id}}\",\n    \"slices\": {\n      \"remove\": [\n        { \"slice_id\": \"{{slice_id}}\" }\n      ],\n      \"add\": [\n        {\n          \"origin\": \"{{change_origin}}\",\n          \"destination\": \"{{change_destination}}\",\n          \"departure_date\": \"{{change_departure_date}}\",\n          \"cabin_class\": \"{{cabin_class}}\"\n        }\n      ]\n    }\n  }\n}"
+            },
+            "url": "{{duffel_base_url}}/air/order_change_requests"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Change request was created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const body = pm.response.json();",
+                  "if (body.data?.id) pm.collectionVariables.set('change_request_id', body.data.id);",
+                  "const firstOffer = body.data?.order_change_offers?.[0];",
+                  "if (firstOffer?.id) pm.collectionVariables.set('change_offer_id', firstOffer.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Get order change request and offers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{duffel_base_url}}/air/order_change_requests/{{change_request_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Change request was returned', () => pm.expect(pm.response.code).to.equal(200));",
+                  "const firstOffer = pm.response.json().data?.order_change_offers?.[0];",
+                  "if (firstOffer?.id) pm.collectionVariables.set('change_offer_id', firstOffer.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Get selected change offer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{duffel_base_url}}/air/order_change_offers/{{change_offer_id}}"
+          }
+        },
+        {
+          "name": "5. Create pending order change",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"selected_order_change_offer\": \"{{change_offer_id}}\"\n  }\n}"
+            },
+            "url": "{{duffel_base_url}}/air/order_changes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pending order change was created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const orderChange = pm.response.json().data;",
+                  "if (orderChange?.id) pm.collectionVariables.set('order_change_id', orderChange.id);",
+                  "if (orderChange?.change_total_amount) pm.collectionVariables.set('change_payment_amount', orderChange.change_total_amount);",
+                  "if (orderChange?.change_total_currency) pm.collectionVariables.set('currency', orderChange.change_total_currency);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Get pending order change",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{duffel_base_url}}/air/order_changes/{{order_change_id}}"
+          }
+        },
+        {
+          "name": "7. Confirm positive-price order change (SANDBOX MUTATION)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"payment\": {\n      \"type\": \"balance\",\n      \"amount\": \"{{change_payment_amount}}\",\n      \"currency\": \"{{currency}}\"\n    }\n  }\n}"
+            },
+            "url": "{{duffel_base_url}}/air/order_changes/{{order_change_id}}/actions/confirm"
+          }
+        },
+        {
+          "name": "8. Confirm zero/negative-price change (SEPARATE SANDBOX PENDING CHANGE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}"
+            },
+            "url": "{{duffel_base_url}}/air/order_changes/{{zero_or_negative_order_change_id}}/actions/confirm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Post-booking baggage",
+      "item": [
+        {
+          "name": "1. List available services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{duffel_base_url}}/air/orders/{{order_id}}/available_services"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Available services were returned', () => pm.expect(pm.response.code).to.equal(200));",
+                  "const service = pm.response.json().data?.[0];",
+                  "if (!service?.id) { pm.collectionVariables.unset('service_id'); pm.test('An addable post-booking service exists', () => { throw new Error('This order has no available post-booking services. Do not run the add-service request.'); }); }",
+                  "if (service?.id) pm.collectionVariables.set('service_id', service.id);",
+                  "if (service?.total_amount) pm.collectionVariables.set('service_payment_amount', service.total_amount);",
+                  "if (service?.total_currency) pm.collectionVariables.set('currency', service.total_currency);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Add available service (SANDBOX MUTATION)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const serviceId = pm.collectionVariables.get('service_id');",
+                  "if (!serviceId || serviceId.startsWith('ase_REPLACE')) throw new Error('Run List available services first. This order has no selected addable service.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"payment\": {\n      \"type\": \"balance\",\n      \"amount\": \"{{service_payment_amount}}\",\n      \"currency\": \"{{currency}}\"\n    },\n    \"add_services\": [\n      {\n        \"id\": \"{{service_id}}\",\n        \"quantity\": 1\n      }\n    ]\n  }\n}"
+            },
+            "url": "{{duffel_base_url}}/air/orders/{{order_id}}/services"
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{duffel_access_token}}", "type": "string" }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });",
+          "pm.request.headers.upsert({ key: 'Duffel-Version', value: pm.collectionVariables.get('duffel_version') || 'v2' });"
+        ]
+      }
+    }
+  ]
+}

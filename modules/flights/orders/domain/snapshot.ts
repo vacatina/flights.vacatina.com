@@ -109,6 +109,7 @@ export function buildFlightOrderSnapshot(
           : `${slice.segments.length - 1} stop${slice.segments.length > 2 ? "s" : ""}`
 
       return {
+        sliceId: slice.id,
         legIndex,
         title: getJourneyLegTitle({
           journeyType,
@@ -637,6 +638,7 @@ function normalizeLegs(rawLegs: unknown): FlightOrderSnapshot["legs"] {
       )
     })
     .map((leg) => ({
+      sliceId: typeof leg.sliceId === "string" ? leg.sliceId : null,
       legIndex: leg.legIndex,
       title: leg.title ?? `Leg ${leg.legIndex + 1}`,
       ownerName: leg.ownerName ?? "Unknown airline",

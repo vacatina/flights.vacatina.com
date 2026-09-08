@@ -10,7 +10,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 
-export default function BookingLookupPage() {
+export default async function BookingLookupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reference?: string }>
+}) {
+  const { reference } = await searchParams
+
   return (
     <main className="min-h-svh bg-muted/40 py-8 md:py-10">
       <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-8">
@@ -33,7 +39,7 @@ export default function BookingLookupPage() {
           </p>
         </div>
 
-        <GuestBookingLookupForm />
+        <GuestBookingLookupForm initialReference={reference} />
       </div>
     </main>
   )

@@ -21,6 +21,7 @@ import {
   mapFlightOrderToListItem,
 } from "@/modules/flights/orders/domain"
 import type { AdminBookingListQuery } from "@/modules/flights/orders/domain/admin-schema"
+import { defaultChangeRepository, type ChangeRepository } from "@/modules/flights/changes/server/repository"
 import {
   defaultNotificationOutboxRepository,
   type NotificationOutboxRepository,
@@ -38,6 +39,7 @@ interface AdminBookingsServiceDeps {
     CancellationRepository,
     "findLatestRequestByFlightOrderId"
   >
+  changeRepository?: Pick<ChangeRepository, "findLatestByFlightOrderId">
 }
 
 const defaultDeps: AdminBookingsServiceDeps = {
@@ -46,6 +48,7 @@ const defaultDeps: AdminBookingsServiceDeps = {
   checkoutSessionRepository: defaultCheckoutSessionRepository,
   notificationOutboxRepository: defaultNotificationOutboxRepository,
   cancellationRepository: defaultCancellationRepository,
+  changeRepository: defaultChangeRepository,
 }
 
 export interface AdminBookingListItem {
@@ -83,6 +86,7 @@ export interface AdminBookingDetailModel {
     refundAmountLabel: string | null
     updatedAtLabel: string
   } | null
+  changes: Array<{ requestId:string; status:string; requestType:string; pricingDirection:string; updatedAtLabel:string }>
   identifiers: {
     flightOrderId: string
     checkoutSessionId: string
@@ -161,13 +165,14 @@ export async function getAdminBookingDetail(
     return null
   }
 
-  const [checkoutSession, notifications, cancellation] = await Promise.all([
+  const [checkoutSession, notifications, cancellation, change] = await Promise.all([
     deps.checkoutSessionRepository.findById(order.checkoutSessionId),
     deps.notificationOutboxRepository.listRecentByFlightOrderId({
       flightOrderId: order.id,
       limit: 20,
     }),
     deps.cancellationRepository.findLatestRequestByFlightOrderId(order.id),
+    deps.changeRepository?.findLatestByFlightOrderId(order.id) ?? null,
   ])
   const bookingNotifications = notifications.filter(
     (notification): notification is typeof notification & {
@@ -212,6 +217,7 @@ export async function getAdminBookingDetail(
           }).format(cancellation.updatedAt),
         }
       : null,
+    changes: change ? [{ requestId:change.id,status:change.status,requestType:change.requestType,pricingDirection:change.pricingDirection,updatedAtLabel:new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short"}).format(change.updatedAt) }] : [],
     identifiers: {
       flightOrderId: order.id,
       checkoutSessionId: order.checkoutSessionId,

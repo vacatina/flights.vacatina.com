@@ -1,5 +1,7 @@
 import "server-only"
 
+export * from "@/modules/flights/payments-adapter/change-payment-service"
+
 import "@/modules/flights/payments-adapter/register"
 import type {
   CheckoutPaymentStartResult,
@@ -135,11 +137,13 @@ export async function capturePayPalPayment(
         },
       eventType: "CAPTURE_COMPLETED",
     })
-    await tryProcessCapturedPaymentFulfillment({
-      paymentAttemptId: attempt.id,
-      checkoutSessionId: input.checkoutSessionId,
-      deps,
-    })
+    if (checkoutOutboxFallbackEnabled()) {
+      await tryProcessCapturedPaymentFulfillment({
+        paymentAttemptId: attempt.id,
+        checkoutSessionId: input.checkoutSessionId,
+        deps,
+      })
+    }
   } else if (nextStatus === "capture_failed" || nextStatus === "capture_denied") {
     await appendEventOnce({
       deps,
@@ -263,6 +267,10 @@ async function tryProcessCapturedPaymentFulfillment(input: {
       })
     }
   }
+}
+
+function checkoutOutboxFallbackEnabled() {
+  return process.env.FLIGHT_CHECKOUT_OUTBOX_FALLBACK_ENABLED?.trim().toLowerCase() !== "false"
 }
 
 function isPassengerDobTypeMismatchError(error: unknown) {

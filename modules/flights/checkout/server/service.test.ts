@@ -231,6 +231,24 @@ test("createCheckoutPayPalOrder creates a PayPal order using sellTotal", async (
   )
 })
 
+test("createCheckoutPayPalOrder does not charge when a selected extra is no longer live", async () => {
+  const sessionRepo = createSessionRepository()
+  const input = createSubmitInput({ paymentMode: "pay_now" })
+  input.ancillarySelection = {
+    services: [{ id: "ase_removed_bag", quantity: 1 }],
+  }
+
+  await expect(
+    createCheckoutPayPalOrder(
+      { actor: createGuestActor(), payload: input },
+      createDeps({ sessionRepository: sessionRepo.repo })
+    )
+  ).rejects.toThrow("A selected extra is no longer available")
+
+  expect(paypalMocks.createPayPalOrder).not.toHaveBeenCalled()
+  expect(sessionRepo.spies.create).not.toHaveBeenCalled()
+})
+
 test("createCheckoutPayPalOrder reuses an existing processing PayPal order", async () => {
   const sessionRepo = createSessionRepository()
 

@@ -9,9 +9,13 @@ import { Input } from "@/components/ui/input"
 import { lookupBookingAction } from "@/modules/flights/orders/server/actions"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 
-export function GuestBookingLookupForm() {
+export function GuestBookingLookupForm({
+  initialReference = "",
+}: {
+  initialReference?: string
+}) {
   const router = useRouter()
-  const [reference, setReference] = useState("")
+  const [reference, setReference] = useState(initialReference)
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
