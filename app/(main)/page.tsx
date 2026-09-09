@@ -1,6 +1,10 @@
 import { Suspense } from "react"
 import { HeroSection } from "@/modules/home/ui/hero-section"
 import {
+  PopularDestinationsSection,
+  PopularDestinationsSkeleton,
+} from "@/modules/home/ui/popular-destinations-section"
+import {
   PopularFlightsSection,
   PopularFlightsSkeleton,
 } from "@/modules/home/ui/popular-flights-section"
@@ -21,6 +25,9 @@ export default async function Page({ searchParams }: HomePageProps) {
   return (
     <main className="bg-background">
       <HeroSection initialValues={initialValues ?? undefined} />
+      <Suspense fallback={<PopularDestinationsSkeleton />}>
+        <PopularDestinationsSection />
+      </Suspense>
       <Suspense fallback={<PopularFlightsSkeleton />}>
         <PopularFlightsSection />
       </Suspense>
