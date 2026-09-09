@@ -47,8 +47,7 @@ export function VisaSearchForm({
       <FieldGroup
         className={cn(
           "gap-7",
-          compact &&
-            "lg:grid lg:grid-cols-[1fr_1fr_auto] lg:items-start lg:gap-3",
+          compact && "gap-5",
           !compact &&
             "md:grid md:grid-cols-2 md:items-start md:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]"
         )}
@@ -125,7 +124,7 @@ export function VisaSearchForm({
           type="submit"
           className={cn(
             "w-full",
-            compact && "mt-7 lg:w-auto",
+            compact && "mt-1 h-12 rounded-xl px-5 text-[15px] font-medium",
             !compact &&
               "h-16 rounded-[10px] px-6 text-[16px] font-medium md:col-span-2 xl:col-span-1 xl:mt-[22px]"
           )}

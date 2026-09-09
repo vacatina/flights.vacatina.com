@@ -14,8 +14,8 @@ import {
 
 export default function VisaDetailsError({ reset }: { reset: () => void }) {
   return (
-    <main className="flex min-h-[60svh] items-center justify-center bg-muted/40 px-5 py-16">
-      <Empty className="max-w-xl border bg-card">
+    <main className="flex min-h-[70svh] items-center justify-center bg-muted/20 px-4 py-16">
+      <Empty className="max-w-xl rounded-2xl border bg-card px-6 py-12 md:px-10">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <AlertTriangleIcon />
@@ -27,7 +27,7 @@ export default function VisaDetailsError({ reset }: { reset: () => void }) {
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button onClick={reset}>
+          <Button onClick={reset} className="h-11 rounded-xl px-6">
             <RotateCcwIcon data-icon="inline-start" />
             Try again
           </Button>
