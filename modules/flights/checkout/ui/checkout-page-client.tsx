@@ -168,13 +168,20 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
         navigateToBookingDetail(resolution.bookingReference)
         return
       }
-      router.replace(
-        buildCheckoutHref({
-          step: "pay",
-          status: mapResolutionStatusToQueryStatus(resolution.status),
-          sessionId: resolution.sessionId,
-        })
-      )
+      const href = buildCheckoutHref({
+        step: "pay",
+        status: mapResolutionStatusToQueryStatus(resolution.status),
+        sessionId: resolution.sessionId,
+      })
+
+      if (resolution.status === "processing") {
+        // Preserve a recoverable URL without unmounting the PayPal SDK while
+        // its approval promise is still awaiting airline confirmation.
+        window.history.replaceState(window.history.state, "", href)
+        return
+      }
+
+      router.replace(href)
     },
   })
   const {
@@ -812,7 +819,7 @@ function ExpiredFareRecovery(input: {
         </div>
         {/* The refresh button is commented out/removed because expired PartialOfferRequests cannot be refreshed.
             We route the user back to the homepage to start a new search instead. */}
-        <Button className="h-10 shrink-0 px-4" render={<a href="/" />}>
+        <Button className="h-10 shrink-0 px-4" render={<Link href="/" />}>
           <RefreshCcwIcon data-icon="inline-start" />
           Start new search
         </Button>

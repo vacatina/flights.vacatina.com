@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { createAdminCancellationRequestFormAction } from "@/modules/flights/cancellations/server/actions"
-import { PendingSubmitButton } from "@/modules/flights/cancellations/ui/pending-submit-button"
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button"
 
 interface AdminCancelBookingDialogProps {
   bookingReference: string

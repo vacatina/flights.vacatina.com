@@ -52,6 +52,8 @@ import { reconcilePaymentAttemptById } from "@/modules/payments/server/reconcili
 import { enqueueNotification } from "@/modules/notifications/server"
 import { createEmailHash } from "@/modules/flights/orders/server/identity"
 import type { NotificationEventType } from "@/modules/notifications/domain"
+import { defaultChangeRepository, type ChangeRepository } from "@/modules/flights/changes/server/repository"
+import { isActiveChangeStatus } from "@/modules/flights/changes/domain"
 
 export interface CancellationStatusSummary {
   id: string
@@ -170,6 +172,7 @@ export interface CancellationServiceDeps {
   }) => Promise<unknown>
   enqueueNotification: typeof enqueueNotification
   listAdminAlertRecipients: () => Promise<AdminAlertRecipient[]>
+  changeRepository?: Pick<ChangeRepository, "findActiveByFlightOrderId">
 }
 
 const defaultDeps: CancellationServiceDeps = {
@@ -184,6 +187,7 @@ const defaultDeps: CancellationServiceDeps = {
     reconcilePaymentAttemptById({ paymentAttemptId }),
   enqueueNotification,
   listAdminAlertRecipients: listActiveAdminAlertRecipients,
+  changeRepository: defaultChangeRepository,
 }
 
 export async function getCancellationEligibilityContext(
@@ -201,12 +205,13 @@ export async function getCancellationEligibilityContext(
     deps
   )
   const snapshot = normalizeSnapshot(booking.orderSnapshot)
-  const [existing, rejected, businessSettings] = await Promise.all([
+  const [existing, rejected, businessSettings, activeChange] = await Promise.all([
     deps.cancellationRepository.findLatestRequestByFlightOrderId(booking.id),
     deps.cancellationRepository.findLatestRejectedRequestByFlightOrderId(
       booking.id
     ),
     deps.cancellationRepository.getBusinessSettings(),
+    deps.changeRepository?.findActiveByFlightOrderId(booking.id) ?? null,
   ])
   const activeRequest =
     existing &&
@@ -247,8 +252,10 @@ export async function getCancellationEligibilityContext(
     snapshot,
     businessSettings,
     existingRequest: existing ? toCancellationStatusSummary(existing) : null,
-    canSubmit: !activeRequest && !cooldownActive,
-    blockedReason: activeRequest
+    canSubmit: !activeRequest && !cooldownActive && !activeChange,
+    blockedReason: activeChange && isActiveChangeStatus(activeChange.status)
+      ? "A flight change is already open for this booking."
+      : activeRequest
       ? "A cancellation request is already open for this booking."
       : cooldownActive
         ? "Please wait before submitting another cancellation request."
@@ -355,6 +362,11 @@ export async function createAdminCancellationRequest(
 
   if (!booking) {
     throw new Error("Booking not found.")
+  }
+
+  const activeChange = await deps.changeRepository?.findActiveByFlightOrderId(booking.id)
+  if (activeChange && isActiveChangeStatus(activeChange.status)) {
+    throw new Error("A flight change is already open for this booking.")
   }
 
   const existing =

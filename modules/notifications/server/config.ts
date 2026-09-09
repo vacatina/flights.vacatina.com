@@ -11,6 +11,7 @@ const DEFAULT_RETRY_DELAY_MS = 5 * 60 * 1000
 export interface NotificationsServerConfig {
   resendApiKey: string | null
   fromEmail: string
+  appBaseUrl: string | null
   dispatchBatchLimit: number
   maxAttempts: number
   retryDelayMs: number
@@ -27,6 +28,11 @@ export function getNotificationsServerConfig(): NotificationsServerConfig {
   cachedConfig = {
     resendApiKey: process.env.RESEND_API_KEY?.trim() || null,
     fromEmail: process.env.RESEND_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL,
+    appBaseUrl: normalizeBaseUrl(
+      process.env.PAYMENTS_PUBLIC_BASE_URL ??
+        process.env.STRIPE_APP_BASE_URL ??
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+    ),
     dispatchBatchLimit: clamp(
       parseIntegerFromEnv("NOTIFICATIONS_DISPATCH_BATCH_LIMIT", DEFAULT_BATCH_LIMIT),
       1,
@@ -46,4 +52,9 @@ export function getNotificationsServerConfig(): NotificationsServerConfig {
   }
 
   return cachedConfig
+}
+
+function normalizeBaseUrl(value: string | undefined) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed.replace(/\/$/, "") : null
 }

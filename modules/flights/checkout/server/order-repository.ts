@@ -131,6 +131,7 @@ export interface FlightOrderRepository {
     contactEmailHash: string
   ): Promise<FlightOrderRecord | null>
   listByOwnerUserId(input: ListFlightOrdersByUserInput): Promise<FlightOrderListResult>
+  updateOrderSnapshot?(input: { id: string; orderSnapshot: Record<string, unknown> }): Promise<FlightOrderRecord | null>
 }
 
 const inMemoryOrders = new Map<string, FlightOrderRecord>()
@@ -261,6 +262,19 @@ export const defaultFlightOrderRepository: FlightOrderRepository = {
       records: rows.map(toOrderRecord),
       total: totalRows[0]?.count ?? 0,
     }
+  },
+  async updateOrderSnapshot(input) {
+    const db = getDbClient()
+    const now = new Date()
+    if (!db) {
+      const current = inMemoryOrders.get(input.id)
+      if (!current) return null
+      const updated = { ...current, orderSnapshot: input.orderSnapshot, updatedAt: now }
+      inMemoryOrders.set(input.id, updated)
+      return updated
+    }
+    const [row] = await db.update(flightOrders).set({ orderSnapshot: input.orderSnapshot, updatedAt: now }).where(eq(flightOrders.id, input.id)).returning()
+    return row ? toOrderRecord(row) : null
   },
 }
 

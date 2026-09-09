@@ -4,7 +4,7 @@ import {
   listAdminCancellationRequests,
   requireActiveAdmin,
 } from "@/modules/flights/cancellations/server"
-import { AdminPanelShell } from "@/modules/flights/cancellations/ui"
+import { AdminPanelShell } from "@/modules/admin/ui/admin-panel-shell"
 import { getAdminPaymentDetail } from "@/modules/payments/server"
 import { AdminPaymentDetail } from "@/modules/payments/ui"
 

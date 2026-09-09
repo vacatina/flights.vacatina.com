@@ -52,7 +52,7 @@ export type PaymentOutboxTaskType =
   | "notify_admin"
   | "sync_payment_state"
 
-export type PaymentInternalOrderType = "flight_checkout"
+export type PaymentInternalOrderType = "flight_checkout" | "flight_change" | "payment_stress_test" | "hotel_checkout"
 
 export interface PaymentOwner {
   ownerUserId: string | null
