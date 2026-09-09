@@ -1,14 +1,14 @@
 import Link from "next/link"
 import { ArrowRightIcon, PlaneTakeoffIcon } from "lucide-react"
 
+import { Accordion } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
-import { Money } from "@/modules/currency/ui/money"
+import { FlightOfferCard } from "@/modules/flights/results/ui/flight-offer-card"
 import {
   destinations,
   destinationSearchHref,
 } from "@/modules/home/domain/destinations"
 import { getPopularFlightOffers } from "@/modules/home/server/popular-flights"
-import { FlightResultSummary } from "@/modules/flights/results/ui/flight-result-summary"
 
 export async function PopularFlightsSection() {
   const selection = await getPopularFlightOffers()
@@ -51,54 +51,29 @@ export async function PopularFlightsSection() {
       </div>
 
       {selection ? (
-        <div className="-mx-4 grid snap-x snap-mandatory  grid-col-1 gap-5 overflow-x-auto px-4 pb-5  lg:mx-0  lg:px-0 ">
+        <Accordion multiple className="gap-5">
           {selection.offers.map((offer) => (
-            <article
+            <FlightOfferCard
               key={offer.id}
-              className="min-w-0 snap-start overflow-hidden rounded-2xl border bg-card  transition-[border-color,box-shadow] duration-200 hover:border-[#13357b]/25 "
-            >
-              <div className="px-5 py-6 md:px-8 md:py-7">
-                <FlightResultSummary
-                  carrierName={offer.ownerName}
-                  carrierCode={offer.ownerCode}
-                  carrierLogoUrl={offer.ownerLogoSymbolUrl}
-                  flightNumbersLabel={offer.flightNumbersLabel}
-                  departureTimeLabel={offer.departureTimeLabel}
-                  arrivalTimeLabel={offer.arrivalTimeLabel}
-                  arrivalDayOffset={offer.arrivalDayOffset}
-                  durationLabel={offer.durationLabel}
-                  routeLabel={offer.routeLabel}
-                  stopsLabel={offer.stopsLabel}
-                  stopsDetails={offer.stopsDetails}
-                />
-              </div>
-              <div className="flex flex-col gap-5 border-t bg-muted/15 px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-8">
-                <p className="text-sm text-muted-foreground">
-                  From{" "}
-                  <span className="text-2xl font-semibold tracking-[-0.03em] text-foreground md:text-3xl">
-                    <Money
-                      money={offer.totalMoney}
-                      fallbackLabel={offer.totalAmountLabel}
-                    />
-                  </span>
-                </p>
+              offer={offer}
+              action={
                 <Button
                   nativeButton={false}
                   render={
                     <Link
                       href={`/results/${selection.partialOfferRequestId}/review?selected=${encodeURIComponent(offer.id)}`}
                       prefetch={false}
-                      aria-label={`View ${offer.ownerName} flight from ${offer.routeLabel}`}
+                      aria-label={`Select ${offer.ownerName} flight from ${offer.routeLabel}`}
                     />
                   }
-                  className="h-11 w-full rounded-xl px-7 text-sm sm:w-auto"
+                  className="h-11 rounded-xl px-7 text-sm"
                 >
-                  View flight
+                  Select
                 </Button>
-              </div>
-            </article>
+              }
+            />
           ))}
-        </div>
+        </Accordion>
       ) : (
         <div className="flex flex-col gap-5 rounded-2xl border bg-muted/20 px-6 py-8 sm:flex-row sm:items-center sm:justify-between md:px-8">
           <div>

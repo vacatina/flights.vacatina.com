@@ -1,19 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { useCallback, useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertCircleIcon,
-  BriefcaseIcon,
   FilterIcon,
   Loader2Icon,
   PlaneLandingIcon,
   PlaneTakeoffIcon,
 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,13 +21,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -49,15 +40,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Slider } from "@/components/ui/slider"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
+import { Accordion } from "@/components/ui/accordion"
 import {
   applyOfferClientSorting,
   toResultsUrlSearchParams,
@@ -68,11 +53,10 @@ import {
   OfferSessionTimer,
   useOfferSessionExpiry,
 } from "@/modules/flights/results/ui/offer-session-timer"
-import { FlightResultSummary } from "@/modules/flights/results/ui/flight-result-summary"
+import { FlightOfferCard } from "@/modules/flights/results/ui/flight-offer-card"
 import { logFlightFlow } from "@/lib/logging/flow-debug"
-import { cn } from "@/lib/utils"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
-import { FxEstimateDisclosure, Money } from "@/modules/currency/ui"
+import { FxEstimateDisclosure } from "@/modules/currency/ui"
 
 const SORT_OPTIONS = [
   { value: "least_expensive", label: "Least expensive" },
@@ -437,183 +421,11 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
             {offers.length > 0 && (
               <Accordion multiple className="gap-5">
                 {offers.map((offer) => (
-                  <Card
+                  <FlightOfferCard
                     key={offer.id}
-                    className="group/card overflow-hidden rounded-2xl border bg-card/95 shadow-none duration-200 hover:shadow-md"
-                  >
-                    <AccordionItem value={offer.id} className="border-none">
-                      <CardHeader className="p-0">
-                        <AccordionTrigger className="w-full px-6 py-5 no-underline hover:no-underline md:px-8 md:py-5">
-                          <FlightResultSummary carrierName={offer.ownerName} carrierCode={offer.ownerCode} carrierLogoUrl={offer.ownerLogoSymbolUrl} flightNumbersLabel={offer.flightNumbersLabel} departureTimeLabel={offer.departureTimeLabel} arrivalTimeLabel={offer.arrivalTimeLabel} arrivalDayOffset={offer.arrivalDayOffset} durationLabel={offer.durationLabel} routeLabel={offer.routeLabel} stopsLabel={offer.stopsLabel} stopsDetails={offer.stopsDetails} />
-                          <div className="hidden">
-                            <div className="flex items-center gap-5">
-                              <div className="flex size-18 items-center justify-center rounded-lg border bg-muted/50 font-semibold text-primary">
-                                {offer.ownerLogoSymbolUrl ? (
-                                  <Image
-                                    src={offer.ownerLogoSymbolUrl}
-                                    alt={`${offer.ownerName} logo`}
-                                    width={32}
-                                    height={32}
-                                    unoptimized
-                                    className="size-12 object-contain"
-                                  />
-                                ) : (
-                                  offer.ownerCode
-                                )}
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-lg leading-tight font-semibold tracking-tight md:text-xl">
-                                  {offer.departureTimeLabel} -{" "}
-                                  {offer.arrivalTimeLabel}
-                                  {offer.arrivalDayOffset > 0 &&
-                                    `+${offer.arrivalDayOffset}`}
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  {offer.flightNumbersLabel.includes(",")
-                                    ? `${offer.ownerName} · ${offer.flightNumbersLabel}`
-                                    : offer.ownerName}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                                Total duration
-                              </span>
-                              <span className="text-lg leading-tight font-semibold tracking-tight md:text-xl">
-                                {offer.durationLabel}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {offer.routeLabel}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                                Stops
-                              </span>
-                              <span className="text-lg leading-tight font-semibold tracking-tight md:text-xl">
-                                {offer.stopsLabel}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {offer.stopsDetails ?? "Direct flight"}
-                              </span>
-                            </div>
-                          </div>
-                        </AccordionTrigger>
-                      </CardHeader>
-
-                      <AccordionContent className="px-6 md:px-10">
-                        <div className="pb-6">
-                          {offer.timeline.map((departureEvent, eventIndex) => {
-                            if (eventIndex % 2 === 1) {
-                              return null
-                            }
-
-                            const arrivalEvent = offer.timeline[eventIndex + 1]
-
-                            if (!arrivalEvent) {
-                              return null
-                            }
-
-                            const segmentIndex = Math.floor(eventIndex / 2)
-                            const layover = offer.layovers[segmentIndex]
-
-                            return (
-                              <div
-                                key={`${departureEvent.id}-${arrivalEvent.id}`}
-                                className="pb-10 last:pb-2"
-                              >
-                                <div className="relative px-1 py-3 md:px-2">
-                                  <div className="absolute top-6 bottom-6 left-3 border-l border-dashed border-border" />
-                                  <span className="absolute top-0 left-0 size-6 rounded-full border-2 border-muted-foreground/35 bg-background" />
-                                  <span className="absolute bottom-0 left-0 size-6 rounded-full border-2 border-muted-foreground/35 bg-background" />
-
-                                  <div className="flex flex-col gap-5 pl-12">
-                                    <div className="grid items-start gap-3 md:grid-cols-[310px_1fr]">
-                                      <strong className="text-base leading-tight font-semibold md:text-lg">
-                                        {departureEvent.dateTimeLabel}
-                                      </strong>
-                                      <span className="text-sm text-foreground md:text-base">
-                                        {departureEvent.description}
-                                      </span>
-                                    </div>
-
-                                    {departureEvent.segmentDurationLabel && (
-                                      <p className="text-sm text-muted-foreground md:text-base">
-                                        Flight duration:{" "}
-                                        {departureEvent.segmentDurationLabel}
-                                      </p>
-                                    )}
-
-                                    <div className="grid items-start gap-3 pt-4 md:grid-cols-[310px_1fr]">
-                                      <strong className="text-base leading-tight font-semibold md:text-lg">
-                                        {arrivalEvent.dateTimeLabel}
-                                      </strong>
-                                      <span className="text-sm text-foreground md:text-base">
-                                        {arrivalEvent.description}
-                                      </span>
-                                    </div>
-
-                                    {arrivalEvent.meta.length > 0 && (
-                                      <div className="flex flex-wrap items-center gap-x-7 gap-y-2 text-sm text-muted-foreground md:text-base">
-                                        {arrivalEvent.meta.map((metaItem) => (
-                                          <span
-                                            key={metaItem}
-                                            className="inline-flex items-center gap-2"
-                                          >
-                                            {(metaItem.includes("carry-on") ||
-                                              metaItem.includes("checked")) && (
-                                                <BriefcaseIcon className="size-4" />
-                                              )}
-                                            {metaItem}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {layover && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="mt-5 ml-12 w-fit rounded-full px-5 py-1.5 text-sm font-normal md:text-base"
-                                  >
-                                    {layover.label}
-                                  </Badge>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <Separator />
-
-                    <CardFooter className="flex items-center justify-between px-6 py-5 md:px-10 md:py-6">
-                      <div className="flex flex-col">
-                        <p
-                          className={cn(
-                            "text-sm text-muted-foreground",
-                            offer.isExpired ? "opacity-80" : ""
-                          )}
-                        >
-                          From{" "}
-                          <span
-                            className={cn(
-                              "text-3xl font-semibold tracking-tight text-foreground md:text-4xl",
-                              offer.isExpired ? "text-muted-foreground" : ""
-                            )}
-                          >
-                            <Money
-                              money={offer.totalMoney}
-                              fallbackLabel={offer.totalAmountLabel}
-                            />
-                          </span>
-                        </p>
-                      </div>
-                      {offer.isExpired ? (
+                    offer={offer}
+                    action={
+                      offer.isExpired ? (
                         <div className="inline-flex items-center gap-3 rounded-full bg-muted px-4 py-2 text-foreground">
                           <AlertCircleIcon className="size-4" />
                           <span className="text-sm md:text-base">
@@ -625,13 +437,15 @@ export function FareOptionsPageClient({ data }: { data: FareOptionsPageData }) {
                           className="h-11 rounded-xl px-7 text-sm"
                           disabled={isSelectingOffer || offerSession.expired}
                           onClick={() => selectOffer(offer.id)}
-                          isLoading={isSelectingOffer && pendingOfferId === offer.id}
+                          isLoading={
+                            isSelectingOffer && pendingOfferId === offer.id
+                          }
                         >
                           Select
                         </LoadingButton>
-                      )}
-                    </CardFooter>
-                  </Card>
+                      )
+                    }
+                  />
                 ))}
               </Accordion>
             )}
