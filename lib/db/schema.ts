@@ -1381,3 +1381,102 @@ export type NewOrganizationMemberRow = typeof organizationMembers.$inferInsert
 
 export type ClerkWebhookEventRow = typeof clerkWebhookEvents.$inferSelect
 export type NewClerkWebhookEventRow = typeof clerkWebhookEvents.$inferInsert
+
+export const hotelOrders = pgTable(
+  "hotel_orders",
+  {
+    id: text("id").primaryKey(),
+    bookingReference: text("booking_reference").notNull(),
+    checkoutSessionId: text("checkout_session_id")
+      .notNull()
+      .references(() => checkoutSessions.id, {
+        onDelete: "cascade",
+      }),
+    paymentAttemptId: text("payment_attempt_id").references(
+      () => paymentAttempts.id,
+      { onDelete: "set null" }
+    ),
+    liteapiOrderId: text("liteapi_order_id").notNull(),
+    hotelId: text("hotel_id").notNull(),
+    roomId: text("room_id").notNull(),
+    selectedRates: jsonb("selected_rates").$type<string[]>().notNull(),
+    ownerUserId: text("owner_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ownerGuestId: text("owner_guest_id").references(() => guestSessions.id, {
+      onDelete: "set null",
+    }),
+    ownerOrgId: text("owner_org_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    contactEmail: text("contact_email").notNull(),
+    contactEmailHash: text("contact_email_hash").notNull(),
+    paymentMode: checkoutPaymentModeEnum("payment_mode").notNull(),
+    settlementType: checkoutSettlementTypeEnum("settlement_type")
+      .notNull()
+      .default("balance"),
+    currency: text("currency").notNull(),
+    netAmount: numeric("net_amount", { precision: 14, scale: 4 }).notNull(),
+    sellAmount: numeric("sell_amount", { precision: 14, scale: 4 }).notNull(),
+    liteapiTotalAmount: numeric("liteapi_total_amount", {
+      precision: 14,
+      scale: 4,
+    }).notNull(),
+    liteapiTotalCurrency: text("liteapi_total_currency").notNull(),
+    paymentAwaiting: boolean("payment_awaiting").notNull().default(false),
+    paymentRequiredBy: timestamp("payment_required_by", { withTimezone: true }),
+    priceGuaranteeExpiresAt: timestamp("price_guarantee_expires_at", {
+      withTimezone: true,
+    }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    orderSnapshot: jsonb("order_snapshot")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    checkoutSessionUniqueIdx: uniqueIndex(
+      "hotel_orders_checkout_session_unique_idx"
+    ).on(table.checkoutSessionId),
+    bookingReferenceUniqueIdx: uniqueIndex(
+      "hotel_orders_booking_reference_unique_idx"
+    ).on(table.bookingReference),
+  })
+)
+
+export const hotelCancellationRequests = pgTable(
+  "hotel_cancellation_requests",
+  {
+    id: text("id").primaryKey(),
+    hotelOrderId: text("hotel_order_id")
+      .notNull()
+      .references(() => hotelOrders.id, {
+        onDelete: "cascade",
+      }),
+    bookingReference: text("booking_reference").notNull(),
+    liteapiOrderId: text("liteapi_order_id").notNull(),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    customerReason: text("customer_reason").notNull(),
+    status: flightCancellationStatusEnum("status")
+      .notNull()
+      .default("requested"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }
+)
+
+export type HotelOrderRow = typeof hotelOrders.$inferSelect
+export type NewHotelOrderRow = typeof hotelOrders.$inferInsert
+export type HotelCancellationRequestRow = typeof hotelCancellationRequests.$inferSelect
+export type NewHotelCancellationRequestRow = typeof hotelCancellationRequests.$inferInsert

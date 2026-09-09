@@ -67,13 +67,10 @@ describe("staging payment topology stress test", () => {
         const firstPublish = await publishPaymentFulfillmentTask({
           paymentAttemptId,
           checkoutSessionId: internalOrderId,
-          onPublishError: (error) => writePublishError(index + 1, error),
-          qstashRetry: QSTASH_STRESS_RETRY,
         })
         const duplicatePublish = await publishPaymentFulfillmentTask({
           paymentAttemptId,
           checkoutSessionId: internalOrderId,
-          qstashRetry: QSTASH_STRESS_RETRY,
         })
         if (firstPublish.published) stats.published += 1
         else addPublishProblem(stats.publishProblems, firstPublish.reason)

@@ -24,7 +24,7 @@ type NavLinkItem = {
 const primaryNavItems: NavLinkItem[] = [
   { href: "/", label: "Home" },
   { href: "#", label: "Flights" },
-  { href: "#", label: "Hotels" },
+  { href: "/hotels", label: "Hotels" },
   { href: "#", label: "Cars" },
   { href: "#", label: "Rails" },
   { href: "#", label: "Cruises" },
@@ -45,7 +45,7 @@ const resourceItems: NavLinkItem[] = [
   { href: "#", label: "Contact Us" },
 ]
 
-const transparentNavbarRoutes = ["/"]
+const transparentNavbarRoutes = ["/", "/hotels"]
 const scrollThresholdPx = 12
 
 export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
@@ -190,13 +190,7 @@ function matchesTransparentNavbarRoute(pathname: string | null) {
     return false
   }
 
-  return transparentNavbarRoutes.some((route) => {
-    if (route === "/") {
-      return pathname === "/"
-    }
-
-    return pathname === route || pathname.startsWith(`${route}/`)
-  })
+  return transparentNavbarRoutes.includes(pathname)
 }
 
 function subscribeToScrollPosition(onStoreChange: () => void) {
