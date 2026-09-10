@@ -1,4 +1,3 @@
-import Image from "next/image"
 import {
   AlertCircleIcon,
   ArrowRightIcon,
@@ -17,27 +16,30 @@ import {
 const outcomeContent = {
   visa_supported: {
     label: "Visa required",
-    title: "You’ll need a visa for this trip",
+    title: "A visa is required for your trip",
     description:
-      "A visa option is available for this passport and destination.",
+      "Review the available visa, prepare your details, and continue when you are ready.",
     icon: FileCheck2Icon,
   },
   document_not_required: {
     label: "Visa not required",
-    title: "You can travel without a visa",
-    description: "No additional visa requirement was found for this trip.",
+    title: "No visa is required for your trip",
+    description:
+      "Keep checking official entry requirements as your departure date approaches.",
     icon: CheckCircle2Icon,
   },
   document_unsupported: {
     label: "Visa may be required",
-    title: "You may need to arrange your visa separately",
-    description: "An online visa option is not currently available here.",
+    title: "Arrange your visa through the embassy",
+    description:
+      "An online visa option is not currently available for this passport and destination.",
     icon: AlertCircleIcon,
   },
   other_document_supported: {
-    label: "Travel document needed",
-    title: "You may need another travel document",
-    description: "Review the available document before making travel plans.",
+    label: "Travel document required",
+    title: "Another travel document is required",
+    description:
+      "Review the available document before you confirm your travel plans.",
     icon: FileQuestionIcon,
   },
 } as const
@@ -51,83 +53,86 @@ export function VisaDetailsHero({ result }: { result: VisaAssistanceResult }) {
     ] ?? outcomeContent.document_unsupported
   const OutcomeIcon = outcome.icon
   const latestMetadata = getLatestMetadata(result)
+  const hasVisaOption = result.eligibleDocuments.length > 0
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-12 md:px-8 md:py-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)] lg:items-center lg:gap-16 lg:px-12 lg:py-20">
-      <div className="max-w-2xl">
-        <div className="inline-flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
-          <OutcomeIcon className="size-4" aria-hidden="true" />
-          {outcome.label}
+    <section className="border-b bg-[#eef3f8] dark:bg-muted/25">
+      <div className="mx-auto w-full max-w-7xl px-4 py-12 md:px-8 md:py-16 lg:px-12 lg:py-20">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="inline-flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
+            <OutcomeIcon className="size-4" aria-hidden="true" />
+            {outcome.label}
+          </div>
+          <FreshnessNote metadata={latestMetadata} />
         </div>
 
-        <h1 className="mt-5 font-heading text-4xl leading-[1.08] font-semibold tracking-[-0.04em] text-balance md:text-5xl lg:text-[3.5rem]">
+        <h1 className="mt-8 max-w-4xl font-heading text-4xl leading-[1.05] font-semibold tracking-[-0.045em] text-balance md:text-6xl lg:text-[4.5rem]">
           {outcome.title}
         </h1>
-        <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
           {outcome.description}
         </p>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3 text-sm">
-          <CountryLabel
-            code={nationality?.code ?? result.nationality}
-            name={nationality?.name ?? result.nationality}
-            suffix="passport"
-          />
-          <ArrowRightIcon
-            className="size-4 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <CountryLabel
-            code={destination?.code ?? result.destination}
-            name={destination?.name ?? result.destination}
-          />
+        <div className="mt-10 grid gap-6 border-t border-[#13357b]/12 pt-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-end dark:border-border">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
+            <CountryLabel
+              label="Passport"
+              code={nationality?.code ?? result.nationality}
+              name={nationality?.name ?? result.nationality}
+            />
+            <ArrowRightIcon
+              className="size-5 shrink-0 text-[#13357b] dark:text-blue-300"
+              aria-hidden="true"
+            />
+            <CountryLabel
+              label="Destination"
+              code={destination?.code ?? result.destination}
+              name={destination?.name ?? result.destination}
+            />
+          </div>
+
+          {hasVisaOption ? (
+            <a
+              href="#visa-options-heading"
+              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#13357b] px-6 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-[#0f2b67] focus-visible:ring-3 focus-visible:ring-[#13357b]/30 focus-visible:outline-none active:translate-y-px md:w-auto"
+            >
+              Review your visa option
+            </a>
+          ) : null}
         </div>
-
-        <FreshnessNote metadata={latestMetadata} />
-      </div>
-
-      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
-        <Image
-          src="/img/visa-assistance-travel.png"
-          alt="Travel document and boarding pass in an airport lounge"
-          fill
-          priority
-          sizes="(max-width: 1023px) 100vw, 44vw"
-          className="object-cover"
-        />
       </div>
     </section>
   )
 }
 
 function CountryLabel({
+  label,
   code,
   name,
-  suffix,
 }: {
+  label: string
   code: string
   name: string
-  suffix?: string
 }) {
   return (
-    <span className="inline-flex items-center gap-3 font-medium">
-      <span className="flex size-10 items-center justify-center rounded-xl border bg-card text-xs font-semibold tracking-wide text-[#13357b] dark:text-blue-300">
+    <div className="grid grid-cols-[2.75rem_1fr] items-center gap-3">
+      <span className="flex size-11 items-center justify-center rounded-xl border border-[#13357b]/12 bg-background text-xs font-semibold tracking-wide text-[#13357b] dark:border-border dark:text-blue-300">
         {code.toUpperCase()}
       </span>
       <span>
-        {name}
-        {suffix ? ` ${suffix}` : ""}
+        <span className="block text-xs text-muted-foreground">{label}</span>
+        <span className="mt-0.5 block text-sm font-semibold">{name}</span>
       </span>
-    </span>
+    </div>
   )
 }
 
 function FreshnessNote({ metadata }: { metadata: VisaResponseMetadata }) {
   return (
-    <p className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground">
+    <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
       <Clock3Icon className="size-4" aria-hidden="true" />
       {metadata.capturedAt
-        ? `Information updated ${formatDate(metadata.capturedAt)}`
+        ? `Updated ${formatDate(metadata.capturedAt)}`
         : "Checked just now"}
     </p>
   )

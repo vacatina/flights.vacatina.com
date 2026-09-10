@@ -16,13 +16,16 @@ import {
   type VisaDocumentResult,
   type VisaProductOption,
 } from "@/modules/visa-assistance/domain"
+import { VisaApplicationCta } from "@/modules/visa-assistance/ui/visa-application-cta"
 
 export function VisaOptionsSection({
   documents,
   outcome,
+  nationality,
 }: {
   documents: VisaDocumentResult[]
   outcome: string
+  nationality: string
 }) {
   if (documents.length === 0) {
     return <NoVisaOption outcome={outcome} />
@@ -45,6 +48,7 @@ export function VisaOptionsSection({
           <VisaOption
             key={`${documentResult.document.visa_type_id ?? index}`}
             documentResult={documentResult}
+            nationality={nationality}
           />
         ))}
       </div>
@@ -54,8 +58,10 @@ export function VisaOptionsSection({
 
 function VisaOption({
   documentResult,
+  nationality,
 }: {
   documentResult: VisaDocumentResult
+  nationality: string
 }) {
   const { document, product } = documentResult
   const validity = product?.validity ?? document.validity
@@ -163,6 +169,11 @@ function VisaOption({
           </div>
         </div>
       ) : null}
+
+      <VisaApplicationCta
+        productId={product?.product_id ?? document.product_id}
+        nationality={nationality}
+      />
     </article>
   )
 }
