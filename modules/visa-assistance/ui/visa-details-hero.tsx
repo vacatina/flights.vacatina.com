@@ -12,6 +12,7 @@ import {
   type VisaAssistanceResult,
   type VisaResponseMetadata,
 } from "@/modules/visa-assistance/domain"
+import { CountryFlag } from "@/modules/visa-assistance/ui/country-flag"
 
 const outcomeContent = {
   visa_supported: {
@@ -57,7 +58,7 @@ export function VisaDetailsHero({ result }: { result: VisaAssistanceResult }) {
 
   return (
     <section className="border-b bg-[#eef3f8] dark:bg-muted/25">
-      <div className="mx-auto w-full max-w-7xl px-4 py-12 md:px-8 md:py-16 lg:px-12 lg:py-20">
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 md:px-8 md:py-14 lg:px-12 lg:py-16">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
             <OutcomeIcon className="size-4" aria-hidden="true" />
@@ -66,28 +67,27 @@ export function VisaDetailsHero({ result }: { result: VisaAssistanceResult }) {
           <FreshnessNote metadata={latestMetadata} />
         </div>
 
-        <h1 className="mt-8 max-w-4xl font-heading text-4xl leading-[1.05] font-semibold tracking-[-0.045em] text-balance md:text-6xl lg:text-[4.5rem]">
+        <h1 className="mt-7 max-w-4xl font-heading text-4xl leading-[1.05] font-semibold tracking-[-0.045em] text-balance md:text-6xl lg:text-[4.25rem]">
           {outcome.title}
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
           {outcome.description}
         </p>
 
-        <div className="mt-10 grid gap-6 border-t border-[#13357b]/12 pt-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-end dark:border-border">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
+        <div className="mt-9 grid gap-5 rounded-2xl border border-[#13357b]/10 bg-background/85 p-4 shadow-[0_14px_36px_rgba(19,53,123,0.06)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:p-5 dark:border-border dark:bg-background/65 dark:shadow-none">
+          <div className="grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] sm:gap-5">
             <CountryLabel
               label="Passport"
-              code={nationality?.code ?? result.nationality}
               name={nationality?.name ?? result.nationality}
+              flagSrc={nationality?.flagSrc}
             />
-            <ArrowRightIcon
-              className="size-5 shrink-0 text-[#13357b] dark:text-blue-300"
-              aria-hidden="true"
-            />
+            <span className="hidden size-10 items-center justify-center rounded-full bg-[#13357b]/7 text-[#13357b] sm:flex dark:bg-blue-300/10 dark:text-blue-300">
+              <ArrowRightIcon className="size-4" aria-hidden="true" />
+            </span>
             <CountryLabel
               label="Destination"
-              code={destination?.code ?? result.destination}
               name={destination?.name ?? result.destination}
+              flagSrc={destination?.flagSrc}
             />
           </div>
 
@@ -107,21 +107,26 @@ export function VisaDetailsHero({ result }: { result: VisaAssistanceResult }) {
 
 function CountryLabel({
   label,
-  code,
   name,
+  flagSrc,
 }: {
   label: string
-  code: string
   name: string
+  flagSrc?: string
 }) {
   return (
-    <div className="grid grid-cols-[2.75rem_1fr] items-center gap-3">
-      <span className="flex size-11 items-center justify-center rounded-xl border border-[#13357b]/12 bg-background text-xs font-semibold tracking-wide text-[#13357b] dark:border-border dark:text-blue-300">
-        {code.toUpperCase()}
-      </span>
-      <span>
+    <div className="flex min-w-0 items-center gap-3 rounded-xl px-1 py-1.5">
+      {flagSrc ? (
+        <CountryFlag
+          src={flagSrc}
+          className="h-8 w-12 rounded-md bg-background shadow-sm ring-foreground/12"
+        />
+      ) : null}
+      <span className="min-w-0">
         <span className="block text-xs text-muted-foreground">{label}</span>
-        <span className="mt-0.5 block text-sm font-semibold">{name}</span>
+        <span className="mt-0.5 block truncate text-sm font-semibold md:text-base">
+          {name}
+        </span>
       </span>
     </div>
   )

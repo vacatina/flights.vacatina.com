@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { DecimalMoney, FxEstimateDisclosure } from "@/modules/currency/ui"
 import {
   type VisaDocumentResult,
   type VisaProductOption,
@@ -151,7 +152,7 @@ function VisaOption({
                         {fee.label}
                       </span>
                       <p className="mt-2 text-lg font-semibold tracking-tight">
-                        {fee.value}
+                        <VisaFeeValue {...fee.value} />
                       </p>
                     </div>
                   ))}
@@ -160,6 +161,12 @@ function VisaOption({
                   Fees are shown separately. Processing choices, taxes, or
                   extras can change the final amount.
                 </p>
+                <FxEstimateDisclosure
+                  sourceCurrencies={fees.flatMap((fee) =>
+                    fee.value.currency ? [fee.value.currency] : []
+                  )}
+                  className="mt-2 text-xs leading-relaxed text-muted-foreground"
+                />
               </div>
             ) : (
               <p className="mt-4 text-sm text-muted-foreground">
@@ -237,7 +244,7 @@ function getVisibleFees(product: VisaProductOption | null) {
 
   const fees: Array<{
     label: string
-    value: string
+    value: VisaFeeValueProps
     icon: typeof WalletCardsIcon
   }> = []
   const basePrice = formatBasePrice(product)
@@ -246,9 +253,11 @@ function getVisibleFees(product: VisaProductOption | null) {
     fees.push({ label: "Service fee", value: basePrice, icon: WalletCardsIcon })
   }
 
-  const displayedVisaCost =
-    product.pricing?.visa_cost_pretty ??
-    formatMoneyValue(product.pricing?.visa_cost, undefined)
+  const displayedVisaCost = formatMoneyValue(
+    product.pricing?.visa_cost,
+    product.validity?.base_price?.currency,
+    product.pricing?.visa_cost_pretty
+  )
 
   if (displayedVisaCost) {
     fees.push({
@@ -299,9 +308,61 @@ function formatBasePrice(product: VisaProductOption) {
   )
 }
 
-function formatMoneyValue(value: unknown, currency: string | undefined) {
-  if (value === null || value === undefined || value === "") return null
-  return currency ? `${currency} ${value}` : String(value)
+interface VisaFeeValueProps {
+  value?: string | number
+  currency?: string
+  fallbackLabel?: string
+}
+
+function VisaFeeValue({ value, currency, fallbackLabel }: VisaFeeValueProps) {
+  if (value !== undefined && currency) {
+    return (
+      <DecimalMoney
+        value={value}
+        currency={currency}
+        fallbackLabel={fallbackLabel}
+      />
+    )
+  }
+
+  return fallbackLabel ?? value ?? null
+}
+
+function formatMoneyValue(
+  value: unknown,
+  currency: string | undefined,
+  fallbackLabel?: string
+): VisaFeeValueProps | null {
+  const normalizedValue = normalizeMoneyValue(value)
+  const normalizedCurrency = currency?.trim().toUpperCase()
+  const normalizedFallback = fallbackLabel?.trim()
+
+  if (normalizedValue !== undefined && normalizedCurrency) {
+    return {
+      value: normalizedValue,
+      currency: normalizedCurrency,
+      fallbackLabel: normalizedFallback,
+    }
+  }
+
+  if (normalizedFallback) {
+    return { fallbackLabel: normalizedFallback }
+  }
+
+  return normalizedValue === undefined ? null : { value: normalizedValue }
+}
+
+function normalizeMoneyValue(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  if (typeof value !== "string") return undefined
+
+  const normalized = value.trim()
+  return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(normalized)
+    ? normalized
+    : undefined
 }
 
 function formatPassportRequirement(product: VisaProductOption) {
