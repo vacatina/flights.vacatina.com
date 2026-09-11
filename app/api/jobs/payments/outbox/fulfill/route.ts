@@ -5,8 +5,6 @@ import "@/modules/flights/payments-adapter/register"
 import { isPaymentJobRequestAuthorized } from "@/modules/payments/server/job-auth"
 import { processPaymentOutboxByPaymentAttemptId } from "@/modules/payments/server/workers/outbox-worker"
 
-export const runtime = "nodejs"
-
 const payloadSchema = z.object({
   paymentAttemptId: z.string().trim().min(1),
 })

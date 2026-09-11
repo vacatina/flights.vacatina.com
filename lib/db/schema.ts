@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -21,6 +22,16 @@ export const pricingJourneyTypeEnum = pgEnum("pricing_journey_type", [
   "one_way",
   "return",
 ])
+
+export const visaPricingFeeComponentEnum = pgEnum(
+  "visa_pricing_fee_component",
+  ["processing_fee", "government_fee"]
+)
+
+export const visaPricingRuleEventTypeEnum = pgEnum(
+  "visa_pricing_rule_event_type",
+  ["created", "updated", "enabled", "disabled"]
+)
 
 export const pricedQuoteStatusEnum = pgEnum("priced_quote_status", [
   "active",
@@ -115,21 +126,23 @@ export const flightCancellationEventActorTypeEnum = pgEnum(
   ["customer", "guest", "admin", "system"]
 )
 
-export const flightChangeRequestTypeEnum = pgEnum("flight_change_request_type", [
-  "itinerary_change",
-  "add_baggage",
-  "remove_passenger",
-  "seat_change",
-  "remove_service",
-  "traveller_details_change",
-  "other",
-])
+export const flightChangeRequestTypeEnum = pgEnum(
+  "flight_change_request_type",
+  [
+    "itinerary_change",
+    "add_baggage",
+    "remove_passenger",
+    "seat_change",
+    "remove_service",
+    "traveller_details_change",
+    "other",
+  ]
+)
 
-export const flightChangeHandlingModeEnum = pgEnum("flight_change_handling_mode", [
-  "automatic",
-  "admin_approval",
-  "manual",
-])
+export const flightChangeHandlingModeEnum = pgEnum(
+  "flight_change_handling_mode",
+  ["automatic", "admin_approval", "manual"]
+)
 
 export const flightChangePricingDirectionEnum = pgEnum(
   "flight_change_pricing_direction",
@@ -403,6 +416,103 @@ export const pricingRules = pgTable(
       table.destinationIata,
       table.airlineIata,
       table.cabinClass
+    ),
+  })
+)
+
+export const visaPricingRules = pgTable(
+  "visa_pricing_rules",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    priority: integer("priority").notNull().default(0),
+    feeComponent: visaPricingFeeComponentEnum("fee_component").notNull(),
+    adjustmentType: pricingAdjustmentTypeEnum("adjustment_type").notNull(),
+    adjustmentAmount: numeric("adjustment_amount", {
+      precision: 30,
+      scale: 0,
+    }).notNull(),
+    adjustmentScale: integer("adjustment_scale").notNull(),
+    adjustmentCurrency: text("adjustment_currency"),
+    nationalityCode: text("nationality_code"),
+    destinationCode: text("destination_code"),
+    visaTypeId: text("visa_type_id"),
+    providerProductId: text("provider_product_id"),
+    activeFrom: timestamp("active_from", { withTimezone: true }),
+    activeTo: timestamp("active_to", { withTimezone: true }),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: text("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    activeLookupIdx: index("visa_pricing_rules_active_lookup_idx").on(
+      table.enabled,
+      table.activeFrom,
+      table.activeTo,
+      table.priority
+    ),
+    scopeLookupIdx: index("visa_pricing_rules_scope_lookup_idx").on(
+      table.feeComponent,
+      table.nationalityCode,
+      table.destinationCode,
+      table.visaTypeId,
+      table.providerProductId
+    ),
+    priorityCheck: check(
+      "visa_pricing_rules_priority_check",
+      sql`${table.priority} between 0 and 1000`
+    ),
+    adjustmentScaleCheck: check(
+      "visa_pricing_rules_adjustment_scale_check",
+      sql`${table.adjustmentScale} between 0 and 12`
+    ),
+    adjustmentAmountCheck: check(
+      "visa_pricing_rules_adjustment_amount_check",
+      sql`${table.adjustmentAmount} >= 0`
+    ),
+    fixedCurrencyCheck: check(
+      "visa_pricing_rules_fixed_currency_check",
+      sql`(${table.adjustmentType} = 'percent' and ${table.adjustmentCurrency} is null) or (${table.adjustmentType} = 'fixed' and ${table.adjustmentCurrency} ~ '^[A-Z]{3}$')`
+    ),
+    activeWindowCheck: check(
+      "visa_pricing_rules_active_window_check",
+      sql`${table.activeFrom} is null or ${table.activeTo} is null or ${table.activeFrom} < ${table.activeTo}`
+    ),
+  })
+)
+
+export const visaPricingRuleEvents = pgTable(
+  "visa_pricing_rule_events",
+  {
+    id: text("id").primaryKey(),
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => visaPricingRules.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    eventType: visaPricingRuleEventTypeEnum("event_type").notNull(),
+    reason: text("reason"),
+    beforeSnapshot: jsonb("before_snapshot"),
+    afterSnapshot: jsonb("after_snapshot"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    ruleTimelineIdx: index("visa_pricing_rule_events_timeline_idx").on(
+      table.ruleId,
+      table.createdAt
     ),
   })
 )
@@ -1109,43 +1219,96 @@ export const flightChangeRequests = pgTable(
   "flight_change_requests",
   {
     id: text("id").primaryKey(),
-    flightOrderId: text("flight_order_id").notNull().references(() => flightOrders.id, { onDelete: "cascade" }),
+    flightOrderId: text("flight_order_id")
+      .notNull()
+      .references(() => flightOrders.id, { onDelete: "cascade" }),
     bookingReference: text("booking_reference").notNull(),
     duffelOrderId: text("duffel_order_id").notNull(),
-    requestedByUserId: text("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    requestedByGuestId: text("requested_by_guest_id").references(() => guestSessions.id, { onDelete: "set null" }),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    requestedByGuestId: text("requested_by_guest_id").references(
+      () => guestSessions.id,
+      { onDelete: "set null" }
+    ),
     requestType: flightChangeRequestTypeEnum("request_type").notNull(),
     handlingMode: flightChangeHandlingModeEnum("handling_mode").notNull(),
     status: flightChangeStatusEnum("status").notNull().default("requested"),
     customerReason: text("customer_reason").notNull(),
-    selectedPassengerIds: jsonb("selected_passenger_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
-    selectedSliceIds: jsonb("selected_slice_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    selectedPassengerIds: jsonb("selected_passenger_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    selectedSliceIds: jsonb("selected_slice_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     requestedChange: jsonb("requested_change"),
-    pricingDirection: flightChangePricingDirectionEnum("pricing_direction").notNull().default("unknown"),
-    additionalPaymentAmount: numeric("additional_payment_amount", { precision: 14, scale: 4 }),
-    customerRefundAmount: numeric("customer_refund_amount", { precision: 14, scale: 4 }),
+    pricingDirection: flightChangePricingDirectionEnum("pricing_direction")
+      .notNull()
+      .default("unknown"),
+    additionalPaymentAmount: numeric("additional_payment_amount", {
+      precision: 14,
+      scale: 4,
+    }),
+    customerRefundAmount: numeric("customer_refund_amount", {
+      precision: 14,
+      scale: 4,
+    }),
     currency: text("currency"),
-    paymentAttemptId: text("payment_attempt_id").references(() => paymentAttempts.id, { onDelete: "set null" }),
-    changeApprovedBy: text("change_approved_by").references(() => users.id, { onDelete: "set null" }),
+    paymentAttemptId: text("payment_attempt_id").references(
+      () => paymentAttempts.id,
+      { onDelete: "set null" }
+    ),
+    changeApprovedBy: text("change_approved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     changeApprovedAt: timestamp("change_approved_at", { withTimezone: true }),
-    refundApprovedBy: text("refund_approved_by").references(() => users.id, { onDelete: "set null" }),
+    refundApprovedBy: text("refund_approved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     refundApprovedAt: timestamp("refund_approved_at", { withTimezone: true }),
     adminRejectionReason: text("admin_rejection_reason"),
     customerMessage: text("customer_message"),
     manualExternalReference: text("manual_external_reference"),
     manualCompletionNotes: text("manual_completion_notes"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => ({
-    orderLookupIdx: index("flight_change_requests_order_lookup_idx").on(table.flightOrderId, table.createdAt),
-    bookingLookupIdx: index("flight_change_requests_booking_lookup_idx").on(table.bookingReference, table.createdAt),
-    statusQueueIdx: index("flight_change_requests_status_queue_idx").on(table.status, table.updatedAt),
-    modeQueueIdx: index("flight_change_requests_mode_queue_idx").on(table.handlingMode, table.status, table.updatedAt),
-    requesterLookupIdx: index("flight_change_requests_requester_lookup_idx").on(table.requestedByUserId, table.requestedByGuestId, table.createdAt),
-    oneActiveOrderIdx: uniqueIndex("flight_change_requests_one_active_order_idx")
+    orderLookupIdx: index("flight_change_requests_order_lookup_idx").on(
+      table.flightOrderId,
+      table.createdAt
+    ),
+    bookingLookupIdx: index("flight_change_requests_booking_lookup_idx").on(
+      table.bookingReference,
+      table.createdAt
+    ),
+    statusQueueIdx: index("flight_change_requests_status_queue_idx").on(
+      table.status,
+      table.updatedAt
+    ),
+    modeQueueIdx: index("flight_change_requests_mode_queue_idx").on(
+      table.handlingMode,
+      table.status,
+      table.updatedAt
+    ),
+    requesterLookupIdx: index("flight_change_requests_requester_lookup_idx").on(
+      table.requestedByUserId,
+      table.requestedByGuestId,
+      table.createdAt
+    ),
+    oneActiveOrderIdx: uniqueIndex(
+      "flight_change_requests_one_active_order_idx"
+    )
       .on(table.flightOrderId)
-      .where(sql`${table.status} not in ('quote_ready', 'quote_unavailable', 'completed', 'rejected', 'expired')`),
+      .where(
+        sql`${table.status} not in ('quote_ready', 'quote_unavailable', 'completed', 'rejected', 'expired')`
+      ),
   })
 )
 
@@ -1153,17 +1316,30 @@ export const flightChangeSearches = pgTable(
   "flight_change_searches",
   {
     id: text("id").primaryKey(),
-    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
-    duffelOrderChangeRequestId: text("duffel_order_change_request_id").notNull(),
+    changeRequestId: text("change_request_id")
+      .notNull()
+      .references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    duffelOrderChangeRequestId: text(
+      "duffel_order_change_request_id"
+    ).notNull(),
     removedSliceIds: jsonb("removed_slice_ids").$type<string[]>().notNull(),
     addCriteria: jsonb("add_criteria").notNull(),
     rawPayload: jsonb("raw_payload"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => ({
-    requestTimelineIdx: index("flight_change_searches_request_timeline_idx").on(table.changeRequestId, table.createdAt),
-    duffelRequestUniqueIdx: uniqueIndex("flight_change_searches_duffel_request_unique_idx").on(table.duffelOrderChangeRequestId),
+    requestTimelineIdx: index("flight_change_searches_request_timeline_idx").on(
+      table.changeRequestId,
+      table.createdAt
+    ),
+    duffelRequestUniqueIdx: uniqueIndex(
+      "flight_change_searches_duffel_request_unique_idx"
+    ).on(table.duffelOrderChangeRequestId),
   })
 )
 
@@ -1171,9 +1347,14 @@ export const flightChangeOffers = pgTable(
   "flight_change_offers",
   {
     id: text("id").primaryKey(),
-    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    changeRequestId: text("change_request_id")
+      .notNull()
+      .references(() => flightChangeRequests.id, { onDelete: "cascade" }),
     duffelOrderChangeOfferId: text("duffel_order_change_offer_id").notNull(),
-    changeTotalAmount: numeric("change_total_amount", { precision: 14, scale: 4 }).notNull(),
+    changeTotalAmount: numeric("change_total_amount", {
+      precision: 14,
+      scale: 4,
+    }).notNull(),
     changeTotalCurrency: text("change_total_currency").notNull(),
     newTotalAmount: numeric("new_total_amount", { precision: 14, scale: 4 }),
     newTotalCurrency: text("new_total_currency"),
@@ -1184,11 +1365,18 @@ export const flightChangeOffers = pgTable(
     selectedAt: timestamp("selected_at", { withTimezone: true }),
     summarySnapshot: jsonb("summary_snapshot"),
     rawPayload: jsonb("raw_payload"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => ({
-    requestTimelineIdx: index("flight_change_offers_request_timeline_idx").on(table.changeRequestId, table.createdAt),
-    duffelOfferUniqueIdx: uniqueIndex("flight_change_offers_duffel_offer_unique_idx").on(table.duffelOrderChangeOfferId),
+    requestTimelineIdx: index("flight_change_offers_request_timeline_idx").on(
+      table.changeRequestId,
+      table.createdAt
+    ),
+    duffelOfferUniqueIdx: uniqueIndex(
+      "flight_change_offers_duffel_offer_unique_idx"
+    ).on(table.duffelOrderChangeOfferId),
   })
 )
 
@@ -1196,25 +1384,44 @@ export const flightOrderChanges = pgTable(
   "flight_order_changes",
   {
     id: text("id").primaryKey(),
-    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    changeRequestId: text("change_request_id")
+      .notNull()
+      .references(() => flightChangeRequests.id, { onDelete: "cascade" }),
     duffelOrderChangeId: text("duffel_order_change_id").notNull(),
     duffelOrderChangeOfferId: text("duffel_order_change_offer_id").notNull(),
-    changeTotalAmount: numeric("change_total_amount", { precision: 14, scale: 4 }).notNull(),
+    changeTotalAmount: numeric("change_total_amount", {
+      precision: 14,
+      scale: 4,
+    }).notNull(),
     changeTotalCurrency: text("change_total_currency").notNull(),
-    newTotalAmount: numeric("new_total_amount", { precision: 14, scale: 4 }).notNull(),
+    newTotalAmount: numeric("new_total_amount", {
+      precision: 14,
+      scale: 4,
+    }).notNull(),
     newTotalCurrency: text("new_total_currency").notNull(),
-    penaltyTotalAmount: numeric("penalty_total_amount", { precision: 14, scale: 4 }),
+    penaltyTotalAmount: numeric("penalty_total_amount", {
+      precision: 14,
+      scale: 4,
+    }),
     penaltyTotalCurrency: text("penalty_total_currency"),
     refundTo: text("refund_to"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     rawPayload: jsonb("raw_payload"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => ({
-    requestUniqueIdx: uniqueIndex("flight_order_changes_request_unique_idx").on(table.changeRequestId),
-    duffelChangeUniqueIdx: uniqueIndex("flight_order_changes_duffel_change_unique_idx").on(table.duffelOrderChangeId),
+    requestUniqueIdx: uniqueIndex("flight_order_changes_request_unique_idx").on(
+      table.changeRequestId
+    ),
+    duffelChangeUniqueIdx: uniqueIndex(
+      "flight_order_changes_duffel_change_unique_idx"
+    ).on(table.duffelOrderChangeId),
   })
 )
 
@@ -1222,17 +1429,27 @@ export const flightChangeEvents = pgTable(
   "flight_change_events",
   {
     id: text("id").primaryKey(),
-    changeRequestId: text("change_request_id").notNull().references(() => flightChangeRequests.id, { onDelete: "cascade" }),
+    changeRequestId: text("change_request_id")
+      .notNull()
+      .references(() => flightChangeRequests.id, { onDelete: "cascade" }),
     actorType: flightChangeEventActorTypeEnum("actor_type").notNull(),
     actorId: text("actor_id"),
     eventType: text("event_type").notNull(),
     message: text("message"),
     metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => ({
-    requestTimelineIdx: index("flight_change_events_request_timeline_idx").on(table.changeRequestId, table.createdAt),
-    eventTypeIdx: index("flight_change_events_type_idx").on(table.eventType, table.createdAt),
+    requestTimelineIdx: index("flight_change_events_request_timeline_idx").on(
+      table.changeRequestId,
+      table.createdAt
+    ),
+    eventTypeIdx: index("flight_change_events_type_idx").on(
+      table.eventType,
+      table.createdAt
+    ),
   })
 )
 
@@ -1304,6 +1521,10 @@ export const notificationOutbox = pgTable(
 
 export type PricingRuleRow = typeof pricingRules.$inferSelect
 export type NewPricingRuleRow = typeof pricingRules.$inferInsert
+
+export type VisaPricingRuleRow = typeof visaPricingRules.$inferSelect
+export type NewVisaPricingRuleRow = typeof visaPricingRules.$inferInsert
+export type VisaPricingRuleEventRow = typeof visaPricingRuleEvents.$inferSelect
 
 export type PricedQuoteRow = typeof pricedQuotes.$inferSelect
 export type NewPricedQuoteRow = typeof pricedQuotes.$inferInsert
@@ -1478,5 +1699,7 @@ export const hotelCancellationRequests = pgTable(
 
 export type HotelOrderRow = typeof hotelOrders.$inferSelect
 export type NewHotelOrderRow = typeof hotelOrders.$inferInsert
-export type HotelCancellationRequestRow = typeof hotelCancellationRequests.$inferSelect
-export type NewHotelCancellationRequestRow = typeof hotelCancellationRequests.$inferInsert
+export type HotelCancellationRequestRow =
+  typeof hotelCancellationRequests.$inferSelect
+export type NewHotelCancellationRequestRow =
+  typeof hotelCancellationRequests.$inferInsert

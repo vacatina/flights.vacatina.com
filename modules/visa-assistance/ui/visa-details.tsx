@@ -46,7 +46,6 @@ export function VisaDetails({ result }: VisaDetailsProps) {
         <VisaOptionsSection
           documents={result.eligibleDocuments}
           outcome={result.requirements.outcome}
-          nationality={result.nationality}
         />
 
         {hasVisaOption ? (

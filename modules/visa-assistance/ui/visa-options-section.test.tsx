@@ -55,21 +55,47 @@ describe("VisaOptionsSection currency display", () => {
                   name: "Government Fee",
                 },
               },
+              pricing: {
+                processingFee: {
+                  feeComponent: "processing_fee",
+                  sourceMoney: { amount: "7099", currency: "USD", scale: 2 },
+                  markupMoney: { amount: "710", currency: "USD", scale: 2 },
+                  sellMoney: { amount: "7809", currency: "USD", scale: 2 },
+                  appliedRuleId: "rule_10_percent",
+                  appliedRuleName: "Processing default",
+                  appliedRuleSpecificity: 0,
+                },
+                governmentFee: {
+                  feeComponent: "government_fee",
+                  sourceMoney: { amount: "11000", currency: "USD", scale: 2 },
+                  markupMoney: { amount: "500", currency: "USD", scale: 2 },
+                  sellMoney: { amount: "11500", currency: "USD", scale: 2 },
+                  appliedRuleId: "rule_government_markup",
+                  appliedRuleName: "Government fee markup",
+                  appliedRuleSpecificity: 0,
+                },
+                totalSellMoney: {
+                  amount: "19309",
+                  currency: "USD",
+                  scale: 2,
+                },
+              },
             },
           ]}
           outcome="visa_supported"
-          nationality="LK"
         />
       </CurrencyProvider>
     )
 
-    expect(screen.getByText("$70.99")).toBeTruthy()
+    expect(screen.getByText("$83.09")).toBeTruthy()
     expect(screen.getByText("$110.00")).toBeTruthy()
+    expect(screen.getByText("$193.09")).toBeTruthy()
 
     fireEvent.click(screen.getByRole("button", { name: "Use JPY" }))
 
-    expect(screen.getByText("¥10,649")).toBeTruthy()
+    expect(screen.getByText("¥12,464")).toBeTruthy()
     expect(screen.getByText("¥16,500")).toBeTruthy()
+    expect(screen.getByText("¥28,964")).toBeTruthy()
     expect(screen.getByText(/Estimated exchange rates as of/)).toBeTruthy()
   })
 
@@ -90,7 +116,6 @@ describe("VisaOptionsSection currency display", () => {
             },
           ]}
           outcome="visa_supported"
-          nationality="LK"
         />
       </CurrencyProvider>
     )

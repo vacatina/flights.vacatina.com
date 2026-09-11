@@ -10,10 +10,20 @@ import {
   fetchVisaProducts,
   fetchVisaRequirements,
 } from "@/modules/visa-assistance/server/client"
+import {
+  calculateVisaProductPricing,
+  defaultVisaPricingRuleRepository,
+  type VisaPricingRuleRepository,
+} from "@/modules/visa-assistance/pricing/server"
 
 export interface VisaServiceDependencies {
   fetchRequirements?: typeof fetchVisaRequirements
   fetchProducts?: typeof fetchVisaProducts
+  pricingRuleRepository?: Pick<
+    VisaPricingRuleRepository,
+    "listActiveCandidates"
+  >
+  now?: () => Date
 }
 
 function normalizeId(value: unknown) {
@@ -56,6 +66,9 @@ export async function getVisaAssistanceResult(
   const fetchRequirements =
     dependencies.fetchRequirements ?? fetchVisaRequirements
   const fetchProducts = dependencies.fetchProducts ?? fetchVisaProducts
+  const pricingRuleRepository =
+    dependencies.pricingRuleRepository ?? defaultVisaPricingRuleRepository
+  const now = dependencies.now?.() ?? new Date()
 
   // Keep the two upstream operations sequential. When the primary provider is
   // unavailable, this avoids opening competing connections to the fallback.
@@ -64,16 +77,30 @@ export async function getVisaAssistanceResult(
 
   const eligibleDocuments = requirementsResult.data.documents?.eligible ?? []
   const products = productsResult.data.options ?? []
+  const pricingRules = await pricingRuleRepository.listActiveCandidates(now)
 
   return {
     nationality,
     destination,
     requirements: requirementsResult.data,
     products: productsResult.data,
-    eligibleDocuments: eligibleDocuments.map((document) => ({
-      document,
-      product: findMatchingProduct(document, products, nationality),
-    })),
+    eligibleDocuments: eligibleDocuments.map((document) => {
+      const product = findMatchingProduct(document, products, nationality)
+      return {
+        document,
+        product,
+        pricing: product
+          ? calculateVisaProductPricing({
+              nationalityCode: nationality,
+              destinationCode: destination,
+              document,
+              product,
+              rules: pricingRules,
+              now,
+            })
+          : null,
+      }
+    }),
     ineligibleDocuments: requirementsResult.data.documents?.ineligible ?? [],
     metadata: {
       requirements: requirementsResult.metadata,

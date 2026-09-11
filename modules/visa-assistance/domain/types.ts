@@ -105,6 +105,7 @@ export interface VisaApiResult<T> {
 export interface VisaDocumentResult {
   document: VisaDocument
   product: VisaProductOption | null
+  pricing?: VisaProductPricing | null
 }
 
 export interface VisaAssistanceResult {
@@ -119,3 +120,4 @@ export interface VisaAssistanceResult {
     products: VisaResponseMetadata
   }
 }
+import type { VisaProductPricing } from "@/modules/visa-assistance/pricing/domain"

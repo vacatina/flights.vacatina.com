@@ -32,7 +32,7 @@ export function VisaProductFaq({
     {
       question: "Does Vacatina issue the visa?",
       answer:
-        "No. Vacatina helps you understand the available requirement. The application continues on iVisa, an external visa-processing service.",
+        "Vacatina manages the application experience, but the relevant immigration authority makes the final visa decision and issues the visa.",
     },
     {
       question: "Is visa approval guaranteed?",

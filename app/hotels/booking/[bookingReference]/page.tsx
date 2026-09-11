@@ -12,7 +12,7 @@ interface HotelBookingPageProps {
 
 export default async function HotelBookingPage({ params }: HotelBookingPageProps) {
   const resolvedParams = await params
-  
+
   const actor = await getActorContext({ ensureGuestSession: true })
 
   logHotelFlow("HotelBookingPage", "page_request", {
@@ -20,25 +20,26 @@ export default async function HotelBookingPage({ params }: HotelBookingPageProps
     actorType: actor.type,
   })
 
+  let data
   try {
-    const data = await fetchBookingPageData({
+    data = await fetchBookingPageData({
       bookingReference: resolvedParams.bookingReference,
     })
-
-    return <HotelBookingClient data={data} clerkEnabled={true} />
   } catch (error) {
     logHotelFlow("HotelBookingPage", "render_error_state", {
       bookingReference: resolvedParams.bookingReference,
-      error: String(error)
+      error: String(error),
     })
-    
+
     return (
       <FlowPageErrorState
         title="Unable to load booking"
         message="Unable to load your booking details right now. Please check your email for confirmation."
-        backHref={`/hotels`}
+        backHref="/hotels"
         backLabel="Back to search"
       />
     )
   }
+
+  return <HotelBookingClient data={data} clerkEnabled={true} />
 }

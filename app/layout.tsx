@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import { shadcn } from "@clerk/ui/themes"
 import { cookies } from "next/headers"
 import { after } from "next/server"
+import { Suspense } from "react"
 
 import "./globals.css"
 import { cn } from "@/lib/utils"
@@ -23,7 +24,11 @@ const figtreeHeading = Figtree({
   adjustFontFallback: false,
 })
 
-const inter = Figtree({ subsets: ["latin"], variable: "--font-sans", adjustFontFallback: false })
+const inter = Figtree({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  adjustFontFallback: false,
+})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -36,32 +41,11 @@ export const metadata: Metadata = {
     "Search, compare, and book international flights with flexible fare options and streamlined checkout.",
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const clerkEnabled = isClerkConfigured()
-  const cookieStore = await cookies()
-  const initialCurrency = parseDisplayCurrency(
-    cookieStore.get(DISPLAY_CURRENCY_COOKIE_NAME)?.value
-  )
-  const initialFxSnapshot = await getDisplayFxSnapshot({
-    scheduleRefresh: (task) => after(task),
-  })
-
-  const appShell = (
-    <CurrencyProvider
-      initialCurrency={initialCurrency}
-      initialFxSnapshot={initialFxSnapshot}
-    >
-      <div className="flex min-h-svh flex-col">
-        {children}
-        <SiteFooter />
-      </div>
-    </CurrencyProvider>
-  )
-
   return (
     <html
       lang="en"
@@ -87,40 +71,64 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        {clerkEnabled ? (
-          <ClerkProvider
-            appearance={{
-              theme: shadcn,
-              variables: {
-                fontFamily: "var(--font-sans)",
-              },
-              elements: {
-                formButtonPrimary:
-                  "!h-14 rounded-[10px] !text-[16px] font-medium",
-                formFieldInput:
-                  "!h-14 !min-h-[56px] rounded-xl !bg-background !border-input !text-foreground !placeholder:text-muted-foreground !text-base font-medium",
-                formFieldLabel:
-                  "!text-[13px] !font-medium uppercase tracking-[0.08em] !text-muted-foreground mb-2",
-                socialButtonsBlockButton:
-                  "!h-14 rounded-[10px] !bg-background border border-border text-foreground hover:bg-muted",
-                socialButtonsBlockButtonText: "font-medium !text-[16px]",
-                dividerText: "!text-muted-foreground",
-                headerSubtitle: "!text-muted-foreground",
-                footerActionText: "!text-muted-foreground",
-                rootBox: "!w-full !shadow-none",
-                cardBox: "!w-full !shadow-none",
-                card: "!w-full rounded-[12px] !shadow-none border-none",
-                header: "!px-5 sm:!px-10 !pt-6 sm:!pt-10",
-                footer: "!px-5 sm:!px-10",
-              },
-            }}
-          >
-            {appShell}
-          </ClerkProvider>
-        ) : (
-          appShell
-        )}
+        <Suspense fallback={<div className="min-h-svh bg-background" />}>
+          <RuntimeAppShell>{children}</RuntimeAppShell>
+        </Suspense>
       </body>
     </html>
+  )
+}
+
+async function RuntimeAppShell({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies()
+  const initialCurrency = parseDisplayCurrency(
+    cookieStore.get(DISPLAY_CURRENCY_COOKIE_NAME)?.value
+  )
+  const initialFxSnapshot = await getDisplayFxSnapshot({
+    scheduleRefresh: (task) => after(task),
+  })
+  const appShell = (
+    <CurrencyProvider
+      initialCurrency={initialCurrency}
+      initialFxSnapshot={initialFxSnapshot}
+    >
+      <div className="flex min-h-svh flex-col">
+        {children}
+        <SiteFooter />
+      </div>
+    </CurrencyProvider>
+  )
+
+  if (!isClerkConfigured()) return appShell
+
+  return (
+    <ClerkProvider
+      appearance={{
+        theme: shadcn,
+        variables: {
+          fontFamily: "var(--font-sans)",
+        },
+        elements: {
+          formButtonPrimary: "!h-14 rounded-[10px] !text-[16px] font-medium",
+          formFieldInput:
+            "!h-14 !min-h-[56px] rounded-xl !bg-background !border-input !text-foreground !placeholder:text-muted-foreground !text-base font-medium",
+          formFieldLabel:
+            "!text-[13px] !font-medium uppercase tracking-[0.08em] !text-muted-foreground mb-2",
+          socialButtonsBlockButton:
+            "!h-14 rounded-[10px] !bg-background border border-border text-foreground hover:bg-muted",
+          socialButtonsBlockButtonText: "font-medium !text-[16px]",
+          dividerText: "!text-muted-foreground",
+          headerSubtitle: "!text-muted-foreground",
+          footerActionText: "!text-muted-foreground",
+          rootBox: "!w-full !shadow-none",
+          cardBox: "!w-full !shadow-none",
+          card: "!w-full rounded-[12px] !shadow-none border-none",
+          header: "!px-5 sm:!px-10 !pt-6 sm:!pt-10",
+          footer: "!px-5 sm:!px-10",
+        },
+      }}
+    >
+      {appShell}
+    </ClerkProvider>
   )
 }

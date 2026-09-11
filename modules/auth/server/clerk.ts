@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 import { verifyWebhook } from "@clerk/nextjs/webhooks"
+import { unstable_rethrow } from "next/navigation"
 import type { NextRequest } from "next/server"
 
 import { getAuthServerConfig } from "@/modules/auth/server/config"
@@ -33,6 +34,7 @@ export async function getClerkAuthState(): Promise<ClerkAuthState> {
       orgId,
     }
   } catch (error) {
+    unstable_rethrow(error)
     logFlightFlowError("auth.clerk", "auth_state_failed", error)
 
     return {

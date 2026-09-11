@@ -12,21 +12,24 @@ import {
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import { DecimalMoney, FxEstimateDisclosure } from "@/modules/currency/ui"
+import type { SerializedMoney } from "@/modules/currency/domain"
+import {
+  DecimalMoney,
+  FxEstimateDisclosure,
+  Money,
+} from "@/modules/currency/ui"
 import {
   type VisaDocumentResult,
   type VisaProductOption,
 } from "@/modules/visa-assistance/domain"
-import { VisaApplicationCta } from "@/modules/visa-assistance/ui/visa-application-cta"
+import { addVisaMoney } from "@/modules/visa-assistance/pricing/domain"
 
 export function VisaOptionsSection({
   documents,
   outcome,
-  nationality,
 }: {
   documents: VisaDocumentResult[]
   outcome: string
-  nationality: string
 }) {
   if (documents.length === 0) {
     return <NoVisaOption outcome={outcome} />
@@ -49,7 +52,6 @@ export function VisaOptionsSection({
           <VisaOption
             key={`${documentResult.document.visa_type_id ?? index}`}
             documentResult={documentResult}
-            nationality={nationality}
           />
         ))}
       </div>
@@ -59,14 +61,12 @@ export function VisaOptionsSection({
 
 function VisaOption({
   documentResult,
-  nationality,
 }: {
   documentResult: VisaDocumentResult
-  nationality: string
 }) {
   const { document, product } = documentResult
   const validity = product?.validity ?? document.validity
-  const fees = getVisibleFees(product)
+  const fees = getVisibleFees(documentResult)
 
   return (
     <article className="overflow-hidden rounded-2xl border bg-card">
@@ -158,12 +158,23 @@ function VisaOption({
                   ))}
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                  Fees are shown separately. Processing choices, taxes, or
-                  extras can change the final amount.
+                  The visa processing fee includes Vacatina&apos;s service
+                  charge. Government charges can change before submission.
                 </p>
+                {documentResult.pricing?.totalSellMoney ? (
+                  <div className="mt-4 flex items-center justify-between border-t pt-4">
+                    <span className="text-sm font-medium">Estimated total</span>
+                    <Money
+                      money={documentResult.pricing.totalSellMoney}
+                      className="text-lg font-semibold tracking-tight"
+                    />
+                  </div>
+                ) : null}
                 <FxEstimateDisclosure
                   sourceCurrencies={fees.flatMap((fee) =>
-                    fee.value.currency ? [fee.value.currency] : []
+                    fee.value.money?.currency || fee.value.currency
+                      ? [fee.value.money?.currency ?? fee.value.currency!]
+                      : []
                   )}
                   className="mt-2 text-xs leading-relaxed text-muted-foreground"
                 />
@@ -176,11 +187,6 @@ function VisaOption({
           </div>
         </div>
       ) : null}
-
-      <VisaApplicationCta
-        productId={product?.product_id ?? document.product_id}
-        nationality={nationality}
-      />
     </article>
   )
 }
@@ -239,7 +245,8 @@ function NoVisaOption({ outcome }: { outcome: string }) {
   )
 }
 
-function getVisibleFees(product: VisaProductOption | null) {
+function getVisibleFees(documentResult: VisaDocumentResult) {
+  const { product, pricing } = documentResult
   if (!product) return []
 
   const fees: Array<{
@@ -247,6 +254,30 @@ function getVisibleFees(product: VisaProductOption | null) {
     value: VisaFeeValueProps
     icon: typeof WalletCardsIcon
   }> = []
+
+  if (pricing) {
+    const processingPrice = addVisaMoney(
+      pricing.processingFee?.sellMoney ?? null,
+      pricing.governmentFee?.markupMoney ?? null
+    )
+
+    if (processingPrice) {
+      fees.push({
+        label: "Visa processing fee",
+        value: { money: processingPrice },
+        icon: WalletCardsIcon,
+      })
+    }
+    if (pricing.governmentFee) {
+      fees.push({
+        label: "Government fee",
+        value: { money: pricing.governmentFee.sourceMoney },
+        icon: LandmarkIcon,
+      })
+    }
+    return fees
+  }
+
   const basePrice = formatBasePrice(product)
 
   if (basePrice) {
@@ -309,12 +340,22 @@ function formatBasePrice(product: VisaProductOption) {
 }
 
 interface VisaFeeValueProps {
+  money?: SerializedMoney
   value?: string | number
   currency?: string
   fallbackLabel?: string
 }
 
-function VisaFeeValue({ value, currency, fallbackLabel }: VisaFeeValueProps) {
+function VisaFeeValue({
+  money,
+  value,
+  currency,
+  fallbackLabel,
+}: VisaFeeValueProps) {
+  if (money) {
+    return <Money money={money} fallbackLabel={fallbackLabel} />
+  }
+
   if (value !== undefined && currency) {
     return (
       <DecimalMoney
