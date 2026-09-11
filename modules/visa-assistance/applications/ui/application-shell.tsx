@@ -1,9 +1,22 @@
 import Link from "next/link"
-import { CheckIcon, LockKeyholeIcon } from "lucide-react"
+import {
+  ArrowRightIcon,
+  CalendarDaysIcon,
+  CheckIcon,
+  LockKeyholeIcon,
+  UsersIcon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import {
   VISA_APPLICATION_STEPS,
@@ -11,6 +24,7 @@ import {
 } from "@/modules/visa-assistance/applications/domain"
 import { getVisaCountry } from "@/modules/visa-assistance/domain"
 import { VisaApplicationPricingEstimate } from "@/modules/visa-assistance/applications/ui/pricing-estimate"
+import { CountryFlag } from "@/modules/visa-assistance/ui/country-flag"
 
 const stepLabels = {
   trip: "Trip",
@@ -37,16 +51,27 @@ export function VisaApplicationShell({
   const destination = getVisaCountry(application.destinationCode)
 
   return (
-    <main className="min-h-[calc(100svh-5rem)] bg-[#f5f7fb] py-8 md:py-12">
+    <main className="min-h-[calc(100svh-5rem)] bg-muted/30 py-8 md:py-12">
       <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
-        <div className="mb-8">
-          <Badge variant="secondary">Request {application.reference}</Badge>
-          <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-            {application.visaName}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {nationality?.name ?? application.nationalityCode} to{" "}
-            {destination?.name ?? application.destinationCode}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-2">
+            <Badge className="w-fit" variant="secondary">
+              Request {application.reference}
+            </Badge>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+              {application.visaName}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              {nationality ? <CountryFlag src={nationality.flagSrc} /> : null}
+              <span>{nationality?.name ?? application.nationalityCode}</span>
+              <ArrowRightIcon className="size-3.5" aria-hidden="true" />
+              {destination ? <CountryFlag src={destination.flagSrc} /> : null}
+              <span>{destination?.name ?? application.destinationCode}</span>
+            </div>
+          </div>
+          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Complete each step at your own pace. Your progress is saved as you
+            continue.
           </p>
         </div>
 
@@ -55,8 +80,13 @@ export function VisaApplicationShell({
           currentIndex={currentIndex}
         />
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div>{children}</div>
+        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div
+            key={currentStep}
+            className="motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
+          >
+            {children}
+          </div>
           <ApplicationSummary detail={detail} />
         </div>
       </div>
@@ -74,7 +104,10 @@ function ApplicationProgress({
   const progress = ((currentIndex + 1) / VISA_APPLICATION_STEPS.length) * 100
 
   return (
-    <nav aria-label="Visa request progress">
+    <nav
+      aria-label="Visa request progress"
+      className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10 md:p-5"
+    >
       <div className="mb-3 flex items-center justify-between text-sm">
         <span className="font-medium">
           Step {currentIndex + 1} of {VISA_APPLICATION_STEPS.length}
@@ -83,8 +116,11 @@ function ApplicationProgress({
           {stepLabels[VISA_APPLICATION_STEPS[currentIndex]]}
         </span>
       </div>
-      <Progress value={progress} />
-      <ol className="mt-4 hidden grid-cols-5 gap-2 md:grid">
+      <Progress
+        value={progress}
+        aria-label={`${Math.round(progress)}% complete`}
+      />
+      <ol className="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:overflow-visible">
         {VISA_APPLICATION_STEPS.map((step, index) => {
           const reachable = index <= currentIndex
 
@@ -94,7 +130,8 @@ function ApplicationProgress({
                 href={`/visa-assistance/applications/${applicationId}/${step}`}
                 aria-current={index === currentIndex ? "step" : undefined}
                 className={cn(
-                  "flex items-center gap-2 text-xs font-medium",
+                  "flex min-w-max items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors",
+                  index === currentIndex && "bg-primary/5",
                   reachable
                     ? "text-foreground"
                     : "pointer-events-none text-muted-foreground"
@@ -108,7 +145,7 @@ function ApplicationProgress({
                   )}
                 >
                   {index < currentIndex ? (
-                    <CheckIcon className="size-3.5" />
+                    <CheckIcon className="size-3.5" aria-hidden="true" />
                   ) : (
                     index + 1
                   )}
@@ -129,26 +166,43 @@ function ApplicationSummary({ detail }: { detail: VisaApplicationDetail }) {
     <Card className="lg:sticky lg:top-24">
       <CardHeader>
         <CardTitle>Request summary</CardTitle>
+        <CardDescription>Your current application at a glance.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <dl className="space-y-3 text-sm">
-          <SummaryRow label="Travelers" value={application.travelerCount} />
+      <CardContent className="flex flex-col gap-5">
+        <dl className="flex flex-col gap-3 text-sm">
           <SummaryRow
+            icon={<UsersIcon />}
+            label="Travelers"
+            value={application.travelerCount}
+          />
+          <SummaryRow
+            icon={<CalendarDaysIcon />}
             label="Entry date"
             value={application.entryDate ?? "Not added"}
           />
-          <SummaryRow label="Status" value={formatStatus(application.status)} />
+          <SummaryRow
+            label="Status"
+            value={
+              <Badge variant="secondary">
+                {formatStatus(application.status)}
+              </Badge>
+            }
+          />
         </dl>
-        <div className="border-t pt-4">
+        <Separator />
+        <div className="flex flex-col gap-2">
           <VisaApplicationPricingEstimate
             pricing={application.pricingSnapshot}
           />
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed text-muted-foreground">
             This is an estimate only. No payment is collected in this flow.
           </p>
         </div>
-        <div className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-          <LockKeyholeIcon className="mt-0.5 size-4 shrink-0" />
+        <div className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+          <LockKeyholeIcon
+            className="mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
           <span>Your submitted details and files are handled securely.</span>
         </div>
       </CardContent>
@@ -157,20 +211,26 @@ function ApplicationSummary({ detail }: { detail: VisaApplicationDetail }) {
 }
 
 function SummaryRow({
+  icon,
   label,
   value,
 }: {
+  icon?: React.ReactNode
   label: string
   value: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
+    <div className="flex items-center justify-between gap-4">
+      <dt className="flex items-center gap-2 text-muted-foreground">
+        {icon ? <span className="[&_svg]:size-4">{icon}</span> : null}
+        {label}
+      </dt>
       <dd className="text-right font-medium">{value}</dd>
     </div>
   )
 }
 
 function formatStatus(status: string) {
-  return status.replaceAll("_", " ")
+  const label = status.replaceAll("_", " ")
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }

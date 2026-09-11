@@ -9,11 +9,18 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   tripStepSchema,
   type TripStepValues,
@@ -58,56 +65,61 @@ export function TripStepForm({
   })
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Trip details</CardTitle>
-        <CardDescription>
-          Tell us when you plan to enter and who is traveling.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-6" noValidate>
-          <input type="hidden" {...form.register("applicationId")} />
-          <VisaFormError message={serverError} />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="entryDate">Planned entry date</Label>
-              <Input
-                id="entryDate"
-                type="date"
-                disabled={isPending}
-                aria-invalid={Boolean(form.formState.errors.entryDate)}
-                {...form.register("entryDate")}
-              />
-              <FieldError message={form.formState.errors.entryDate?.message} />
+    <form onSubmit={onSubmit} noValidate>
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle className="text-lg">Trip details</CardTitle>
+          <CardDescription>
+            Tell us when you plan to enter and who is traveling.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <input type="hidden" {...form.register("applicationId")} />
+            <VisaFormError message={serverError} />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field data-invalid={Boolean(form.formState.errors.entryDate)}>
+                <FieldLabel htmlFor="entryDate">Planned entry date</FieldLabel>
+                <Input
+                  id="entryDate"
+                  type="date"
+                  disabled={isPending}
+                  aria-invalid={Boolean(form.formState.errors.entryDate)}
+                  {...form.register("entryDate")}
+                />
+                <FieldDescription>
+                  Choose the date you expect to arrive.
+                </FieldDescription>
+                <FieldError errors={[form.formState.errors.entryDate]} />
+              </Field>
+              <Field
+                data-invalid={Boolean(form.formState.errors.travelerCount)}
+              >
+                <FieldLabel htmlFor="travelerCount">
+                  Number of travelers
+                </FieldLabel>
+                <Input
+                  id="travelerCount"
+                  type="number"
+                  disabled={isPending}
+                  min={1}
+                  max={10}
+                  placeholder="e.g. 2"
+                  aria-invalid={Boolean(form.formState.errors.travelerCount)}
+                  {...form.register("travelerCount", { valueAsNumber: true })}
+                />
+                <FieldDescription>
+                  Include every traveler, including children.
+                </FieldDescription>
+                <FieldError errors={[form.formState.errors.travelerCount]} />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="travelerCount">Number of travelers</Label>
-              <Input
-                id="travelerCount"
-                type="number"
-                disabled={isPending}
-                min={1}
-                max={10}
-                aria-invalid={Boolean(form.formState.errors.travelerCount)}
-                {...form.register("travelerCount", { valueAsNumber: true })}
-              />
-              <FieldError
-                message={form.formState.errors.travelerCount?.message}
-              />
-            </div>
-          </div>
+          </FieldGroup>
+        </CardContent>
+        <CardFooter className="border-t bg-muted/20">
           <VisaFormActions isPending={isPending} />
-        </form>
-      </CardContent>
-    </Card>
+        </CardFooter>
+      </Card>
+    </form>
   )
-}
-
-function FieldError({ message }: { message?: string }) {
-  return message ? (
-    <p className="text-sm text-destructive" role="alert">
-      {message}
-    </p>
-  ) : null
 }

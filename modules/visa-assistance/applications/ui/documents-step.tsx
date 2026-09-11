@@ -9,11 +9,14 @@ import {
   UploadCloudIcon,
 } from "lucide-react"
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -178,25 +181,50 @@ export function DocumentsStep({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Supporting documents</CardTitle>
+      <CardHeader className="border-b">
+        <CardTitle className="text-lg">Supporting documents</CardTitle>
         <CardDescription>
           Upload a clear passport bio page for each traveler. Other files can be
           added now or requested later by our team.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="flex flex-col gap-6">
         <VisaFormError message={pageError} />
-        <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
-          Accepted files: PDF, JPG, or PNG. Maximum file size: 10 MB.
-        </div>
+        <Alert>
+          <FileIcon aria-hidden="true" />
+          <AlertTitle>Before you upload</AlertTitle>
+          <AlertDescription>
+            Use a clear PDF, JPG, or PNG file up to 10 MB. Make sure all text
+            and the full document edges are visible.
+          </AlertDescription>
+        </Alert>
 
         {travelers.map((traveler, index) => (
-          <section key={traveler.id} className="rounded-xl border p-4 md:p-5">
-            <h2 className="font-semibold">
-              Traveler {index + 1}: {traveler.firstName} {traveler.lastName}
-            </h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <section
+            key={traveler.id}
+            className="overflow-hidden rounded-xl border bg-muted/15"
+          >
+            <div className="flex flex-wrap items-center gap-2 border-b bg-card px-4 py-3 md:px-5">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Traveler {index + 1}
+                </p>
+                <h2 className="font-semibold">
+                  {traveler.firstName} {traveler.lastName}
+                </h2>
+              </div>
+              <Badge
+                className="ml-auto"
+                variant={
+                  passportTravelerIds.has(traveler.id) ? "secondary" : "outline"
+                }
+              >
+                {passportTravelerIds.has(traveler.id)
+                  ? "Required file added"
+                  : "Passport required"}
+              </Badge>
+            </div>
+            <div className="grid gap-3 p-4 sm:grid-cols-2 md:p-5">
               {documentOptions.map((option) => {
                 const uploaded = uploadedDocuments(
                   documents,
@@ -221,7 +249,8 @@ export function DocumentsStep({
             </div>
           </section>
         ))}
-
+      </CardContent>
+      <CardFooter className="flex-col gap-3 border-t bg-muted/20 sm:items-end">
         <VisaFormActions
           backHref={`/visa-assistance/applications/${applicationId}/contact`}
           nextHref={`/visa-assistance/applications/${applicationId}/review`}
@@ -229,11 +258,11 @@ export function DocumentsStep({
           disabled={!passportsComplete}
         />
         {!passportsComplete ? (
-          <p className="text-right text-xs text-muted-foreground">
+          <p className="w-full text-right text-xs text-muted-foreground">
             Upload a passport bio page for every traveler to continue.
           </p>
         ) : null}
-      </CardContent>
+      </CardFooter>
     </Card>
   )
 }
@@ -260,34 +289,46 @@ function DocumentUploadCard({
   const canUpload = option.type === "additional" || documents.length === 0
 
   return (
-    <div className="rounded-lg bg-muted/45 p-4">
+    <div className="rounded-lg bg-card p-4 ring-1 ring-foreground/10">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium">{option.label}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <Badge
+            className="mt-2"
+            variant={option.required ? "default" : "outline"}
+          >
             {option.required ? "Required" : "Optional"}
-          </p>
+          </Badge>
         </div>
         {documents.length > 0 ? (
-          <CheckCircle2Icon className="size-5 text-emerald-600" />
+          <CheckCircle2Icon
+            className="size-5 text-primary"
+            aria-label="Uploaded"
+          />
         ) : (
-          <FileIcon className="size-5 text-muted-foreground" />
+          <FileIcon
+            className="size-5 text-muted-foreground"
+            aria-hidden="true"
+          />
         )}
       </div>
 
       {documents.length > 0 ? (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 flex flex-col gap-3">
           {documents.map((document) => {
             const deleting = deletingId === document.id
 
             return (
-              <div key={document.id}>
+              <div key={document.id} className="rounded-md bg-muted/50 p-3">
                 <a
                   href={`/api/visa-applications/${applicationId}/documents/${document.id}`}
                   className="block truncate text-sm font-medium text-primary hover:underline"
                 >
                   {document.originalFilename}
                 </a>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatFileSize(document.sizeBytes)}
+                </p>
                 <Button
                   type="button"
                   size="sm"
@@ -299,7 +340,7 @@ function DocumentUploadCard({
                   {deleting ? (
                     <Spinner data-icon="inline-start" />
                   ) : (
-                    <Trash2Icon />
+                    <Trash2Icon data-icon="inline-start" />
                   )}
                   {deleting ? "Removing..." : "Remove"}
                 </Button>
@@ -330,7 +371,11 @@ function DocumentUploadCard({
             disabled={uploading}
             onClick={() => inputRef.current?.click()}
           >
-            {uploading ? <Spinner /> : <UploadCloudIcon />}
+            {uploading ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <UploadCloudIcon data-icon="inline-start" />
+            )}
             {uploading
               ? "Uploading..."
               : documents.length > 0
@@ -362,6 +407,14 @@ function uploadedDocuments(
       document.documentType === type &&
       document.status === "uploaded"
   )
+}
+
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function uploadFile(

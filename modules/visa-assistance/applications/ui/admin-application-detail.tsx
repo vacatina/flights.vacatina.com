@@ -1,8 +1,19 @@
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button"
 import { Textarea } from "@/components/ui/textarea"
 import { Money } from "@/modules/currency/ui"
@@ -26,7 +37,7 @@ export function AdminVisaApplicationDetail({
 
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="space-y-5">
+      <div className="flex flex-col gap-5">
         <Card>
           <CardHeader className="border-b">
             <CardTitle>Request overview</CardTitle>
@@ -65,7 +76,7 @@ export function AdminVisaApplicationDetail({
           <CardHeader className="border-b">
             <CardTitle>Travelers and documents</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="flex flex-col gap-5">
             {travelers.map((traveler, index) => {
               const travelerDocuments = documents.filter(
                 (document) =>
@@ -130,7 +141,7 @@ export function AdminVisaApplicationDetail({
             <CardTitle>Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <ol className="space-y-4">
+            <ol className="flex flex-col gap-4">
               {events.map((event) => (
                 <li key={event.id} className="border-l-2 pl-4">
                   <p className="text-sm font-medium">
@@ -150,53 +161,57 @@ export function AdminVisaApplicationDetail({
         <CardHeader>
           <CardTitle>Manage request</CardTitle>
         </CardHeader>
-        <CardContent>
-          <form action={updateVisaApplicationAdminAction} className="space-y-5">
+        <form action={updateVisaApplicationAdminAction}>
+          <CardContent>
             <input type="hidden" name="applicationId" value={application.id} />
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                name="status"
-                defaultValue={application.status}
-                className="h-11 w-full rounded-md bg-muted/70 px-3 text-sm outline-none focus:ring-3 focus:ring-primary/10"
-              >
-                {VISA_APPLICATION_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {getVisaApplicationStatusLabel(status)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="internalNotes">Internal notes</Label>
-              <Textarea
-                id="internalNotes"
-                name="internalNotes"
-                defaultValue={application.internalNotes ?? ""}
-                rows={7}
-                placeholder="Notes for the Vacatina operations team"
-              />
-              <p className="text-xs text-muted-foreground">
-                Internal notes are never shown to the customer.
-              </p>
-            </div>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="status">Status</FieldLabel>
+                <select
+                  id="status"
+                  name="status"
+                  defaultValue={application.status}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {VISA_APPLICATION_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {getVisaApplicationStatusLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="internalNotes">Internal notes</FieldLabel>
+                <Textarea
+                  id="internalNotes"
+                  name="internalNotes"
+                  defaultValue={application.internalNotes ?? ""}
+                  rows={7}
+                  placeholder="Notes for the Vacatina operations team"
+                />
+                <FieldDescription>
+                  Internal notes are never shown to the customer.
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </CardContent>
+          <CardFooter className="flex-col gap-3 border-t bg-muted/20">
             <PendingSubmitButton
               className="w-full"
               pendingLabel="Saving changes..."
             >
               Save changes
             </PendingSubmitButton>
-          </form>
-          <Button
-            className="mt-3 w-full"
-            variant="outline"
-            nativeButton={false}
-            render={<Link href="/admin/visa-applications" />}
-          >
-            Back to visa requests
-          </Button>
-        </CardContent>
+            <Button
+              className="w-full"
+              variant="outline"
+              nativeButton={false}
+              render={<Link href="/admin/visa-applications" />}
+            >
+              Back to visa requests
+            </Button>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   )

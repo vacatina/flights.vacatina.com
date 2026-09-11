@@ -2,6 +2,13 @@ import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { MaterialIcon } from "@/components/ui/material-icon"
 import { Money } from "@/modules/currency/ui"
@@ -37,7 +44,7 @@ export function AdminVisaApplicationList({
   ).length
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       <div className="grid gap-4 sm:grid-cols-3">
         <QueueStat
           label="Results"
@@ -60,7 +67,7 @@ export function AdminVisaApplicationList({
         />
       </div>
 
-      <section className="rounded-md border border-[#dfe4ec] bg-white p-4 shadow-sm">
+      <section className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
         <form className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_220px_auto]">
           <Input
             name="query"
@@ -72,7 +79,7 @@ export function AdminVisaApplicationList({
             name="status"
             defaultValue={status ?? ""}
             aria-label="Filter by status"
-            className="h-11 rounded-md bg-muted/70 px-3 text-sm outline-none focus:ring-3 focus:ring-primary/10"
+            className="h-11 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="">All statuses</option>
             {VISA_APPLICATION_STATUSES.map((value) => (
@@ -82,17 +89,21 @@ export function AdminVisaApplicationList({
             ))}
           </select>
           <Button type="submit">
-            <MaterialIcon name="filter_list" className="text-[18px]" />
+            <MaterialIcon
+              name="filter_list"
+              className="text-[18px]"
+              data-icon="inline-start"
+            />
             Apply
           </Button>
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-md border border-[#dfe4ec] bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10">
         <div className="overflow-x-auto">
           <Table className="min-w-[900px]">
             <TableHeader>
-              <TableRow className="bg-[#fafbfc]">
+              <TableRow className="bg-muted/40">
                 <TableHead>Reference</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Visa</TableHead>
@@ -106,7 +117,7 @@ export function AdminVisaApplicationList({
             <TableBody>
               {applications.map((application) => (
                 <TableRow key={application.id}>
-                  <TableCell className="font-semibold text-[#1749d8]">
+                  <TableCell className="font-semibold text-primary">
                     {application.reference}
                   </TableCell>
                   <TableCell>
@@ -159,9 +170,17 @@ export function AdminVisaApplicationList({
           </Table>
         </div>
         {applications.length === 0 ? (
-          <p className="p-10 text-center text-sm text-muted-foreground">
-            No visa requests match these filters.
-          </p>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MaterialIcon name="search_off" />
+              </EmptyMedia>
+              <EmptyTitle>No matching visa requests</EmptyTitle>
+              <EmptyDescription>
+                Try changing the search text or status filter.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : null}
         {page > 1 || hasNextPage ? (
           <div className="flex items-center justify-between border-t p-4">
@@ -215,13 +234,13 @@ function QueueStat({
   icon: string
 }) {
   return (
-    <section className="rounded-md border border-[#dfe4ec] bg-white p-4 shadow-sm">
+    <section className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-[#667085]">{label}</p>
-          <p className="mt-1 text-2xl font-semibold text-[#111827]">{value}</p>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
         </div>
-        <span className="flex size-10 items-center justify-center rounded-md bg-[#eef3ff] text-[#1749d8]">
+        <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <MaterialIcon name={icon} filled className="text-[21px]" />
         </span>
       </div>

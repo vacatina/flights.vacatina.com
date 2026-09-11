@@ -18,10 +18,11 @@ export function VisaFormActions({
   disabled?: boolean
 }) {
   return (
-    <div className="flex flex-col-reverse justify-between gap-3 border-t pt-6 sm:flex-row">
+    <div className="flex w-full flex-col-reverse justify-between gap-3 sm:flex-row">
       {backHref ? (
         <Button
-          variant="ghost"
+          className="w-full sm:w-auto"
+          variant="outline"
           nativeButton={false}
           render={<Link href={backHref} />}
         >
@@ -33,6 +34,7 @@ export function VisaFormActions({
       )}
       {nextHref ? (
         <Button
+          className="w-full sm:w-auto"
           nativeButton={false}
           render={<Link href={nextHref} />}
           disabled={disabled}
@@ -42,6 +44,7 @@ export function VisaFormActions({
         </Button>
       ) : (
         <Button
+          className="w-full sm:w-auto"
           type="submit"
           disabled={disabled || isPending}
           aria-busy={isPending}

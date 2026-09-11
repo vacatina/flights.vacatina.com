@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { CheckCircle2Icon } from "lucide-react"
+import { ArrowRightIcon, CheckCircle2Icon, MailIcon } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { Money } from "@/modules/currency/ui"
 import { loadOwnedVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
 
@@ -22,28 +24,37 @@ export default async function VisaApplicationConfirmationPage({
   }
 
   return (
-    <main className="min-h-[calc(100svh-5rem)] bg-[#f5f7fb] py-12">
+    <main className="min-h-[calc(100svh-5rem)] bg-muted/30 py-12 md:py-16">
       <div className="mx-auto max-w-2xl px-4">
         <Card>
-          <CardContent className="py-10 text-center">
-            <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle2Icon className="size-7" />
+          <CardContent className="flex flex-col items-center px-6 py-10 text-center md:px-10">
+            <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary ring-8 ring-primary/5">
+              <CheckCircle2Icon className="size-7" aria-hidden="true" />
             </span>
-            <h1 className="mt-5 font-heading text-2xl font-semibold">
+            <Badge className="mt-6" variant="secondary">
+              Request submitted
+            </Badge>
+            <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight md:text-3xl">
               Visa request received
             </h1>
-            <p className="mt-3 text-muted-foreground">
-              Your reference is{" "}
-              <strong className="text-foreground">
+            <p className="mt-3 max-w-lg leading-relaxed text-muted-foreground">
+              Our team will review your information and contact you with the
+              next steps and confirmed pricing. No payment has been taken.
+            </p>
+            <div className="mt-7 w-full rounded-xl bg-primary/5 p-5 ring-1 ring-primary/15">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Your reference
+              </p>
+              <p className="mt-1 font-heading text-xl font-semibold tracking-wide">
                 {detail.application.reference}
-              </strong>
-              . Our team will review the information and contact you with the
-              next steps and confirmed pricing.
-            </p>
-            <p className="mt-4 text-sm text-muted-foreground">
-              No payment has been taken.
-            </p>
-            <dl className="mx-auto mt-7 grid max-w-lg gap-4 rounded-xl bg-muted/60 p-5 text-left sm:grid-cols-2">
+              </p>
+              <p className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <MailIcon className="size-3.5" aria-hidden="true" />
+                Keep this reference for future communication.
+              </p>
+            </div>
+            <Separator className="my-7" />
+            <dl className="grid w-full gap-5 text-left sm:grid-cols-2">
               <ConfirmationDetail
                 label="Submitted"
                 value={
@@ -73,14 +84,16 @@ export default async function VisaApplicationConfirmationPage({
                 }
               />
             </dl>
+          </CardContent>
+          <CardFooter className="justify-center border-t bg-muted/20">
             <Button
-              className="mt-7"
               nativeButton={false}
               render={<Link href="/visa-assistance" />}
             >
               Back to visa assistance
+              <ArrowRightIcon data-icon="inline-end" />
             </Button>
-          </CardContent>
+          </CardFooter>
         </Card>
       </div>
     </main>
@@ -96,8 +109,10 @@ function ConfirmationDetail({
 }) {
   return (
     <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm font-medium">{value}</dd>
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-medium tabular-nums">{value}</dd>
     </div>
   )
 }

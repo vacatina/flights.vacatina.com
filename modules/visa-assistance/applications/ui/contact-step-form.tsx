@@ -9,11 +9,18 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   contactStepSchema,
   type ContactStepValues,
@@ -58,59 +65,59 @@ export function ContactStepForm({
   })
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Contact details</CardTitle>
-        <CardDescription>
-          We will use these details for updates about this request.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-6" noValidate>
-          <input type="hidden" {...form.register("applicationId")} />
-          <VisaFormError message={serverError} />
-          <div className="space-y-2">
-            <Label htmlFor="contactEmail">Email address</Label>
-            <Input
-              id="contactEmail"
-              type="email"
-              disabled={isPending}
-              autoComplete="email"
-              aria-invalid={Boolean(form.formState.errors.contactEmail)}
-              {...form.register("contactEmail")}
-            />
-            <FieldError message={form.formState.errors.contactEmail?.message} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contactPhone">Phone number</Label>
-            <Input
-              id="contactPhone"
-              type="tel"
-              disabled={isPending}
-              autoComplete="tel"
-              placeholder="+94 77 123 4567"
-              aria-invalid={Boolean(form.formState.errors.contactPhone)}
-              {...form.register("contactPhone")}
-            />
-            <p className="text-xs text-muted-foreground">
-              Include the international country code.
-            </p>
-            <FieldError message={form.formState.errors.contactPhone?.message} />
-          </div>
+    <form onSubmit={onSubmit} noValidate>
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle className="text-lg">Contact details</CardTitle>
+          <CardDescription>
+            We will use these details for updates about this request.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <input type="hidden" {...form.register("applicationId")} />
+            <VisaFormError message={serverError} />
+            <Field data-invalid={Boolean(form.formState.errors.contactEmail)}>
+              <FieldLabel htmlFor="contactEmail">Email address</FieldLabel>
+              <Input
+                id="contactEmail"
+                type="email"
+                disabled={isPending}
+                autoComplete="email"
+                placeholder="name@example.com"
+                aria-invalid={Boolean(form.formState.errors.contactEmail)}
+                {...form.register("contactEmail")}
+              />
+              <FieldDescription>
+                We will send application updates to this address.
+              </FieldDescription>
+              <FieldError errors={[form.formState.errors.contactEmail]} />
+            </Field>
+            <Field data-invalid={Boolean(form.formState.errors.contactPhone)}>
+              <FieldLabel htmlFor="contactPhone">Phone number</FieldLabel>
+              <Input
+                id="contactPhone"
+                type="tel"
+                disabled={isPending}
+                autoComplete="tel"
+                placeholder="+94 77 123 4567"
+                aria-invalid={Boolean(form.formState.errors.contactPhone)}
+                {...form.register("contactPhone")}
+              />
+              <FieldDescription>
+                Include the international country code.
+              </FieldDescription>
+              <FieldError errors={[form.formState.errors.contactPhone]} />
+            </Field>
+          </FieldGroup>
+        </CardContent>
+        <CardFooter className="border-t bg-muted/20">
           <VisaFormActions
             backHref={`/visa-assistance/applications/${applicationId}/travelers`}
             isPending={isPending}
           />
-        </form>
-      </CardContent>
-    </Card>
+        </CardFooter>
+      </Card>
+    </form>
   )
-}
-
-function FieldError({ message }: { message?: string }) {
-  return message ? (
-    <p className="text-sm text-destructive" role="alert">
-      {message}
-    </p>
-  ) : null
 }
