@@ -20,6 +20,26 @@ const payload: NotificationOutboxPayload = {
 }
 
 describe("notification templates", () => {
+  test("renders a Vacatina visa request acknowledgement", () => {
+    const content = toNotificationContent(
+      "visa_request_received",
+      {
+        bookingReference: "VA-12345",
+        routeLabel: "LK to IN",
+        amountLabel: "$120.00",
+        statusLabel: "Received",
+        applicationId: "va_123",
+      },
+      "https://vacatina.example"
+    )
+
+    expect(content.subject).toBe("Visa request received — VA-12345")
+    expect(content.text).toContain("No payment")
+    expect(content.html).toContain(
+      "/visa-assistance/applications/va_123/confirmation"
+    )
+  })
+
   test("renders a flight change request as a flight-change email, never a cancellation", () => {
     const content = toNotificationContent(
       "change_request_received",
@@ -41,11 +61,16 @@ describe("notification templates", () => {
   })
 
   test("uses the cancellation template only for cancellation events", () => {
-    const content = toNotificationContent("cancellation_request_received", payload)
+    const content = toNotificationContent(
+      "cancellation_request_received",
+      payload
+    )
 
     expect(content.subject).toBe("Cancellation request received — VAC-12345")
     expect(content.html).toContain("Your cancellation request was received")
-    expect(content.html).not.toContain("Your flight change request was received")
+    expect(content.html).not.toContain(
+      "Your flight change request was received"
+    )
   })
 
   test("renders a branded action button and supports administrative review links", () => {
@@ -92,11 +117,9 @@ describe("notification templates", () => {
     )
 
     expect(sent).toEqual(["Booking confirmed — VAC-12345"])
-    expect(repository.findPending).toHaveBeenCalledWith(
-      expect.any(Date),
-      1,
-      ["new-booking"]
-    )
+    expect(repository.findPending).toHaveBeenCalledWith(expect.any(Date), 1, [
+      "new-booking",
+    ])
   })
 })
 

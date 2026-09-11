@@ -22,6 +22,7 @@ export type NotificationEventType =
   | "change_refund_approved"
   | "change_refund_completed"
   | "change_issue"
+  | "visa_request_received"
 
 export type NotificationOutboxStatus = "pending" | "sent" | "failed"
 
@@ -43,4 +44,5 @@ export interface NotificationOutboxPayload {
   supportWhatsapp?: string | null
   businessAddress?: string | null
   recipientRole?: "customer" | "admin"
+  applicationId?: string | null
 }

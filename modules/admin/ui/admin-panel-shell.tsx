@@ -13,6 +13,7 @@ type ActiveAdminPage =
   | "cancellations"
   | "changes"
   | "visa-pricing"
+  | "visa-applications"
   | "settings"
 
 export interface AdminNavigationCounts {
@@ -60,6 +61,12 @@ const navigation = [
     label: "Payments & Refunds",
     value: "payments",
     icon: "payments",
+  },
+  {
+    href: "/admin/visa-applications",
+    label: "Visa Requests",
+    value: "visa-applications",
+    icon: "travel_explore",
   },
   {
     href: "/admin/visa-pricing",

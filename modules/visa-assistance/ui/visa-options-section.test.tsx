@@ -5,6 +5,10 @@ vi.mock("@/modules/currency/server/actions", () => ({
   persistDisplayCurrency: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock("@/modules/visa-assistance/applications/server/actions", () => ({
+  createVisaApplicationDraftAction: vi.fn(),
+}))
+
 import type {
   DisplayCurrencyCode,
   SerializedFxSnapshot,
