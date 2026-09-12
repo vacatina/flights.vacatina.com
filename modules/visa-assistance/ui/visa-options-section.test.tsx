@@ -87,6 +87,8 @@ describe("VisaOptionsSection currency display", () => {
             },
           ]}
           outcome="visa_supported"
+          nationalityCode="lk"
+          destinationCode="ae"
         />
       </CurrencyProvider>
     )
@@ -94,6 +96,9 @@ describe("VisaOptionsSection currency display", () => {
     expect(screen.getByText("$83.09")).toBeTruthy()
     expect(screen.getByText("$110.00")).toBeTruthy()
     expect(screen.getByText("$193.09")).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "Start visa request" }).className
+    ).toContain("overflow-hidden")
 
     fireEvent.click(screen.getByRole("button", { name: "Use JPY" }))
 

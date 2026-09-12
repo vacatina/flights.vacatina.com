@@ -1,4 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import Comparison from "@/components/visa-assistance/comparison"
+import HowItWorks from "@/components/visa-assistance/how-it-works"
 import { VisaSearchForm } from "@/modules/visa-assistance/ui/visa-search-form"
 
 export function VisaAssistanceLanding() {
@@ -27,6 +29,34 @@ export function VisaAssistanceLanding() {
               <VisaSearchForm />
             </CardContent>
           </Card>
+        </div>
+      </section>
+      <section className="bg-background py-20 md:py-28">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-8 lg:px-12">
+          <div className="text-center">
+            <h2 className="font-heading text-3xl font-semibold tracking-tight md:text-5xl">
+              Why travellers prefer Vacatina
+              <br /> for their visa applications
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              Skip the stress. Vacatina brings together everything you need
+            </p>
+          </div>
+          <Comparison />
+        </div>
+      </section>
+
+      <section className="bg-background pb-20 md:pb-28">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-8 lg:px-12">
+          <div className="text-center">
+            <h2 className="font-heading text-3xl font-semibold tracking-tight md:text-5xl">
+              Get Started in 4 Easy Steps
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              Your visa journey made simple and straightforward
+            </p>
+          </div>
+          <HowItWorks />
         </div>
       </section>
     </main>

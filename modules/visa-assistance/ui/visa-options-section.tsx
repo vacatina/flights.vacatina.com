@@ -139,56 +139,43 @@ function VisaOption({
       </div>
 
       {product ? (
-        <div className="grid gap-8 border-t px-5 py-7 md:px-7 lg:grid-cols-2 lg:gap-10">
-          <div>
-            <h4 className="text-sm font-semibold">Passport requirement</h4>
-            <div className="mt-4 flex items-start gap-3">
-              <NotebookTabsIcon
-                className="mt-0.5 size-5 shrink-0 text-[#13357b] dark:text-blue-300"
-                aria-hidden="true"
-              />
-              <div>
-                <p className="font-medium">
-                  {formatPassportRequirement(product)}
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Check the expiry date printed on your passport before
-                  applying.
+        <div className="border-t px-5 py-7 md:px-7">
+          <h4 className="text-sm font-semibold">Passport and estimated fees</h4>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-xl bg-muted/70 p-4 sm:col-span-2 xl:col-span-1">
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                <NotebookTabsIcon className="size-4" aria-hidden="true" />
+                Passport requirement
+              </span>
+              <p className="mt-2 font-semibold tracking-tight">
+                {formatPassportRequirement(product)}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Check the expiry date printed on your passport before applying.
+              </p>
+            </div>
+
+            {fees.map((fee) => (
+              <div key={fee.label} className="rounded-xl bg-muted/70 p-4">
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <fee.icon className="size-4" aria-hidden="true" />
+                  {fee.label}
+                </span>
+                <p className="mt-2 text-lg font-semibold tracking-tight">
+                  <VisaFeeValue {...fee.value} />
                 </p>
               </div>
-            </div>
+            ))}
           </div>
 
-          <div>
-            <h4 className="text-sm font-semibold">Estimated fees</h4>
-            {fees.length > 0 ? (
-              <div className="mt-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                  {fees.map((fee) => (
-                    <div key={fee.label} className="rounded-xl bg-muted/70 p-4">
-                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <fee.icon className="size-4" aria-hidden="true" />
-                        {fee.label}
-                      </span>
-                      <p className="mt-2 text-lg font-semibold tracking-tight">
-                        <VisaFeeValue {...fee.value} />
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {fees.length > 0 ? (
+            <div className="mt-5 grid gap-4 border-t pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-8">
+              <div className="max-w-3xl">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   The visa processing fee includes Vacatina&apos;s service
                   charge. Government charges can change before submission.
                 </p>
-                {documentResult.pricing?.totalSellMoney ? (
-                  <div className="mt-4 flex items-center justify-between border-t pt-4">
-                    <span className="text-sm font-medium">Estimated total</span>
-                    <Money
-                      money={documentResult.pricing.totalSellMoney}
-                      className="text-lg font-semibold tracking-tight"
-                    />
-                  </div>
-                ) : null}
                 <FxEstimateDisclosure
                   sourceCurrencies={fees.flatMap((fee) =>
                     fee.value.money?.currency || fee.value.currency
@@ -198,12 +185,28 @@ function VisaOption({
                   className="mt-2 text-xs leading-relaxed text-muted-foreground"
                 />
               </div>
-            ) : (
-              <p className="mt-4 text-sm text-muted-foreground">
+
+              {documentResult.pricing?.totalSellMoney ? (
+                <div className="flex items-baseline justify-between gap-8 md:min-w-56">
+                  <span className="text-sm font-medium">Estimated total</span>
+                  <Money
+                    money={documentResult.pricing.totalSellMoney}
+                    className="text-lg font-semibold tracking-tight"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-5 flex items-start gap-3 border-t pt-4">
+              <CircleDollarSignIcon
+                className="mt-0.5 size-5 shrink-0 text-[#13357b] dark:text-blue-300"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">
                 Fee information is not currently available.
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -223,7 +226,7 @@ function VisaOption({
           <p className="text-sm text-muted-foreground">
             Start now and submit the details to Vacatina. No payment is needed.
           </p>
-          <PendingSubmitButton pendingLabel="Starting request...">
+          <PendingSubmitButton pendingAnimation="flight-progress">
             Start visa request
           </PendingSubmitButton>
         </form>

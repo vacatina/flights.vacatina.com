@@ -1,11 +1,13 @@
 "use client"
 
+import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { SearchIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
+import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Field,
   FieldDescription,
@@ -30,6 +32,7 @@ export function VisaSearchForm({
   compact = false,
 }: VisaSearchFormProps) {
   const router = useRouter()
+  const [isNavigating, startTransition] = useTransition()
   const form = useForm<VisaSearchValues>({
     resolver: zodResolver(visaSearchSchema),
     defaultValues: {
@@ -39,8 +42,19 @@ export function VisaSearchForm({
   })
 
   function submit(values: VisaSearchValues) {
-    router.push(`/visa-assistance/${values.nationality}/${values.destination}`)
+    startTransition(() => {
+      router.push(
+        `/visa-assistance/${values.nationality}/${values.destination}`
+      )
+    })
   }
+
+  const submitButtonClassName = cn(
+    "w-full",
+    compact && "mt-1 h-12 rounded-xl px-5 text-[15px] font-medium",
+    !compact &&
+      "h-16 rounded-[10px] px-6 text-[16px] font-medium md:col-span-2 xl:col-span-1 xl:mt-[22px]"
+  )
 
   return (
     <form onSubmit={form.handleSubmit(submit)} noValidate>
@@ -120,18 +134,20 @@ export function VisaSearchForm({
           )}
         />
 
-        <Button
-          type="submit"
-          className={cn(
-            "w-full",
-            compact && "mt-1 h-12 rounded-xl px-5 text-[15px] font-medium",
-            !compact &&
-              "h-16 rounded-[10px] px-6 text-[16px] font-medium md:col-span-2 xl:col-span-1 xl:mt-[22px]"
-          )}
-        >
-          {compact ? <SearchIcon data-icon="inline-start" /> : null}
-          {compact ? "Check again" : "Check Visa Requirements"}
-        </Button>
+        {compact ? (
+          <Button type="submit" className={submitButtonClassName}>
+            <SearchIcon data-icon="inline-start" />
+            Check again
+          </Button>
+        ) : (
+          <LoadingButton
+            type="submit"
+            isLoading={isNavigating}
+            className={submitButtonClassName}
+          >
+            Check Visa Requirements
+          </LoadingButton>
+        )}
       </FieldGroup>
     </form>
   )
