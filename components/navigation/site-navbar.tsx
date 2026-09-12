@@ -32,7 +32,7 @@ const primaryNavItems: NavLinkItem[] = [
 
 const addOnItems: NavLinkItem[] = [
   { href: "#", label: "Activities" },
-  { href: "#", label: "Visa Assistance" },
+  { href: "/visa-assistance", label: "Visa Assistance" },
   { href: "#", label: "Sightseeing Tours" },
   { href: "#", label: "Holiday Packages" },
   { href: "#", label: "Travel Insurance" },
@@ -45,7 +45,7 @@ const resourceItems: NavLinkItem[] = [
   { href: "#", label: "Contact Us" },
 ]
 
-const transparentNavbarRoutes = ["/", "/hotels"]
+const transparentNavbarRoutes = ["/", "/visa-assistance", "/hotels"]
 const scrollThresholdPx = 12
 
 export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {

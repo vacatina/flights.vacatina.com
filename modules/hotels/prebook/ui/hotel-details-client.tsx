@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { CheckIcon, Loader2Icon, MapPinIcon, StarIcon, InfoIcon } from "lucide-react"
+import { InfoIcon, Loader2Icon, MapPinIcon, StarIcon } from "lucide-react"
 
 import {
   Breadcrumb,
@@ -17,7 +17,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DecimalMoney } from "@/modules/currency/ui"
-import { cn } from "@/lib/utils"
 
 import type { LiteApiHotelInfo, LiteApiRateResponseItem } from "@/modules/hotels/results/server/liteapi-rates"
 
@@ -165,11 +164,13 @@ export function HotelDetailsClient({ hotel, ratesData, summary, searchParams }: 
             {ratesData.roomTypes?.map((roomType, rIdx) => (
               <Card key={`room-${rIdx}`} className="overflow-hidden rounded-2xl shadow-none">
                 <CardHeader className="bg-muted/30 pb-4">
-                  <CardTitle className="text-lg">{roomType.name || "Standard Room"}</CardTitle>
+                  <CardTitle className="text-lg">
+                    {roomType.rates[0]?.name || "Standard Room"}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y">
-                    {roomType.rates.map((rate, rateIdx) => {
+                    {roomType.rates.map((rate) => {
                       const amount = rate.retailRate.total[0]?.amount
                       const currency = rate.retailRate.total[0]?.currency || "USD"
                       const isPending = isPrebooking && selectedRateId === rate.rateId
@@ -178,13 +179,7 @@ export function HotelDetailsClient({ hotel, ratesData, summary, searchParams }: 
                         <div key={rate.rateId} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 md:p-6 transition-colors hover:bg-muted/20">
                           <div className="space-y-1">
                             <p className="font-semibold">
-                              {rate.boardType === "RO" ? "Room Only" :
-                               rate.boardType === "BB" ? "Bed & Breakfast" :
-                               rate.boardType === "HB" ? "Half Board" :
-                               rate.boardType === "FB" ? "Full Board" :
-                               rate.boardType === "AI" ? "All Inclusive" :
-                               rate.boardType === "BI" ? "Breakfast Included" :
-                               rate.boardName || rate.boardType || "Standard Rate"}
+                              {rate.boardName || "Standard Rate"}
                             </p>
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                               <InfoIcon className="h-4 w-4" />

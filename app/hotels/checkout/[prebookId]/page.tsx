@@ -12,7 +12,7 @@ interface CheckoutPageProps {
 
 export default async function HotelCheckoutPage({ params }: CheckoutPageProps) {
   const resolvedParams = await params
-  
+
   const actor = await getActorContext({ ensureGuestSession: true })
 
   logHotelFlow("HotelCheckoutPage", "page_request", {
@@ -20,25 +20,26 @@ export default async function HotelCheckoutPage({ params }: CheckoutPageProps) {
     actorType: actor.type,
   })
 
+  let data
   try {
-    const data = await fetchCheckoutPageData({
+    data = await fetchCheckoutPageData({
       prebookId: resolvedParams.prebookId,
     })
-
-    return <HotelCheckoutClient data={data} clerkEnabled={true} />
   } catch (error) {
     logHotelFlow("HotelCheckoutPage", "render_error_state", {
       prebookId: resolvedParams.prebookId,
-      error: String(error)
+      error: String(error),
     })
-    
+
     return (
       <FlowPageErrorState
         title="Unable to load checkout"
         message="Unable to load checkout details right now. The session may have expired."
-        backHref={`/hotels`}
+        backHref="/hotels"
         backLabel="Back to search"
       />
     )
   }
+
+  return <HotelCheckoutClient data={data} />
 }

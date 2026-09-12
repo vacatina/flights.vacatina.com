@@ -92,7 +92,7 @@ function HotelPayPalControls({
               return { orderId }
             }}
             onApprove={async (data) => {
-              if (data.orderID) await onCapturePayPalOrder(data.orderID)
+              if (data.orderId) await onCapturePayPalOrder(data.orderId)
             }}
             onCancel={onPayPalCancel}
             onError={onPayPalError}
@@ -109,7 +109,7 @@ function HotelPayPalControls({
               return { orderId }
             }}
             onApprove={async (data) => {
-              if (data.orderID) await onCapturePayPalOrder(data.orderID)
+              if (data.orderId) await onCapturePayPalOrder(data.orderId)
             }}
             onCancel={onPayPalCancel}
             onError={onPayPalError}

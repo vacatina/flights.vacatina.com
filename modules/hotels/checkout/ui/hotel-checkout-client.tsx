@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { ShieldCheckIcon } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,7 +12,6 @@ import { Label } from "@/components/ui/label"
 import { DecimalMoney } from "@/modules/currency/ui"
 
 import type { LiteApiPrebookData } from "@/modules/hotels/checkout/server/service"
-import { processHotelCheckoutAction } from "@/modules/hotels/checkout/server/actions"
 import { createHotelPayPalOrderAction, captureHotelPayPalOrderAction } from "@/modules/hotels/checkout/server/paypal-actions"
 import { toSafeUserErrorMessage } from "@/lib/shared/safe-error-message"
 import { HotelPayPalCheckout } from "./hotel-paypal"
@@ -23,17 +21,16 @@ const hotelCheckoutSchema = z.object({
   lastName: z.string().min(2, "Last name is required"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Valid phone number is required"),
-  paymentMethod: z.enum(["card", "paypal"]).default("card"),
+  paymentMethod: z.enum(["card", "paypal"]),
 })
 
 type HotelCheckoutValues = z.infer<typeof hotelCheckoutSchema>
 
 interface HotelCheckoutClientProps {
   data: LiteApiPrebookData
-  clerkEnabled: boolean
 }
 
-export function HotelCheckoutClient({ data, clerkEnabled }: HotelCheckoutClientProps) {
+export function HotelCheckoutClient({ data }: HotelCheckoutClientProps) {
   const router = useRouter()
   const [isSubmitting, startSubmitting] = useTransition()
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -210,7 +207,9 @@ export function HotelCheckoutClient({ data, clerkEnabled }: HotelCheckoutClientP
                       onCreatePayPalOrder={handleCreatePayPalOrder}
                       onCapturePayPalOrder={handleCapturePayPalOrder}
                       onPayPalCancel={() => setSubmitError("Payment was cancelled.")}
-                      onPayPalError={(err) => setSubmitError("A payment error occurred.")}
+                      onPayPalError={() =>
+                        setSubmitError("A payment error occurred.")
+                      }
                     />
                   ) : (
                     <p className="text-sm text-destructive">PayPal Client ID is missing</p>

@@ -31,10 +31,15 @@ export function getNotificationsServerConfig(): NotificationsServerConfig {
     appBaseUrl: normalizeBaseUrl(
       process.env.PAYMENTS_PUBLIC_BASE_URL ??
         process.env.STRIPE_APP_BASE_URL ??
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+        (process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : undefined)
     ),
     dispatchBatchLimit: clamp(
-      parseIntegerFromEnv("NOTIFICATIONS_DISPATCH_BATCH_LIMIT", DEFAULT_BATCH_LIMIT),
+      parseIntegerFromEnv(
+        "NOTIFICATIONS_DISPATCH_BATCH_LIMIT",
+        DEFAULT_BATCH_LIMIT
+      ),
       1,
       200
     ),
@@ -44,7 +49,10 @@ export function getNotificationsServerConfig(): NotificationsServerConfig {
       20
     ),
     retryDelayMs: clamp(
-      parseIntegerFromEnv("NOTIFICATIONS_RETRY_DELAY_MS", DEFAULT_RETRY_DELAY_MS),
+      parseIntegerFromEnv(
+        "NOTIFICATIONS_RETRY_DELAY_MS",
+        DEFAULT_RETRY_DELAY_MS
+      ),
       60_000,
       24 * 60 * 60 * 1000
     ),

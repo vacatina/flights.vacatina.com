@@ -60,164 +60,173 @@ export interface NotificationOutboxRepository {
 
 const inMemoryOutbox = new Map<string, NotificationOutboxRecord>()
 
-export const defaultNotificationOutboxRepository: NotificationOutboxRepository = {
-  async create(input) {
-    const db = getDbClient()
-    const now = new Date()
+export const defaultNotificationOutboxRepository: NotificationOutboxRepository =
+  {
+    async create(input) {
+      const db = getDbClient()
+      const now = new Date()
 
-    if (!db) {
-      const record: NotificationOutboxRecord = {
-        ...input,
-        status: "pending",
-        payload: input.payload,
-        attemptCount: 0,
-        lastError: null,
-        sentAt: null,
-        nextAttemptAt: now,
-        createdAt: now,
-        updatedAt: now,
+      if (!db) {
+        const record: NotificationOutboxRecord = {
+          ...input,
+          status: "pending",
+          payload: input.payload,
+          attemptCount: 0,
+          lastError: null,
+          sentAt: null,
+          nextAttemptAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }
+        inMemoryOutbox.set(record.id, record)
+        return record
       }
-      inMemoryOutbox.set(record.id, record)
-      return record
-    }
 
-    const [row] = await db
-      .insert(notificationOutbox)
-      .values({
-        id: input.id,
-        eventType: input.eventType,
-        status: "pending",
-        flightOrderId: input.flightOrderId,
-        checkoutSessionId: input.checkoutSessionId,
-        bookingReference: input.bookingReference,
-        recipientEmail: input.recipientEmail,
-        recipientEmailHash: input.recipientEmailHash,
-        payload: input.payload,
-        attemptCount: 0,
-        lastError: null,
-        sentAt: null,
-        nextAttemptAt: now,
-        createdAt: now,
-        updatedAt: now,
+      const [row] = await db
+        .insert(notificationOutbox)
+        .values({
+          id: input.id,
+          eventType: input.eventType,
+          status: "pending",
+          flightOrderId: input.flightOrderId,
+          checkoutSessionId: input.checkoutSessionId,
+          bookingReference: input.bookingReference,
+          recipientEmail: input.recipientEmail,
+          recipientEmailHash: input.recipientEmailHash,
+          payload: input.payload,
+          attemptCount: 0,
+          lastError: null,
+          sentAt: null,
+          nextAttemptAt: now,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning()
+
+      return toRecord(row)
+    },
+    async findPending(now, limit, outboxIds) {
+      const db = getDbClient()
+      const ids = outboxIds?.filter(Boolean)
+
+      if (ids?.length === 0) {
+        return []
+      }
+
+      if (!db) {
+        return Array.from(inMemoryOutbox.values())
+          .filter(
+            (record) =>
+              record.status === "pending" &&
+              record.nextAttemptAt <= now &&
+              (!ids || ids.includes(record.id))
+          )
+          .sort(
+            (left, right) =>
+              left.createdAt.getTime() - right.createdAt.getTime()
+          )
+          .slice(0, limit)
+      }
+
+      const rows = await db.query.notificationOutbox.findMany({
+        where: and(
+          eq(notificationOutbox.status, "pending"),
+          lte(notificationOutbox.nextAttemptAt, now),
+          ids ? inArray(notificationOutbox.id, ids) : undefined
+        ),
+        orderBy: [asc(notificationOutbox.createdAt)],
+        limit,
       })
-      .returning()
 
-    return toRecord(row)
-  },
-  async findPending(now, limit, outboxIds) {
-    const db = getDbClient()
-    const ids = outboxIds?.filter(Boolean)
+      return rows.map(toRecord)
+    },
+    async listRecentByFlightOrderId(input) {
+      const db = getDbClient()
 
-    if (ids?.length === 0) {
-      return []
-    }
+      if (!db) {
+        return Array.from(inMemoryOutbox.values())
+          .filter((record) => record.flightOrderId === input.flightOrderId)
+          .sort(
+            (left, right) =>
+              right.createdAt.getTime() - left.createdAt.getTime()
+          )
+          .slice(0, input.limit)
+      }
 
-    if (!db) {
-      return Array.from(inMemoryOutbox.values())
-        .filter(
-          (record) =>
-            record.status === "pending" &&
-            record.nextAttemptAt <= now &&
-            (!ids || ids.includes(record.id))
-        )
-        .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-        .slice(0, limit)
-    }
+      const rows = await db.query.notificationOutbox.findMany({
+        where: eq(notificationOutbox.flightOrderId, input.flightOrderId),
+        orderBy: [desc(notificationOutbox.createdAt)],
+        limit: input.limit,
+      })
 
-    const rows = await db.query.notificationOutbox.findMany({
-      where: and(
-        eq(notificationOutbox.status, "pending"),
-        lte(notificationOutbox.nextAttemptAt, now),
-        ids ? inArray(notificationOutbox.id, ids) : undefined
-      ),
-      orderBy: [asc(notificationOutbox.createdAt)],
-      limit,
-    })
+      return rows.map(toRecord)
+    },
+    async markSent(input) {
+      const db = getDbClient()
 
-    return rows.map(toRecord)
-  },
-  async listRecentByFlightOrderId(input) {
-    const db = getDbClient()
-
-    if (!db) {
-      return Array.from(inMemoryOutbox.values())
-        .filter((record) => record.flightOrderId === input.flightOrderId)
-        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-        .slice(0, input.limit)
-    }
-
-    const rows = await db.query.notificationOutbox.findMany({
-      where: eq(notificationOutbox.flightOrderId, input.flightOrderId),
-      orderBy: [desc(notificationOutbox.createdAt)],
-      limit: input.limit,
-    })
-
-    return rows.map(toRecord)
-  },
-  async markSent(input) {
-    const db = getDbClient()
-
-    if (!db) {
-      const current = inMemoryOutbox.get(input.id)
-      if (!current) {
+      if (!db) {
+        const current = inMemoryOutbox.get(input.id)
+        if (!current) {
+          return
+        }
+        inMemoryOutbox.set(input.id, {
+          ...current,
+          status: "sent",
+          sentAt: input.sentAt,
+          updatedAt: new Date(),
+        })
         return
       }
-      inMemoryOutbox.set(input.id, {
-        ...current,
-        status: "sent",
-        sentAt: input.sentAt,
-        updatedAt: new Date(),
-      })
-      return
-    }
 
-    await db
-      .update(notificationOutbox)
-      .set({
-        status: "sent",
-        sentAt: input.sentAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(notificationOutbox.id, input.id))
-  },
-  async markFailed(input) {
-    const db = getDbClient()
+      await db
+        .update(notificationOutbox)
+        .set({
+          status: "sent",
+          sentAt: input.sentAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(notificationOutbox.id, input.id))
+    },
+    async markFailed(input) {
+      const db = getDbClient()
 
-    if (!db) {
-      const current = inMemoryOutbox.get(input.id)
-      if (!current) {
+      if (!db) {
+        const current = inMemoryOutbox.get(input.id)
+        if (!current) {
+          return
+        }
+        inMemoryOutbox.set(input.id, {
+          ...current,
+          attemptCount: current.attemptCount + 1,
+          status: input.permanent ? "failed" : "pending",
+          nextAttemptAt: input.nextAttemptAt,
+          lastError: input.lastError,
+          updatedAt: new Date(),
+        })
         return
       }
-      inMemoryOutbox.set(input.id, {
-        ...current,
-        attemptCount: current.attemptCount + 1,
-        status: input.permanent ? "failed" : "pending",
-        nextAttemptAt: input.nextAttemptAt,
-        lastError: input.lastError,
-        updatedAt: new Date(),
-      })
-      return
-    }
 
-    const current = await db.query.notificationOutbox.findFirst({
-      where: eq(notificationOutbox.id, input.id),
-      columns: { attemptCount: true },
-    })
-    const nextAttemptCount = (current?.attemptCount ?? 0) + 1
-    await db
-      .update(notificationOutbox)
-      .set({
-        attemptCount: nextAttemptCount,
-        status: input.permanent ? "failed" : "pending",
-        lastError: input.lastError,
-        nextAttemptAt: input.nextAttemptAt,
-        updatedAt: new Date(),
+      const current = await db.query.notificationOutbox.findFirst({
+        where: eq(notificationOutbox.id, input.id),
+        columns: { attemptCount: true },
       })
-      .where(eq(notificationOutbox.id, input.id))
-  },
-}
+      const nextAttemptCount = (current?.attemptCount ?? 0) + 1
+      await db
+        .update(notificationOutbox)
+        .set({
+          attemptCount: nextAttemptCount,
+          status: input.permanent ? "failed" : "pending",
+          lastError: input.lastError,
+          nextAttemptAt: input.nextAttemptAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(notificationOutbox.id, input.id))
+    },
+  }
 
-function toRecord(row: typeof notificationOutbox.$inferSelect): NotificationOutboxRecord {
+function toRecord(
+  row: typeof notificationOutbox.$inferSelect
+): NotificationOutboxRecord {
   return {
     id: row.id,
     eventType: row.eventType,
@@ -228,7 +237,9 @@ function toRecord(row: typeof notificationOutbox.$inferSelect): NotificationOutb
     recipientEmail: row.recipientEmail,
     recipientEmailHash: row.recipientEmailHash,
     payload:
-      row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)
+      row.payload &&
+      typeof row.payload === "object" &&
+      !Array.isArray(row.payload)
         ? (row.payload as NotificationOutboxPayload)
         : null,
     attemptCount: row.attemptCount,

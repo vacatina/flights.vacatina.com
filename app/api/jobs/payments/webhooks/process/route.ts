@@ -4,8 +4,6 @@ import { processPayPalWebhookEvent } from "@/modules/flights/checkout/server/ser
 import { isPaymentJobRequestAuthorized } from "@/modules/payments/server/job-auth"
 import { processPayPalWebhookInbox } from "@/modules/payments/server/webhooks/paypal"
 
-export const runtime = "nodejs"
-
 export async function POST(request: NextRequest) {
   if (!isPaymentJobRequestAuthorized(request.headers)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })

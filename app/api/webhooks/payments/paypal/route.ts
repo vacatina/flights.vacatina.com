@@ -5,8 +5,6 @@ import { logFlightFlow, logFlightFlowError } from "@/lib/logging/flow-debug"
 import { incrementCheckoutMetric } from "@/modules/flights/checkout/server/metrics"
 import { verifyAndStorePayPalWebhook } from "@/modules/payments/server/webhooks/paypal"
 
-export const runtime = "nodejs"
-
 export async function POST(request: NextRequest) {
   let event: PayPalWebhookEvent
 
