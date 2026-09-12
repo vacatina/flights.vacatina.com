@@ -26,13 +26,13 @@ const primaryNavItems: NavLinkItem[] = [
   { href: "#", label: "Flights" },
   { href: "/hotels", label: "Hotels" },
   { href: "#", label: "Cars" },
-  { href: "#", label: "Rails" },
+  { href: "/visa-assistance", label: "Visa Assistance" },
   { href: "#", label: "Cruises" },
 ]
 
 const addOnItems: NavLinkItem[] = [
   { href: "#", label: "Activities" },
-  { href: "/visa-assistance", label: "Visa Assistance" },
+  { href: "#", label: "Rails" },
   { href: "#", label: "Sightseeing Tours" },
   { href: "#", label: "Holiday Packages" },
   { href: "#", label: "Travel Insurance" },
