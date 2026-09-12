@@ -1,7 +1,7 @@
 import "server-only"
 
 import { randomUUID } from "node:crypto"
-import { and, asc, desc, eq, ilike, inArray, ne, or } from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike, inArray, ne, or } from "drizzle-orm"
 
 import { getDbClient } from "@/lib/db/client"
 import {
@@ -289,6 +289,39 @@ export async function listAdminVisaApplications(
     .orderBy(desc(visaApplications.updatedAt))
     .limit(input.limit ?? 100)
     .offset(input.offset ?? 0)
+}
+
+export async function listOwnedVisaApplications(input: {
+  ownerUserId: string
+  limit: number
+  offset: number
+}) {
+  const db = requireDb()
+  const ownerCondition = eq(visaApplications.ownerUserId, input.ownerUserId)
+
+  const [items, totalRows, statusRows] = await Promise.all([
+    db
+      .select()
+      .from(visaApplications)
+      .where(ownerCondition)
+      .orderBy(desc(visaApplications.updatedAt))
+      .limit(input.limit)
+      .offset(input.offset),
+    db.select({ count: count() }).from(visaApplications).where(ownerCondition),
+    db
+      .select({ status: visaApplications.status, count: count() })
+      .from(visaApplications)
+      .where(ownerCondition)
+      .groupBy(visaApplications.status),
+  ])
+
+  return {
+    items,
+    total: totalRows[0]?.count ?? 0,
+    statusCounts: Object.fromEntries(
+      statusRows.map((row) => [row.status, row.count])
+    ),
+  }
 }
 
 export async function getAdminVisaApplicationDetail(applicationId: string) {

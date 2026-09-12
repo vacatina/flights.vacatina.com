@@ -1,6 +1,7 @@
 export * from "@/modules/visa-assistance/applications/domain/application-schema"
 export * from "@/modules/visa-assistance/applications/domain/application-types"
 export * from "@/modules/visa-assistance/applications/domain/constants"
+export * from "@/modules/visa-assistance/applications/domain/customer-dashboard"
 export * from "@/modules/visa-assistance/applications/domain/document-schema"
 export * from "@/modules/visa-assistance/applications/domain/form-types"
 export * from "@/modules/visa-assistance/applications/domain/pricing-snapshot"

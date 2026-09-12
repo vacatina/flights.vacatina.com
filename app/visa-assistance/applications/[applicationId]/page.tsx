@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
+import { getVisaApplicationResumeStep } from "@/modules/visa-assistance/applications/domain"
 import { loadOwnedVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
 
 export default async function VisaApplicationPage({
@@ -12,8 +13,8 @@ export default async function VisaApplicationPage({
   const { detail } = await loadOwnedVisaApplicationPage(applicationId, path)
 
   if (detail.application.status !== "draft") {
-    redirect(`${path}/confirmation`)
+    redirect(`/visa-requests/${applicationId}`)
   }
 
-  redirect(`${path}/trip`)
+  redirect(`${path}/${getVisaApplicationResumeStep(detail)}`)
 }

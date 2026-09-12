@@ -21,6 +21,7 @@ import {
   addVisaApplicationEvent,
   createVisaApplication,
   getVisaApplicationDetail,
+  listOwnedVisaApplications,
   saveVisaApplicationTravelers,
   submitVisaApplicationRecord,
   updateVisaApplication,
@@ -71,6 +72,18 @@ export async function getOwnedVisaApplication(
   }
 
   return detail
+}
+
+export async function getOwnedVisaApplicationList(input: {
+  actorUserId: string
+  page: number
+  pageSize: number
+}) {
+  return listOwnedVisaApplications({
+    ownerUserId: input.actorUserId,
+    limit: input.pageSize,
+    offset: (input.page - 1) * input.pageSize,
+  })
 }
 
 export async function saveVisaApplicationTrip(input: {

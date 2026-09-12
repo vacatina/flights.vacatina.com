@@ -85,12 +85,21 @@ export default async function VisaApplicationConfirmationPage({
               />
             </dl>
           </CardContent>
-          <CardFooter className="justify-center border-t bg-muted/20">
+          <CardFooter className="flex-col-reverse justify-center gap-3 border-t bg-muted/20 sm:flex-row">
             <Button
+              size="lg"
+              variant="outline"
               nativeButton={false}
               render={<Link href="/visa-assistance" />}
             >
-              Back to visa assistance
+              Start another request
+            </Button>
+            <Button
+              size="lg"
+              nativeButton={false}
+              render={<Link href="/visa-requests" />}
+            >
+              View my visa requests
               <ArrowRightIcon data-icon="inline-end" />
             </Button>
           </CardFooter>

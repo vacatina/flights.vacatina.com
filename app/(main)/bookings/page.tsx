@@ -14,6 +14,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { logFlightFlowError } from "@/lib/logging/flow-debug"
+import { CustomerDashboardHeader } from "@/components/customer-dashboard/customer-dashboard-header"
 
 interface BookingsPageProps {
   searchParams: Promise<{
@@ -24,7 +25,9 @@ interface BookingsPageProps {
   }>
 }
 
-export default async function BookingsPage({ searchParams }: BookingsPageProps) {
+export default async function BookingsPage({
+  searchParams,
+}: BookingsPageProps) {
   const [actor, resolvedSearchParams] = await Promise.all([
     getActorContext({ ensureGuestSession: false }),
     searchParams,
@@ -77,13 +80,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="space-y-1">
-          <p className="text-sm uppercase tracking-wide text-muted-foreground">Bookings center</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">My bookings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            View and manage your previous bookings.
-          </p>
-        </div>
+        <CustomerDashboardHeader activeSection="bookings" />
 
         {result ? (
           <BookingsListView
@@ -106,7 +103,9 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             <div className="mt-4">
               <Link
                 href={`/bookings?page=${normalizedQuery.page}${
-                  normalizedQuery.q ? `&q=${encodeURIComponent(normalizedQuery.q)}` : ""
+                  normalizedQuery.q
+                    ? `&q=${encodeURIComponent(normalizedQuery.q)}`
+                    : ""
                 }&status=${normalizedQuery.status}&sort=${normalizedQuery.sort}`}
                 className="text-base font-medium text-primary underline-offset-4 hover:underline"
               >
