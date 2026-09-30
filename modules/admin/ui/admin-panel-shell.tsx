@@ -13,6 +13,7 @@ type ActiveAdminPage =
   | "cancellations"
   | "changes"
   | "visa-pricing"
+  | "visa-listings"
   | "visa-applications"
   | "settings"
 
@@ -69,10 +70,10 @@ const navigation = [
     icon: "travel_explore",
   },
   {
-    href: "/admin/visa-pricing",
-    label: "Visa Pricing",
-    value: "visa-pricing",
-    icon: "request_quote",
+    href: "/admin/visa-listings",
+    label: "Visa Listings",
+    value: "visa-listings",
+    icon: "description",
   },
   {
     href: "/admin/settings",

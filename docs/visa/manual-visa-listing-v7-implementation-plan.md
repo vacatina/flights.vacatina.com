@@ -104,6 +104,17 @@ reviewed visa-only development migration/reset path. It must not touch flight,
 hotel, payment, user, or unrelated admin records. Document what the migration
 resets before running it in any shared environment.
 
+**Phase 1 migration decision:** `0011_manual_visa_listings.sql` is additive:
+it creates the two catalog tables and leaves the active legacy application,
+API, and pricing-rule data untouched while customers still use that journey.
+Before Phase 4 switches application foreign keys and document slots, use a
+separate reviewed, visa-only development reset. That reset may clear legacy
+`visa_application_*` rows (including uploads and events) and replace their
+schema, but must not delete `users`, flights, payments, or unrelated records.
+Do not run that reset in a shared environment without confirming the exact
+visa rows and R2 objects to discard. Catalog listings created in Phase 1
+must be preserved by the later reset.
+
 ## Admin experience
 
 Add **Visa Listings** to the existing admin navigation. Keep **Visa Requests**.
@@ -217,6 +228,36 @@ must recheck requirements after the final upload and remain safe against a
 double submit.
 
 ## Phases and review gates
+
+### Implementation checkpoint — 30 September 2026
+
+- Phase 1 catalog foundation and Phase 2 admin code are implemented.
+- Migration `0011_manual_visa_listings` adds the catalog. Migration
+  `0012_visa_listing_audit` adds its audit history. Both are applied to the
+  configured database; existing visa applications are preserved.
+- Admins use `/admin/visa-listings`, `/admin/visa-listings/new`, and
+  `/admin/visa-listings/[listingId]`. The editor uses the installed Base UI
+  shadcn components, React Hook Form, and shared Zod validation.
+- The editor supports descriptions, exact fees, a live total, ordered
+  required/optional documents of either scope, draft saves, customer preview,
+  atomic save-and-publish, duplication with new document IDs, and unpublishing.
+  Document edits clear the review confirmation. Published edits require a
+  complete listing and a reviewed checklist.
+- Visa Listings replaces Visa Pricing in admin navigation. The retired
+  pricing routes redirect to listings, and their active write actions are
+  disabled. Original page/action implementations are retained in
+  `modules/visa-assistance/pricing/**/legacy-*`; API and markup code remains.
+- Validation includes catalog domain tests, admin action/read guards,
+  document reorder tests, and an opt-in PostgreSQL lifecycle test. The
+  database test wraps all fixtures and publications in a transaction that
+  rolls back. Set `VISA_CATALOG_TEST_DATABASE_URL` to a migrated test database
+  to run `pnpm exec vitest run
+modules/visa-assistance/catalog/server/repository.integration.test.ts`.
+- TypeScript, focused lint, regression tests, and production build are the
+  code verification gates. Browser/authenticated visual acceptance is not
+  claimed; browser testing was omitted at the user's request.
+- Next is Phase 3: public search and details read published database listings.
+  Checkout snapshot selection and dynamic document uploads remain Phase 4.
 
 ### Phase 1 — Catalog foundation
 

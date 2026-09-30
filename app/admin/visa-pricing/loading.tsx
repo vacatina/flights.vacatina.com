@@ -1,14 +1,14 @@
 import { AdminPanelShell } from "@/modules/admin/ui/admin-panel-shell"
-import { VisaPricingAdminLoadingState } from "@/modules/visa-assistance/pricing/ui"
+import { VisaCatalogLoading } from "@/modules/visa-assistance/catalog/ui/loading-state"
 
 export default function VisaPricingLoading() {
   return (
     <AdminPanelShell
-      active="visa-pricing"
-      title="Visa Pricing"
-      description="Loading pricing rules and current supplier fees."
+      active="visa-listings"
+      title="Visa Listings"
+      description="Opening your visa catalog."
     >
-      <VisaPricingAdminLoadingState />
+      <VisaCatalogLoading />
     </AdminPanelShell>
   )
 }

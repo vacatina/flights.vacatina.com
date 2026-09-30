@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type Ref } from "react"
 import { ChevronsUpDownIcon, Globe2Icon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
   Command,
+  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
@@ -24,6 +25,9 @@ import {
 import { CountryFlag } from "@/modules/visa-assistance/ui/country-flag"
 
 interface CountrySearchFieldProps {
+  id?: string
+  buttonRef?: Ref<HTMLButtonElement>
+  onBlur?: () => void
   value?: string
   onChange: (countryCode: string) => void
   placeholder: string
@@ -33,6 +37,9 @@ interface CountrySearchFieldProps {
 }
 
 export function CountrySearchField({
+  id,
+  buttonRef,
+  onBlur,
   value,
   onChange,
   placeholder,
@@ -86,6 +93,9 @@ export function CountrySearchField({
       <PopoverTrigger
         render={
           <Button
+            id={id}
+            ref={buttonRef}
+            onBlur={onBlur}
             type="button"
             variant="outline"
             role="combobox"
@@ -158,23 +168,25 @@ export function CountrySearchField({
             className="max-h-80 scroll-py-2 p-1.5"
           >
             {matchingCountries.length ? (
-              matchingCountries.map((country) => (
-                <CommandItem
-                  key={country.code}
-                  value={country.code}
-                  data-checked={country.code === value}
-                  onSelect={() => selectCountry(country)}
-                  className="min-h-11 gap-3 rounded-lg px-3 py-2.5"
-                >
-                  <CountryFlag src={country.flagSrc} />
-                  <span className="min-w-0 flex-1 truncate">
-                    {country.name}
-                  </span>
-                  <span className="text-xs font-medium tracking-[0.08em] text-muted-foreground group-data-[checked=true]/command-item:mr-6">
-                    {country.code}
-                  </span>
-                </CommandItem>
-              ))
+              <CommandGroup>
+                {matchingCountries.map((country) => (
+                  <CommandItem
+                    key={country.code}
+                    value={country.code}
+                    data-checked={country.code === value}
+                    onSelect={() => selectCountry(country)}
+                    className="min-h-11 gap-3 rounded-lg px-3 py-2.5"
+                  >
+                    <CountryFlag src={country.flagSrc} />
+                    <span className="min-w-0 flex-1 truncate">
+                      {country.name}
+                    </span>
+                    <span className="text-xs font-medium tracking-[0.08em] text-muted-foreground group-data-[checked=true]/command-item:mr-6">
+                      {country.code}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             ) : (
               <div className="px-4 py-10 text-center">
                 <p className="text-sm font-medium">No country found</p>
