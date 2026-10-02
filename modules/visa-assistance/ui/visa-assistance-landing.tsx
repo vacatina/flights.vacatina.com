@@ -3,6 +3,10 @@ import Comparison from "@/components/visa-assistance/comparison"
 import HowItWorks from "@/components/visa-assistance/how-it-works"
 import { VisaPhotoHero } from "./visa-photo-hero"
 import { VisaSearchForm } from "@/modules/visa-assistance/ui/visa-search-form"
+import { VisaDestinations } from "./landing/visa-destinations"
+import { VisaTravelPlans } from "./landing/visa-travel-plans"
+import { VisaPreparation } from "./landing/visa-preparation"
+import { VisaFaq } from "./landing/visa-faq"
 
 export function VisaAssistanceLanding() {
   return (
@@ -19,7 +23,10 @@ export function VisaAssistanceLanding() {
         imagePosition="center 15%"
         alt="Travellers setting off on holiday with their luggage"
       />
-      <div className="relative mx-auto -mt-8 w-full max-w-screen-2xl px-5 sm:px-8">
+      <div
+        id="visa-search"
+        className="relative mx-auto -mt-8 w-full max-w-screen-2xl scroll-mt-28 px-5 sm:px-8"
+      >
         <Card className="gap-0 overflow-visible rounded-[26px] border border-primary/10 bg-card p-5 shadow-[0_16px_45px_-25px_rgba(10,19,69,0.35)] ring-0 sm:p-8">
           <CardHeader className="sr-only">
             <CardTitle>Search our visa services</CardTitle>
@@ -29,6 +36,8 @@ export function VisaAssistanceLanding() {
           </CardContent>
         </Card>
       </div>
+      <VisaDestinations />
+      <VisaTravelPlans />
       <section className="py-16 md:py-20">
         <div className="mx-auto w-full max-w-screen-2xl px-5 sm:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-12">
@@ -43,7 +52,6 @@ export function VisaAssistanceLanding() {
           <Comparison />
         </div>
       </section>
-
       <section className="pb-16 md:pb-20">
         <div className="mx-auto w-full max-w-screen-2xl px-5 sm:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-12">
@@ -57,6 +65,8 @@ export function VisaAssistanceLanding() {
           <HowItWorks />
         </div>
       </section>
+      <VisaPreparation />
+      <VisaFaq />
     </main>
   )
 }
