@@ -16,8 +16,7 @@ const publicFields = [
   "passportValidityText",
   "additionalNotes",
   "feeCurrency",
-  "governmentFeeMinor",
-  "processingFeeMinor",
+  "priceMinor",
 ] as const
 
 export type PublicVisaListing = Pick<
@@ -50,15 +49,12 @@ export function publicListingPath(listing: PublicVisaListing) {
 }
 
 export function publicListingFees(listing: PublicVisaListing) {
-  const { governmentFeeMinor, processingFeeMinor } = listing
   const total = getListingEstimate(listing)
-  if (!total || governmentFeeMinor === null || processingFeeMinor === null) {
-    throw new Error("Published visa listing is missing its fees")
+  if (!total) {
+    throw new Error("Published visa listing is missing its price")
   }
   return {
     total,
-    government: { ...total, amount: governmentFeeMinor },
-    processing: { ...total, amount: processingFeeMinor },
   }
 }
 

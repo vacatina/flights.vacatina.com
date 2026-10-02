@@ -7,11 +7,9 @@ import {
 import { visaListingSnapshotSchema } from "./listing-snapshot"
 
 describe("frozen manual visa estimates", () => {
-  it("multiplies both exact fees by traveler count", () => {
+  it("multiplies the exact price by traveler count", () => {
     const snapshot = applicationFixture().application.listingSnapshot
     const pricing = createApplicationPricing(snapshot, 3)
-    expect(pricing.governmentFee.amount).toBe("7500")
-    expect(pricing.processingFee.amount).toBe("3705")
     expect(pricing.totalMoney.amount).toBe("11205")
     expect(pricing.travelerCount).toBe(3)
   })
@@ -33,17 +31,15 @@ describe("frozen manual visa estimates", () => {
   it("supports zero fees and rejects invalid counts and snapshots", () => {
     const snapshot = applicationFixture().application.listingSnapshot
     expect(
-      createApplicationPricing(
-        { ...snapshot, governmentFeeMinor: "0", processingFeeMinor: "0" },
-        2
-      ).totalMoney.amount
+      createApplicationPricing({ ...snapshot, priceMinor: "0" }, 2).totalMoney
+        .amount
     ).toBe("0")
     for (const count of [0, 11, 1.5, NaN])
       expect(() => createApplicationPricing(snapshot, count)).toThrow()
     expect(
       visaListingSnapshotSchema.safeParse({
         ...snapshot,
-        governmentFeeMinor: "-1",
+        priceMinor: "-1",
       }).success
     ).toBe(false)
     expect(

@@ -90,8 +90,7 @@ describe.skipIf(!process.env.VISA_CATALOG_TEST_DATABASE_URL)(
                 shortSummary: "Holiday assistance",
                 fullDescription: "Original description",
                 feeCurrency: "USD",
-                governmentFee: "25",
-                processingFee: "12.35",
+                price: "37.35",
                 documentsReviewed: true,
                 documents: [
                   { label: "Passport", required: true, scope: "per_traveler" },
@@ -129,7 +128,7 @@ describe.skipIf(!process.env.VISA_CATALOG_TEST_DATABASE_URL)(
             await saveVisaListing(
               {
                 ...toListingFormValues(listing),
-                governmentFee: "90",
+                price: "90",
                 fullDescription: "New description",
                 documents: [],
               },

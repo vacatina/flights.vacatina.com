@@ -41,10 +41,7 @@ export function ListingTextField({
     id: name,
     placeholder,
     maxLength,
-    inputMode:
-      name === "governmentFee" || name === "processingFee"
-        ? ("decimal" as const)
-        : ("text" as const),
+    inputMode: name === "price" ? ("decimal" as const) : ("text" as const),
     "aria-invalid": Boolean(error),
     "aria-describedby": error
       ? `${name}-error`

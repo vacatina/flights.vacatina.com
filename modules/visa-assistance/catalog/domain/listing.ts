@@ -48,8 +48,7 @@ export const visaListingInputSchema = z
       .toUpperCase()
       .refine(isDisplayCurrencyCode, "Select a supported currency")
       .nullish(),
-    governmentFee: z.string().trim().nullish(),
-    processingFee: z.string().trim().nullish(),
+    price: z.string().trim().nullish(),
     documentsReviewed: z.boolean().default(false),
     documents: z.array(visaListingDocumentSchema).max(30),
   })
@@ -58,16 +57,14 @@ export const visaListingInputSchema = z
     message: "Choose a different destination",
   })
   .superRefine((value, context) => {
-    for (const key of ["governmentFee", "processingFee"] as const) {
-      try {
-        parseListingFee(value[key], value.feeCurrency ?? null)
-      } catch (error) {
-        context.addIssue({
-          code: "custom",
-          path: [key],
-          message: error instanceof Error ? error.message : "Enter a valid fee",
-        })
-      }
+    try {
+      parseListingFee(value.price, value.feeCurrency ?? null)
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        path: ["price"],
+        message: error instanceof Error ? error.message : "Enter a valid price",
+      })
     }
     const ids = value.documents.flatMap((document) =>
       document.id ? [document.id] : []
@@ -89,8 +86,7 @@ export function parseVisaListingFees(input: ParsedVisaListingInput) {
 
   return {
     feeCurrency: currency,
-    governmentFeeMinor: parseListingFee(input.governmentFee, currency),
-    processingFeeMinor: parseListingFee(input.processingFee, currency),
+    priceMinor: parseListingFee(input.price, currency),
   }
 }
 
@@ -99,17 +95,15 @@ export function getListingPublishIssues(input: {
   shortSummary: string
   fullDescription: string
   feeCurrency: string | null
-  governmentFeeMinor: string | null
-  processingFeeMinor: string | null
+  priceMinor: string | null
   documentsReviewed: boolean
 }) {
   const issues: string[] = []
   if (!input.title.trim()) issues.push("Add a public title")
   if (!input.shortSummary.trim()) issues.push("Add a short summary")
   if (!input.fullDescription.trim()) issues.push("Add a full description")
-  if (!input.feeCurrency) issues.push("Select a fee currency")
-  if (input.governmentFeeMinor === null) issues.push("Enter the government fee")
-  if (input.processingFeeMinor === null) issues.push("Enter the processing fee")
+  if (!input.feeCurrency) issues.push("Select a price currency")
+  if (input.priceMinor === null) issues.push("Enter the price")
   if (!input.documentsReviewed) issues.push("Review the document checklist")
   return issues
 }

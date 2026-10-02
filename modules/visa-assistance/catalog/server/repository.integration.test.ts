@@ -90,15 +90,13 @@ describe.skipIf(!process.env.VISA_CATALOG_TEST_DATABASE_URL)(
                 title: code,
                 shortSummary: "Tourist visits",
                 fullDescription: "Visa assistance for a holiday.",
-                governmentFee: "0",
-                processingFee: "12.35",
+                price: "12.35",
                 documentsReviewed: true,
                 documents: toListingFormValues(draft).documents.toReversed(),
               },
               actorId
             )
-            expect(edited.governmentFeeMinor).toBe("0")
-            expect(edited.processingFeeMinor).toBe("1235")
+            expect(edited.priceMinor).toBe("1235")
             expect(edited.documents.map((document) => document.id)).toEqual(
               draft.documents.map((document) => document.id).toReversed()
             )

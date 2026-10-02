@@ -10,20 +10,20 @@ export function parseListingFee(
   currency: string | null
 ) {
   if (!value?.trim()) return null
-  if (!currency) throw new Error("Choose a currency before entering fees")
+  if (!currency) throw new Error("Choose a currency before entering a price")
 
   const normalized = value.trim()
   const precision = getCurrencyPrecision(currency)
   const fraction = normalized.split(".")[1] ?? ""
   if (!/^\d+(?:\.\d+)?$/.test(normalized) || fraction.length > precision) {
     throw new Error(
-      `Enter a nonnegative fee with at most ${precision} decimals`
+      `Enter a nonnegative price with at most ${precision} decimals`
     )
   }
 
   const amount = decimalToScaledInteger(normalized, precision)
   if (amount.toString().length > 30) {
-    throw new Error("Fee exceeds the supported amount")
+    throw new Error("Price exceeds the supported amount")
   }
   return amount.toString()
 }
@@ -38,21 +38,14 @@ export function listingFeeDecimal(
 
 export function getListingEstimate(input: {
   feeCurrency: string | null
-  governmentFeeMinor: string | null
-  processingFeeMinor: string | null
+  priceMinor: string | null
 }): SerializedMoney | null {
-  const { feeCurrency, governmentFeeMinor, processingFeeMinor } = input
-  if (
-    !feeCurrency ||
-    governmentFeeMinor === null ||
-    processingFeeMinor === null
-  ) {
+  const { feeCurrency, priceMinor } = input
+  if (!feeCurrency || priceMinor === null) {
     return null
   }
   return {
-    amount: (
-      BigInt(governmentFeeMinor) + BigInt(processingFeeMinor)
-    ).toString(),
+    amount: priceMinor,
     currency: feeCurrency,
     scale: getCurrencyPrecision(feeCurrency),
   }

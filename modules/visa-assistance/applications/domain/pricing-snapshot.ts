@@ -17,8 +17,6 @@ const moneySchema = z
   )
 
 export const visaApplicationPricingSnapshotSchema = z.object({
-  governmentFee: moneySchema,
-  processingFee: moneySchema,
   totalMoney: moneySchema,
   travelerCount: z.number().int().min(1).max(10),
   pricedAt: z.iso.datetime(),
@@ -36,13 +34,10 @@ export function createApplicationPricing(
   z.number().int().min(1).max(10).parse(travelerCount)
   const currency = snapshot.feeCurrency
   const scale = getCurrencyPrecision(currency)
-  const government = BigInt(snapshot.governmentFeeMinor) * BigInt(travelerCount)
-  const processing = BigInt(snapshot.processingFeeMinor) * BigInt(travelerCount)
+  const total = BigInt(snapshot.priceMinor) * BigInt(travelerCount)
   return visaApplicationPricingSnapshotSchema.parse({
-    governmentFee: { amount: government.toString(), currency, scale },
-    processingFee: { amount: processing.toString(), currency, scale },
     totalMoney: {
-      amount: (government + processing).toString(),
+      amount: total.toString(),
       currency,
       scale,
     },
@@ -57,14 +52,8 @@ export function areVisaApplicationPricesEquivalent(
 ) {
   return (
     left.travelerCount === right.travelerCount &&
-    (["governmentFee", "processingFee", "totalMoney"] as const).every((key) => {
-      const a = left[key]
-      const b = right[key]
-      return (
-        a.amount === b.amount &&
-        a.currency === b.currency &&
-        a.scale === b.scale
-      )
-    })
+    left.totalMoney.amount === right.totalMoney.amount &&
+    left.totalMoney.currency === right.totalMoney.currency &&
+    left.totalMoney.scale === right.totalMoney.scale
   )
 }

@@ -575,11 +575,7 @@ export const visaListings = pgTable(
     passportValidityText: text("passport_validity_text"),
     additionalNotes: text("additional_notes"),
     feeCurrency: text("fee_currency"),
-    governmentFeeMinor: numeric("government_fee_minor", {
-      precision: 30,
-      scale: 0,
-    }),
-    processingFeeMinor: numeric("processing_fee_minor", {
+    priceMinor: numeric("price_minor", {
       precision: 30,
       scale: 0,
     }),
@@ -627,9 +623,9 @@ export const visaListings = pgTable(
       "visa_listings_currency_check",
       sql`${table.feeCurrency} is null or ${table.feeCurrency} ~ '^[A-Z]{3}$'`
     ),
-    feesCheck: check(
-      "visa_listings_fees_check",
-      sql`(${table.governmentFeeMinor} is null or ${table.governmentFeeMinor} >= 0) and (${table.processingFeeMinor} is null or ${table.processingFeeMinor} >= 0)`
+    priceCheck: check(
+      "visa_listings_price_check",
+      sql`${table.priceMinor} is null or ${table.priceMinor} >= 0`
     ),
   })
 )

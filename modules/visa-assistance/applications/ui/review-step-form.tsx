@@ -111,9 +111,8 @@ export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
               pricing={application.pricingSnapshot}
             />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Includes government and Vacatina processing fees for all
-              travelers. No payment now. Our team will confirm the final quote
-              after review.
+              Includes the estimated price for all travelers. No payment now.
+              Our team will confirm the final quote after review.
             </p>
           </section>
 

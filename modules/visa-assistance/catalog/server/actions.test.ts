@@ -48,11 +48,11 @@ describe("visa catalog admin actions", () => {
   it("returns field validation without writing invalid fees", async () => {
     const result = await saveVisaListingAction({
       intent: "save",
-      values: { ...values, governmentFee: "1.001" },
+      values: { ...values, price: "1.001" },
     })
     expect(result).toMatchObject({
       ok: false,
-      fields: [{ path: "governmentFee" }],
+      fields: [{ path: "price" }],
     })
     expect(saveVisaListing).not.toHaveBeenCalled()
   })

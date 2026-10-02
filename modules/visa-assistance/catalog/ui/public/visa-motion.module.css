@@ -1,0 +1,13 @@
+@keyframes drift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .photograph {
+    animation: drift 18s ease-in-out alternate infinite;
+  }
+}

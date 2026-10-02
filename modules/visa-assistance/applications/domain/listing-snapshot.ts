@@ -27,8 +27,7 @@ export const visaListingSnapshotSchema = z
     passportValidityText: text,
     additionalNotes: text,
     feeCurrency: z.string().refine(isDisplayCurrencyCode),
-    governmentFeeMinor: amount,
-    processingFeeMinor: amount,
+    priceMinor: amount,
     reviewedAt: z.iso.datetime().nullable(),
     capturedAt: z.iso.datetime(),
     documents: z

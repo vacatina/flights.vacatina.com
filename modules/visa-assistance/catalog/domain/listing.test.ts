@@ -42,25 +42,24 @@ describe("visa listing catalog validation", () => {
     const input = visaListingInputSchema.parse({
       ...draft,
       feeCurrency: "USD",
-      governmentFee: "0",
-      processingFee: "12.35",
+      price: "12.35",
     })
     expect(parseVisaListingFees(input)).toEqual({
       feeCurrency: "USD",
-      governmentFeeMinor: "0",
-      processingFeeMinor: "1235",
+      priceMinor: "1235",
     })
     expect(listingFeeDecimal("1235", "USD")).toBe("12.35")
+    expect(parseVisaListingFees({ ...input, price: "0" }).priceMinor).toBe("0")
   })
 
   it("rejects silent rounding and negative fees", () => {
-    const base = { ...draft, feeCurrency: "USD", governmentFee: "1.001" }
+    const base = { ...draft, feeCurrency: "USD", price: "1.001" }
     expect(() =>
       parseVisaListingFees(visaListingInputSchema.parse(base))
     ).toThrow()
     expect(() =>
       parseVisaListingFees(
-        visaListingInputSchema.parse({ ...base, governmentFee: "-1" })
+        visaListingInputSchema.parse({ ...base, price: "-1" })
       )
     ).toThrow()
   })
@@ -71,8 +70,7 @@ describe("visa listing catalog validation", () => {
       shortSummary: "",
       fullDescription: "Details",
       feeCurrency: "USD",
-      governmentFeeMinor: "0",
-      processingFeeMinor: "1000",
+      priceMinor: "0",
       documentsReviewed: false,
     })
     expect(issues).toEqual([
@@ -85,8 +83,7 @@ describe("visa listing catalog validation", () => {
         shortSummary: "Summary",
         fullDescription: "Details",
         feeCurrency: "USD",
-        governmentFeeMinor: "0",
-        processingFeeMinor: "1000",
+        priceMinor: "0",
         documentsReviewed: true,
       })
     ).toEqual([])

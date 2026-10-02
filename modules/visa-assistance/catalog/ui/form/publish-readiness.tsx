@@ -25,8 +25,7 @@ export function listingFormPublishIssues(values: VisaListingInput) {
     shortSummary: values.shortSummary ?? "",
     fullDescription: values.fullDescription ?? "",
     feeCurrency: values.feeCurrency ?? null,
-    governmentFeeMinor: fee(values.governmentFee),
-    processingFeeMinor: fee(values.processingFee),
+    priceMinor: fee(values.price),
     documentsReviewed: values.documentsReviewed ?? false,
   })
   if (!values.nationalityCode) issues.unshift("Select a passport country")

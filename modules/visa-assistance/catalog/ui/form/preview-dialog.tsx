@@ -42,14 +42,7 @@ export function ListingPreviewDialog({
   try {
     fees = getListingEstimate({
       feeCurrency: values.feeCurrency ?? null,
-      governmentFeeMinor: parseListingFee(
-        values.governmentFee,
-        values.feeCurrency ?? null
-      ),
-      processingFeeMinor: parseListingFee(
-        values.processingFee,
-        values.feeCurrency ?? null
-      ),
+      priceMinor: parseListingFee(values.price, values.feeCurrency ?? null),
     })
   } catch {
     /* A draft can be previewed before its fee fields are valid. */
@@ -66,7 +59,7 @@ export function ListingPreviewDialog({
         <DialogHeader>
           <DialogTitle>Customer preview</DialogTitle>
           <DialogDescription>
-            Review the visa details, estimated fees, and upload checklist.
+            Review the visa details, estimated price, and upload checklist.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-6">
@@ -163,18 +156,8 @@ export function ListingPreviewDialog({
           </section>
           <Separator />
           <section className="flex flex-col gap-2">
-            <h3 className="font-medium">Estimated fees per traveler</h3>
+            <h3 className="font-medium">Price per traveler</h3>
             <dl className="flex flex-col gap-2">
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Government fee</dt>
-                <dd>{formatFee(values.governmentFee, values.feeCurrency)}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">
-                  Vacatina processing fee
-                </dt>
-                <dd>{formatFee(values.processingFee, values.feeCurrency)}</dd>
-              </div>
               <div className="flex justify-between gap-4 font-semibold">
                 <dt>Estimated total</dt>
                 <dd>{fees ? formatSerializedMoney(fees) : "Not entered"}</dd>
@@ -199,22 +182,4 @@ export function ListingPreviewDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-function formatFee(
-  value: string | null | undefined,
-  currency: string | null | undefined
-) {
-  try {
-    const amount = parseListingFee(value, currency ?? null)
-    if (amount === null || !currency) return "Not entered"
-    const estimate = getListingEstimate({
-      feeCurrency: currency,
-      governmentFeeMinor: amount,
-      processingFeeMinor: "0",
-    })
-    return estimate ? formatSerializedMoney(estimate) : "Not entered"
-  } catch {
-    return "Check fee"
-  }
 }

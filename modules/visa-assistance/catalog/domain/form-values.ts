@@ -18,8 +18,7 @@ export const EMPTY_LISTING_VALUES: ParsedVisaListingInput = {
   passportValidityText: "",
   additionalNotes: "",
   feeCurrency: "USD",
-  governmentFee: "",
-  processingFee: "",
+  price: "",
   documentsReviewed: false,
   documents: [],
 }
@@ -46,14 +45,7 @@ export function toListingFormValues(
     feeCurrency: isDisplayCurrencyCode(listing.feeCurrency)
       ? listing.feeCurrency
       : null,
-    governmentFee: listingFeeDecimal(
-      listing.governmentFeeMinor,
-      listing.feeCurrency
-    ),
-    processingFee: listingFeeDecimal(
-      listing.processingFeeMinor,
-      listing.feeCurrency
-    ),
+    price: listingFeeDecimal(listing.priceMinor, listing.feeCurrency),
     documentsReviewed: duplicate ? false : listing.documentsReviewed,
     documents: listing.documents.map((document) => ({
       id: duplicate ? undefined : document.id,

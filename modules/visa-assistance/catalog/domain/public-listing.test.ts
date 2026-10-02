@@ -20,35 +20,31 @@ describe("public visa listing", () => {
   it("uses exact admin fees with no markup or floating point arithmetic", () => {
     const listing = toPublicVisaListing(
       listingFixture({
-        governmentFeeMinor: "999999999999999999999999999999",
-        processingFeeMinor: "1",
+        priceMinor: "999999999999999999999999999999",
       })
     )
     expect(publicListingFees(listing).total).toEqual({
       currency: "USD",
       scale: 2,
-      amount: "1000000000000000000000000000000",
+      amount: "999999999999999999999999999999",
     })
-    expect(publicListingFees(listing).processing.amount).toBe("1")
   })
   it("supports zero fees and zero-decimal currencies", () => {
     const fees = publicListingFees(
       toPublicVisaListing(
         listingFixture({
           feeCurrency: "JPY",
-          governmentFeeMinor: "0",
-          processingFeeMinor: "1235",
+          priceMinor: "1235",
         })
       )
     )
-    expect(fees.government.amount).toBe("0")
     expect(fees.total).toEqual({ amount: "1235", currency: "JPY", scale: 0 })
   })
   it("does not manufacture a quote when published data lacks fees", () => {
     expect(() =>
       publicListingFees(
-        toPublicVisaListing(listingFixture({ processingFeeMinor: null }))
+        toPublicVisaListing(listingFixture({ priceMinor: null }))
       )
-    ).toThrow("missing its fees")
+    ).toThrow("missing its price")
   })
 })

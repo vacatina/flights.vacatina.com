@@ -108,8 +108,8 @@ describe("public visa catalog UI", () => {
     expect(
       screen.getByText("Once per request, shared by all travelers")
     ).toBeTruthy()
-    expect(screen.getByText("USD 2500")).toBeTruthy()
-    expect(screen.getByText("USD 1235")).toBeTruthy()
+    expect(screen.queryByText("Government fee")).toBeNull()
+    expect(screen.queryByText("Processing fee")).toBeNull()
     expect(screen.getByText("USD 3735")).toBeTruthy()
     expect(
       screen.getByRole("button", { name: /Start visa request/ })

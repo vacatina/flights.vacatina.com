@@ -1,3 +1,4 @@
+import { visaPanel } from "./visa-surfaces"
 import Link from "next/link"
 import { ArrowLeftIcon, InfoIcon } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -11,14 +12,14 @@ import { ListingFeeSummary } from "./fee-summary"
 
 export function PublicVisaDetails({ listing }: { listing: PublicVisaDetail }) {
   return (
-    <main>
+    <main className="bg-primary/[0.035]">
       <VisaRouteHeading
         nationality={listing.nationalityCode}
         destination={listing.destinationCode}
         title={listing.title}
         description={listing.shortSummary}
       />
-      <div className="w-full mx-auto flex max-w-screen-2xl flex-col gap-7 px-4 py-10 md:px-8 md:py-14">
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-7 px-4 py-10 md:px-8 md:py-14">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             role="link"
@@ -36,9 +37,9 @@ export function PublicVisaDetails({ listing }: { listing: PublicVisaDetail }) {
           </Button>
           <ListingReviewedDate value={listing.reviewedAt} />
         </div>
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="flex min-w-0 flex-col gap-6">
-            <Card>
+            <Card className={visaPanel}>
               <CardHeader>
                 <CardTitle>
                   <h2>About this visa</h2>
@@ -64,7 +65,7 @@ export function PublicVisaDetails({ listing }: { listing: PublicVisaDetail }) {
               </CardContent>
             </Card>
             <DocumentOverview documents={listing.documents} />
-            <Alert>
+            <Alert className="rounded-2xl border-primary/15 bg-card">
               <InfoIcon />
               <AlertTitle>Before you travel</AlertTitle>
               <AlertDescription>

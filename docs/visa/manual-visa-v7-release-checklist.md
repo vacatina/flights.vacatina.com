@@ -2,11 +2,17 @@
 
 Date: 30 September 2026.
 
+Pricing amendment, 2 October 2026: the catalog and frozen requests now use one
+price per traveler. Migration `0014_visa_single_price` replaces the fee split.
+See [development seed](./manual-visa-development-seed.md) for the three sample
+routes, safe reruns, and recoverable test-data cleanup. Verification below is
+the original Phase 5 record, not the October 2 validation report.
+
 ## Scope and runtime contract
 
 The database catalog is the only active source. Admins publish selected
 passport-country/destination/visa-type combinations with descriptions, final
-government and Vacatina processing fees, and an ordered document checklist.
+price per traveler, and an ordered document checklist.
 The checklist can be required/optional and per traveler/once per request.
 
 Drafts freeze the listing, checklist, currency, and exact unit fees. Changing

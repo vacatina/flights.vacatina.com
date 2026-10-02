@@ -43,16 +43,15 @@ const currencies = [
 
 export function ListingFeesSection() {
   const { control } = useFormContext<VisaListingInput>()
-  const [currency, governmentFee, processingFee] = useWatch({
+  const [currency, price] = useWatch({
     control,
-    name: ["feeCurrency", "governmentFee", "processingFee"],
+    name: ["feeCurrency", "price"],
   })
   let estimate = null
   try {
     estimate = getListingEstimate({
       feeCurrency: currency ?? null,
-      governmentFeeMinor: parseListingFee(governmentFee, currency ?? null),
-      processingFeeMinor: parseListingFee(processingFee, currency ?? null),
+      priceMinor: parseListingFee(price, currency ?? null),
     })
   } catch {
     /* Invalid partial input is handled by the field validation. */
@@ -61,9 +60,9 @@ export function ListingFeesSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Estimated fees</CardTitle>
+        <CardTitle>Price</CardTitle>
         <CardDescription>
-          Enter the final customer fees for one traveler.
+          Enter one complete customer price per traveler, including your margin.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -102,27 +101,19 @@ export function ListingFeesSection() {
                   </SelectContent>
                 </Select>
                 <FieldDescription>
-                  Both fees use this currency. Customer display conversion is
-                  separate.
+                  Customer display conversion is separate from this source
+                  price.
                 </FieldDescription>
                 <FieldError errors={[fieldState.error]} />
               </Field>
             )}
           />
-          <FieldGroup className="grid gap-5 md:grid-cols-2">
-            <ListingTextField
-              name="governmentFee"
-              label="Government fee"
-              placeholder="0.00"
-              description="Enter 0 if there is no government fee."
-            />
-            <ListingTextField
-              name="processingFee"
-              label="Vacatina processing fee"
-              placeholder="25.00"
-              description="Include your service margin in this amount."
-            />
-          </FieldGroup>
+          <ListingTextField
+            name="price"
+            label="Price per traveler"
+            placeholder="e.g. 75.00"
+            description="The full estimated price. Enter 0 for a free service."
+          />
         </FieldGroup>
       </CardContent>
       <CardFooter className="flex-wrap justify-between gap-3">
@@ -130,7 +121,7 @@ export function ListingFeesSection() {
           Estimated total per traveler
         </span>
         <strong className="text-lg tabular-nums">
-          {estimate ? formatSerializedMoney(estimate) : "Enter both fees"}
+          {estimate ? formatSerializedMoney(estimate) : "Enter a price"}
         </strong>
       </CardFooter>
     </Card>

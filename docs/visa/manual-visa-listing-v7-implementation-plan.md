@@ -1,5 +1,10 @@
 # Manual Visa Listing V7 — Implementation Plan
 
+Updated 2 October 2026: one price replaces the government/processing fee split.
+Historical phase completion notes below describe the original implementation;
+the product contract here and [seed guide](./manual-visa-development-seed.md)
+describe the current pricing model.
+
 ## Goal
 
 Make Vacatina's database the only active source for visa listings. An admin
@@ -25,11 +30,11 @@ this work.
 2. Admins create only the combinations Vacatina supports. A listing is either
    `draft` or `published`; only published listings appear to customers.
 3. Prices are final, customer-facing **per-traveler estimates** entered by the
-   admin: government fee and Vacatina processing fee, both in one currency.
+   admin: one price per traveler, in one currency.
    Zero is valid. There is no markup calculation in this flow. The displayed
-   request estimate is `(government fee + processing fee) × traveler count`.
-   The draft freezes the unit fees; changing the draft's traveler count
-   recalculates its total from those frozen unit fees.
+   request estimate is `price per traveler × traveler count`.
+   The draft freezes the unit price; changing the draft's traveler count
+   recalculates its total from that frozen unit price.
 4. Each listing owns an ordered document checklist. Every item has a label,
    optional instructions, a required/optional flag, and a scope: **each
    traveler** or **once per request**. Initially, one uploaded file satisfies
@@ -60,7 +65,7 @@ country-combination generator.
 - `eligibility_notes`, `processing_time_text`, `validity_text`,
   `max_stay_text`, `entries_text`, `passport_validity_text`,
   `additional_notes`: optional structured copy shown only when provided.
-- `fee_currency`, `government_fee_minor`, `processing_fee_minor`: exact money
+- `fee_currency`, `price_minor`: exact money
   values in the listing currency. Use the existing currency registry to
   validate precision and convert admin-entered decimal text to integer minor
   units. No floating-point money arithmetic.
@@ -141,8 +146,8 @@ Use one page with four short sections instead of a large wizard:
    validity, stay, entries, passport, and additional notes. Use labeled
    multiline inputs with examples and length guidance. Plain text is enough
    for V7; no rich-text editor or HTML input.
-3. **Estimated fees** — currency, government fee, Vacatina processing fee,
-   and a live per-traveler total. Show that prices are final entered values.
+3. **Price** — currency, one price per traveler, and a live estimate.
+   Show that the amount includes the full customer-facing price and margin.
 4. **Required documents** — an editable ordered list of rows. Each row has
    label, instructions, required toggle, and scope selector. Provide add,
    remove, and reorder controls. Show a small customer-view preview per row.

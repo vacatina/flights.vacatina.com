@@ -1,3 +1,4 @@
+import { visaPanel } from "./visa-surfaces"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -14,7 +15,7 @@ export function DocumentOverview({
   documents: PublicVisaDocument[]
 }) {
   return (
-    <Card>
+    <Card className={visaPanel}>
       <CardHeader>
         <CardTitle>
           <h2>Documents to prepare</h2>
@@ -28,7 +29,10 @@ export function DocumentOverview({
         {documents.length ? (
           <ul className="flex flex-col gap-6">
             {documents.map((document) => (
-              <li key={document.id} className="flex flex-col gap-2">
+              <li
+                key={document.id}
+                className="flex flex-col gap-2 rounded-2xl border border-primary/10 bg-primary/[0.035] p-4"
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-medium [overflow-wrap:anywhere]">
                     {document.label}
