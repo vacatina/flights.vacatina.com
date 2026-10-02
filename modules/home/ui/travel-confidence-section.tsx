@@ -26,7 +26,7 @@ export function TravelConfidenceSection() {
   return (
     <section
       aria-labelledby="travel-confidence-title"
-      className="mx-auto max-w-7xl px-4 pb-16 md:px-8 lg:px-12"
+      className="w-full mx-auto max-w-screen-2xl px-4 pb-16 md:px-8 lg:px-12"
     >
       <div className="border-t border-border pt-10">
         <h2

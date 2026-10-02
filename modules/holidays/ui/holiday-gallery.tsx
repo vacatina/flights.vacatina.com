@@ -38,7 +38,7 @@ export function HolidayGallery({
               src={holidayImage(photo.file)!}
               alt={photo.alt}
               fill
-              sizes="(min-width: 1024px) 530px, 90vw"
+              sizes="(min-width: 1536px) 790px, (min-width: 1024px) 52vw, 90vw"
               className="object-cover"
             />
             <span

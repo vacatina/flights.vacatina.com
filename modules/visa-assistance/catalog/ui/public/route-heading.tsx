@@ -14,7 +14,7 @@ export function VisaRouteHeading({
 }) {
   return (
     <header className="border-b bg-muted/30">
-      <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-10 md:px-8 md:py-14">
+      <div className="w-full mx-auto flex max-w-screen-2xl flex-col gap-5 px-4 py-10 md:px-8 md:py-14">
         <p className="text-sm font-medium text-primary">
           Vacatina visa assistance
         </p>

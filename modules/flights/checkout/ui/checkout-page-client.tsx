@@ -559,7 +559,7 @@ export function CheckoutPageClient({ data, clerkEnabled }: CheckoutPageClientPro
 
   return (
     <main className="min-h-svh bg-background py-5 text-foreground md:py-8">
-      <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
+      <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-8">
         <div className="space-y-5">
           <Breadcrumb>
             <BreadcrumbList>
@@ -996,7 +996,7 @@ function CheckoutMobileSummary(input: {
             : ""
       )}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+      <div className="w-full mx-auto flex max-w-screen-2xl items-center justify-between gap-4">
         <div>
           <p className="text-xs text-muted-foreground">Total due</p>
           <p className="text-base font-semibold">

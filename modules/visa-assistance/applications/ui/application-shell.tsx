@@ -52,7 +52,7 @@ export function VisaApplicationShell({
 
   return (
     <main className="min-h-[calc(100svh-5rem)] bg-muted/30 py-8 md:py-12">
-      <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
+      <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex flex-col gap-2">
             <Badge className="w-fit" variant="secondary">

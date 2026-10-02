@@ -19,7 +19,7 @@ export function ChangeFlightFlow({ context }: { context: any }) {
   const selectedLeg = eligibleLegs.find((leg: any) => leg.sliceId === selectedSliceId) ?? null
 
   return (
-    <div className="mx-auto max-w-6xl space-y-7 pb-10">
+    <div className="w-full mx-auto max-w-screen-2xl space-y-7 pb-10">
       <header className="border-b pb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Flight change</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Search replacement flights</h1>

@@ -15,7 +15,7 @@ export default async function BaggagePage({ params }: { params: Promise<{ bookin
 
   return (
     <main className="min-h-svh py-8">
-      <div className="mx-auto max-w-3xl space-y-6 px-4">
+      <div className="w-full mx-auto max-w-screen-2xl space-y-6 px-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.08em] text-primary">Manage booking</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Add baggage</h1>

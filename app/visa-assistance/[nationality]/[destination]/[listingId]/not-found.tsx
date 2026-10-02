@@ -10,7 +10,7 @@ import {
 
 export default function VisaListingNotFound() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-20">
+    <main className="w-full mx-auto max-w-screen-2xl px-4 py-20">
       <Empty className="rounded-xl border">
         <EmptyHeader>
           <EmptyTitle>This visa service is not available</EmptyTitle>

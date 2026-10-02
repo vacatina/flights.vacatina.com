@@ -7,14 +7,14 @@ export function PublicVisaLoading() {
         Loading visa services…
       </span>
       <div className="border-b bg-muted/30">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-10 md:px-8 md:py-14">
+        <div className="w-full mx-auto flex max-w-screen-2xl flex-col gap-5 px-4 py-10 md:px-8 md:py-14">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-12 w-full max-w-xl" />
           <Skeleton className="h-5 w-full max-w-2xl" />
           <Skeleton className="h-12 w-full max-w-md" />
         </div>
       </div>
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 md:grid-cols-2 md:px-8">
+      <div className="w-full mx-auto grid max-w-screen-2xl gap-6 px-4 py-10 md:grid-cols-2 md:px-8">
         {[0, 1].map((index) => (
           <div
             key={index}

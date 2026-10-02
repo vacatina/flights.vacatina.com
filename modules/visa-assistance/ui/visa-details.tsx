@@ -27,7 +27,7 @@ export function VisaDetails({ result }: VisaDetailsProps) {
     <main className="bg-background">
       <VisaDetailsHero result={result} />
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-14 px-4 py-12 md:gap-20 md:px-8 md:py-16 lg:px-12 lg:py-20">
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-14 px-4 py-12 md:gap-20 md:px-8 md:py-16 lg:px-12 lg:py-20">
         <section aria-labelledby="requirement-summary-heading">
           <h2
             id="requirement-summary-heading"

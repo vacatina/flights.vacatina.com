@@ -32,7 +32,7 @@ export function HolidayListing() {
   return (
     <section
       aria-label="Explore holiday packages"
-      className="relative mx-auto flex max-w-[1060px] flex-col gap-7 px-5 pt-20 pb-12 sm:px-8 md:pb-20"
+      className="relative mx-auto flex w-full max-w-screen-2xl flex-col gap-7 px-5 pt-20 pb-12 sm:px-8 md:pb-20"
     >
       <div className="absolute inset-x-5 top-6 flex items-center justify-between gap-4 sm:inset-x-8">
         <p className="text-sm text-muted-foreground" role="status">

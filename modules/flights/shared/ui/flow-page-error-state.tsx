@@ -18,7 +18,7 @@ export function FlowPageErrorState({
 }: FlowPageErrorStateProps) {
   return (
     <main className="min-h-svh bg-muted/40 py-10">
-      <div className="mx-auto w-full max-w-2xl px-4">
+      <div className="mx-auto w-full max-w-screen-2xl px-4">
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="text-xl">{title}</CardTitle>

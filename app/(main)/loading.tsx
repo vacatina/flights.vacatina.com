@@ -7,7 +7,7 @@ export default function RootLoading() {
         <div className="absolute inset-0 bg-gradient-to-b from-[#5f83a8] via-[#e8a878] via-55% to-[#1a2a3d]" />
         <div className="absolute inset-0 bg-[#05103680]" />
 
-        <div className="relative mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 pt-6 md:px-8 md:pt-14 lg:px-12 lg:pt-16">
+        <div className="relative mx-auto flex w-full max-w-screen-2xl flex-1 min-h-0 flex-col px-4 pt-6 md:px-8 md:pt-14 lg:px-12 lg:pt-16">
           <div className="mx-auto max-w-4xl shrink-0 text-center text-white">
             <h1 className="text-[54px] font-semibold tracking-[-0.02em] leading-14 text-balance md:text-[56px]">
               Book Everything in One Place
@@ -18,7 +18,7 @@ export default function RootLoading() {
             </p>
           </div>
 
-          <div className="mx-auto mb-10 mt-8 flex w-full max-w-7xl flex-1 min-h-0 flex-col md:mt-10">
+          <div className="mx-auto mb-10 mt-8 flex w-full max-w-screen-2xl flex-1 min-h-0 flex-col md:mt-10">
             <div className="flex w-full h-fit flex-col gap-8 rounded-[12px] border border-border bg-background p-4 shadow-xl md:gap-9 md:p-8">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <Skeleton className="h-12 w-full md:w-[400px] rounded-[12px]" />

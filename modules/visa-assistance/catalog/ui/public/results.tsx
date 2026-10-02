@@ -30,7 +30,7 @@ export function PublicVisaResults({
         title={`Visa assistance for ${destination.name}`}
         description={`Explore our available visa services for ${passport.name} passport holders. Review the details and estimated fees before contacting our team.`}
       />
-      <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:px-8 md:py-14">
+      <div className="w-full mx-auto flex max-w-screen-2xl flex-col gap-10 px-4 py-10 md:px-8 md:py-14">
         <section
           aria-labelledby="visa-options-heading"
           className="flex flex-col gap-6"

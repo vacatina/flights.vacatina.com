@@ -25,7 +25,7 @@ export default async function VisaApplicationConfirmationPage({
 
   return (
     <main className="min-h-[calc(100svh-5rem)] bg-muted/30 py-12 md:py-16">
-      <div className="mx-auto max-w-2xl px-4">
+      <div className="w-full mx-auto max-w-screen-2xl px-4">
         <Card>
           <CardContent className="flex flex-col items-center px-6 py-10 text-center md:px-10">
             <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary ring-8 ring-primary/5">

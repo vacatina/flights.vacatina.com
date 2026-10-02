@@ -58,7 +58,7 @@ export function VisaDetailsHero({ result }: { result: VisaAssistanceResult }) {
 
   return (
     <section className="border-b bg-[#eef3f8] dark:bg-muted/25">
-      <div className="mx-auto w-full max-w-7xl px-4 py-10 md:px-8 md:py-14 lg:px-12 lg:py-16">
+      <div className="mx-auto w-full max-w-screen-2xl px-4 py-10 md:px-8 md:py-14 lg:px-12 lg:py-16">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
             <OutcomeIcon className="size-4" aria-hidden="true" />

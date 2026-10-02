@@ -68,7 +68,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
     <header
       className={cn(
         "sticky top-0 z-40 text-primary-foreground transition-colors duration-200",
-        shouldShowTransparentNavbar ? "bg-transparent" : "bg-[#13357b]"
+        shouldShowTransparentNavbar ? "bg-transparent" : "bg-brand-navy"
       )}
     >
       <div className="mx-auto flex h-[90px] w-full items-center px-4 lg:px-8">
@@ -130,7 +130,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
       {mobileMenuOpen ? (
         <div
           id="mobile-navbar-menu"
-          className="border-t border-primary-foreground/15 bg-[#13357b] px-4 pt-4 pb-6 xl:hidden"
+          className="border-t border-primary-foreground/15 bg-brand-navy px-4 pt-4 pb-6 xl:hidden"
         >
           <div className="flex flex-col gap-3 text-[16px] font-medium">
             {primaryNavItems.map((item) => (

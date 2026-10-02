@@ -23,7 +23,7 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
             src={holidayImage(holiday.media.thumbnailImage)!}
             alt={holiday.media.alt}
             fill
-            sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 90vw"
+            sizes="(min-width: 1536px) 485px, (min-width: 1024px) 32vw, (min-width: 640px) 45vw, 90vw"
             className="object-cover transition-transform duration-500 motion-safe:group-hover:scale-105"
           />
           <div className="absolute top-3 left-3">

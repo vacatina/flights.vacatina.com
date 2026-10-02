@@ -186,7 +186,7 @@ export function AdminPanelShell({
       </aside>
       <div className="min-w-0">
         <header className="border-b border-[#dfe4ec] bg-white px-4 py-5 md:px-7 lg:px-8 lg:py-6">
-          <div className="mx-auto max-w-[1500px]">
+          <div className="w-full mx-auto max-w-screen-2xl">
             <p className="mb-1 text-xs font-semibold text-[#1749d8]">
               Vacatina admin
             </p>
@@ -199,7 +199,7 @@ export function AdminPanelShell({
           </div>
         </header>
         <main className="px-4 py-5 md:px-7 md:py-7 lg:px-8">
-          <div className="mx-auto max-w-[1500px]">{children}</div>
+          <div className="w-full mx-auto max-w-screen-2xl">{children}</div>
         </main>
       </div>
     </div>

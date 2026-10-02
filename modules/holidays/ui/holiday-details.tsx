@@ -60,7 +60,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
         image={holidayImage(holiday.media.heroImage)!}
         alt={holiday.media.alt}
       />
-      <div className="mx-auto flex max-w-[1060px] flex-wrap items-center justify-between gap-4 px-5 pt-8 sm:px-8">
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-wrap items-center justify-between gap-4 px-5 pt-8 sm:px-8">
         <Link
           href="/holiday-packages"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
@@ -76,7 +76,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
           <ArrowRight className="size-4" />
         </Link>
       </div>
-      <div className="mx-auto grid max-w-[1060px] gap-10 px-5 pt-10 pb-16 sm:px-8 lg:grid-cols-[1.27fr_1fr] lg:gap-16">
+      <div className="mx-auto grid w-full max-w-screen-2xl gap-10 px-5 pt-10 pb-16 sm:px-8 lg:grid-cols-[1.27fr_1fr] lg:gap-16">
         <div className="flex min-w-0 flex-col gap-10">
           <HolidayFacts holiday={holiday} />
           <HolidaySection title="Trip overview">
@@ -103,7 +103,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
                   src={holidayImage(map.file)!}
                   alt={map.alt}
                   fill
-                  sizes="(min-width: 1024px) 530px, 90vw"
+                  sizes="(min-width: 1536px) 790px, (min-width: 1024px) 52vw, 90vw"
                   className="object-contain"
                 />
               </div>
@@ -135,7 +135,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
       {!!related.length && (
         <section
           aria-labelledby="related-holidays"
-          className="mx-auto flex max-w-[1060px] flex-col gap-7 px-5 pt-8 pb-20 sm:px-8"
+          className="mx-auto flex w-full max-w-screen-2xl flex-col gap-7 px-5 pt-8 pb-20 sm:px-8"
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2
