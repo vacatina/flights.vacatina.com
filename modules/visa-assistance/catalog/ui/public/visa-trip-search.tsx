@@ -13,10 +13,6 @@ export function VisaTripSearch({
       className="relative isolate grid gap-8 overflow-hidden rounded-[32px] bg-brand-navy p-6 sm:p-8 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:p-10"
       aria-labelledby="change-trip-heading"
     >
-      <div
-        aria-hidden="true"
-        className="absolute -bottom-32 -left-20 -z-10 size-96 rounded-full bg-primary/30 blur-3xl"
-      />
       <div className="flex flex-col gap-4 text-white">
         <Compass className="size-10 text-white/60" aria-hidden="true" />
         <h2

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type React from "react"
 import Image from "next/image"
 
 import { cn } from "@/lib/utils"
@@ -38,6 +37,7 @@ export default function HowItWorks() {
   ]
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
     const interval = setInterval(() => {
       setActiveCard((prev) => (prev + 1) % cards.length)
       setAnimationKey((prev) => prev + 1)
@@ -54,7 +54,7 @@ export default function HowItWorks() {
   return (
     <>
       {/* Content Section */}
-      <div className="flex w-full items-center justify-start overflow-hidden px-4 md:px-9">
+      <div className="flex w-full items-center justify-start overflow-hidden">
         <div className="flex w-full flex-col items-start justify-start gap-6 py-8 md:grid md:grid-cols-2 md:items-center md:gap-8 md:py-11 lg:grid-cols-6">
           {/* Left Column - Feature Cards */}
           <div className="flex h-full w-full flex-col items-center justify-between gap-3 md:col-span-1 md:gap-4 lg:col-span-3">
@@ -62,14 +62,16 @@ export default function HowItWorks() {
               const isActive = index === activeCard
 
               return (
-                <div
+                <button
+                  type="button"
+                  aria-pressed={isActive}
                   key={index}
                   onClick={() => handleCardClick(index)}
                   className={cn(
-                    "flex w-full cursor-pointer flex-col items-start justify-start overflow-hidden rounded-sm transition-all duration-300",
+                    "flex w-full cursor-pointer flex-col items-start justify-start overflow-hidden rounded-2xl border border-primary/10 text-left shadow-[0_8px_25px_-18px_rgba(10,19,69,0.3)] transition-all duration-300 focus-visible:outline-2 focus-visible:outline-ring",
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground"
+                      ? "border-primary/40 bg-card text-card-foreground ring-2 ring-primary/10"
+                      : "bg-card text-card-foreground"
                   )}
                 >
                   <div
@@ -83,11 +85,11 @@ export default function HowItWorks() {
                       className="!h-2 animate-[progressBar_5s_linear_forwards] bg-primary-foreground will-change-transform"
                     />
                   </div>
-                  <div className="relative flex w-full gap-4 !px-5 !py-4 md:gap-6 md:!px-6 md:!py-5 lg:gap-10">
-                    <div className="flex aspect-square h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border font-sans text-xl font-medium sm:h-14 sm:w-14 sm:text-2xl md:h-24 md:w-24 md:text-4xl">
+                  <div className="relative flex w-full gap-4 !px-5 !py-4 md:gap-6 md:!px-6 md:!py-5 lg:gap-5">
+                    <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/5 font-sans text-lg font-medium text-primary sm:size-12 sm:text-xl md:size-14 md:text-2xl">
                       0{index + 1}
                     </div>
-                    <div className="flex min-w-0 flex-1 flex-col justify-between py-4">
+                    <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
                       <div className="font-sans text-base leading-tight font-semibold sm:text-lg md:text-xl md:leading-6">
                         {card.title}
                       </div>
@@ -96,17 +98,18 @@ export default function HowItWorks() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
           {/* Right Column - Image (shown first on mobile) */}
           <div className="w-full md:col-span-1 lg:col-span-3">
-            <div className="relative flex aspect-square w-full flex-col items-start justify-start overflow-hidden rounded-sm bg-background md:aspect-video lg:aspect-square">
+            <div className="relative flex aspect-square w-full flex-col items-start justify-start overflow-hidden rounded-[26px] border-4 border-white bg-card shadow-xl md:aspect-video lg:aspect-square">
               <Image
                 src={cards[activeCard].image}
                 alt={cards[activeCard].title}
                 fill
+                sizes="(min-width: 1536px) 720px, (min-width: 768px) 48vw, 90vw"
                 className="object-cover transition-all duration-500"
               />
             </div>

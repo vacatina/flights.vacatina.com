@@ -1,4 +1,5 @@
-import { Check, X } from "lucide-react";
+import { Check, X } from "lucide-react"
+import Image from "next/image"
 
 const cons = [
   {
@@ -30,7 +31,7 @@ const cons = [
     title: "Restricted payment methods",
     description: "Some portals accept only one or two types of payments.",
   },
-];
+]
 
 const pros = [
   {
@@ -62,65 +63,61 @@ const pros = [
     title: "Multiple payment options",
     description: "Pay the way you prefer — fast and secure every time.",
   },
-];
+]
 
 export default function Comparison() {
   return (
-    <div className="w-full grid gap-6 md:mt-20 pb-14 md:grid-cols-4 md:gap-0  mx-auto max-w-screen-2xl">
-      <div className="rounded-md flex flex-col justify-between space-y-8  border-dashed border-1 p-6 md:col-span-2 md:my-2 md:rounded-r-none md:border-r-0 lg:p-10">
-        <div className="space-y-6">
-          <h3 className="!text-2xl font-bold !mb-6 text-muted-foreground">
-            Do it yourself
-          </h3>
-          <hr className=" border-0.5 !mb-8 !border-dashed" />
-          <div className="space-y-8">
-            {cons.map((item, index) => (
-              <div key={index} className="flex gap-4">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-destructive/20 flex items-center justify-center mt-1">
-                  <X className="w-4 h-4 text-destructive" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-foreground mb-1">
-                    {item.title}
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
+    <div className="mt-8 grid w-full gap-6 lg:grid-cols-2">
+      <div className="rounded-[26px] border border-primary/10 bg-background/50 p-6 sm:p-8">
+        <h3 className="mb-6 border-b border-primary/10 pb-5 font-heading text-2xl tracking-tight">
+          Do it yourself
+        </h3>
+        <ul className="flex flex-col gap-6">
+          {cons.map((item) => (
+            <li key={item.title} className="flex gap-3">
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <X className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <h4 className="mb-1 text-sm font-medium">{item.title}</h4>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {item.description}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
+            </li>
+          ))}
+        </ul>
       </div>
-
-      <div className=" bg-white rounded-md border-1 border-dashed border-blue-400 p-6 shadow-lg shadow-gray-950/5 md:col-span-2 lg:p-10 ">
-        <div className="grid gap-6 ">
-          <div>
-            <h3 className="!text-xl gap-3  items-center flex font-bold !mb-6 text-muted-foreground">
-              <span>With</span>{" "}
-              <img src="/img/general/logo-dark.svg" alt="logo icon " />
-            </h3>
-            <hr className=" border-0.5 !mb-8 !border-dashed " />
-            <div className="space-y-8">
-              {pros.map((item, index) => (
-                <div key={index} className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
-                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground mb-1">
-                      {item.title}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      <div className="relative overflow-hidden rounded-[26px] border border-primary/20 bg-card p-6 shadow-[0_16px_40px_-24px_rgba(10,19,69,0.3)] sm:p-8">
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-1 bg-primary"
+        />
+        <h3 className="mb-6 flex items-center gap-3 border-b border-primary/10 pb-5 font-heading text-2xl tracking-tight">
+          <span>With</span>
+          <Image
+            src="/img/general/logo-dark.svg"
+            alt="Vacatina"
+            width={145}
+            height={38}
+          />
+        </h3>
+        <ul className="flex flex-col gap-6">
+          {pros.map((item) => (
+            <li key={item.title} className="flex gap-3">
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Check className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <h4 className="mb-1 text-sm font-medium">{item.title}</h4>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {item.description}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
-  );
+  )
 }

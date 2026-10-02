@@ -21,6 +21,7 @@ export async function seedVisaListings(db: NodePgDatabase<typeof schema>) {
       if (!created) {
         results.push({
           route: record.listing.destinationCode,
+          visa: record.listing.code,
           result: "skipped",
         })
         continue
@@ -40,7 +41,11 @@ export async function seedVisaListings(db: NodePgDatabase<typeof schema>) {
         .where(eq(schema.visaListings.id, created.id))
       if (saved?.status !== "published")
         throw new Error("Seed verification failed")
-      results.push({ route: record.listing.destinationCode, result: "created" })
+      results.push({
+        route: record.listing.destinationCode,
+        visa: record.listing.code,
+        result: "created",
+      })
     }
     return results
   })

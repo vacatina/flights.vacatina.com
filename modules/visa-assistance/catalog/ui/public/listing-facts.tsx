@@ -28,7 +28,7 @@ export function ListingFacts({ listing }: { listing: PublicVisaListing }) {
         return (
           <div
             key={key}
-            className="min-w-0 rounded-xl border border-primary/10 bg-primary/[0.035] p-4"
+            className="min-w-0 rounded-xl border border-primary/10 bg-primary/[0.035] p-4 last:odd:sm:col-span-2"
           >
             <dt className="flex items-center gap-2 text-xs text-muted-foreground">
               <Icon
