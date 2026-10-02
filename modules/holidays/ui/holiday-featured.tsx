@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowUpRight, Clock3 } from "lucide-react"
+import { ArrowUpRight, Clock3, Compass } from "lucide-react"
 import { getHolidayBySlug } from "../data"
 import { holidayImage } from "../domain/catalog"
 import { cn } from "@/lib/utils"
@@ -15,14 +15,21 @@ export function HolidayFeatured() {
   return (
     <section
       aria-labelledby="featured-journeys"
-      className="flex flex-col gap-5"
+      className="relative isolate flex flex-col gap-6 overflow-hidden rounded-[32px] bg-brand-navy p-4 shadow-[0_24px_60px_-35px_rgba(10,19,69,0.6)] sm:p-7"
     >
-      <h2
-        id="featured-journeys"
-        className="font-heading text-3xl tracking-tight sm:text-4xl"
-      >
-        A little inspiration
-      </h2>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-32 -right-24 -z-10 size-[500px] rounded-full bg-primary/35 blur-3xl"
+      />
+      <div className="flex items-center justify-between gap-4 pt-2 text-white">
+        <h2
+          id="featured-journeys"
+          className="font-heading text-3xl tracking-tight sm:text-4xl"
+        >
+          A little inspiration
+        </h2>
+        <Compass className="size-10 text-white/50" aria-hidden="true" />
+      </div>
       <div className="grid gap-4 md:h-[560px] md:grid-cols-[1.4fr_1fr] md:grid-rows-2">
         {featuredSlugs.map((slug, index) => {
           const holiday = getHolidayBySlug(slug)!
@@ -31,7 +38,7 @@ export function HolidayFeatured() {
               key={slug}
               href={`/holiday-packages/${slug}`}
               className={cn(
-                "group relative flex min-h-64 items-end overflow-hidden rounded-[24px] p-6 text-white outline-none focus-visible:ring-3 focus-visible:ring-ring sm:p-8",
+                "group relative flex min-h-64 items-end overflow-hidden rounded-[24px] border border-white/20 p-6 text-white outline-none focus-visible:ring-3 focus-visible:ring-ring sm:p-8",
                 index === 0 && "min-h-96 md:row-span-2"
               )}
             >
@@ -66,7 +73,7 @@ export function HolidayFeatured() {
                     {holiday.route.slice(0, 3).join(" · ")}
                   </p>
                 </div>
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white text-brand-navy transition-transform motion-safe:group-hover:-rotate-45">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white text-brand-navy shadow-lg transition-transform motion-safe:group-hover:-rotate-45">
                   <ArrowUpRight aria-hidden="true" />
                 </span>
               </div>

@@ -36,7 +36,7 @@ export function HolidayDiscovery({
               onSelect(selected === category.slug ? "all" : category.slug)
             }
             className={cn(
-              "group relative h-40 w-40 shrink-0 overflow-hidden rounded-2xl text-left text-white outline-none focus-visible:ring-3 focus-visible:ring-ring md:w-auto",
+              "group relative h-40 w-40 shrink-0 overflow-hidden rounded-2xl border-4 border-white text-left text-white shadow-[0_6px_18px_-10px_rgba(10,19,69,0.3)] transition-transform duration-300 outline-none focus-visible:ring-3 focus-visible:ring-ring motion-safe:hover:-translate-y-1 md:w-auto",
               selected === category.slug && "ring-3 ring-primary ring-offset-3"
             )}
           >

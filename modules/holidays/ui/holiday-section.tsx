@@ -9,7 +9,7 @@ export function HolidaySection({
 }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="font-heading text-2xl font-normal tracking-tight">
+      <h2 className="flex items-center gap-3 font-heading text-2xl font-normal tracking-tight before:h-6 before:w-1 before:rounded-full before:bg-primary">
         {title}
       </h2>
       {children}

@@ -1,3 +1,4 @@
+import { holidayAccordionCard } from "./holiday-surfaces"
 import {
   Accordion,
   AccordionContent,
@@ -25,9 +26,9 @@ export function HolidayItinerary({
           <AccordionItem
             key={day.day}
             value={day.day}
-            className="rounded-xl border border-border/60 bg-card px-5"
+            className={holidayAccordionCard}
           >
-            <AccordionTrigger>
+            <AccordionTrigger className="items-center py-5 hover:no-underline aria-expanded:text-primary">
               <span className="flex items-center gap-4">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
                   {String(day.day).padStart(2, "0")}

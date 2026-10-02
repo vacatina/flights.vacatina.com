@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import { CheckCircle2 } from "lucide-react"
+import { Compass, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { cn } from "@/lib/utils"
+import { holidayPanel } from "./holiday-surfaces"
 import type { HolidayPackage } from "../domain/types"
 
 function EnquiryInput({
@@ -59,8 +61,23 @@ export function HolidayEnquiry({ holiday }: { holiday: HolidayPackage }) {
       <form
         id="holiday-enquiry"
         onSubmit={submit}
-        className="scroll-mt-28 rounded-2xl bg-card p-6 sm:p-7"
+        className={cn(
+          holidayPanel,
+          "relative scroll-mt-28 overflow-hidden p-6 sm:p-7"
+        )}
       >
+        <div
+          className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary/30 via-primary to-primary/30"
+          aria-hidden="true"
+        />
+        <div className="mb-6 flex items-center gap-3 border-b border-primary/10 pb-5">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Compass className="size-6" aria-hidden="true" />
+          </span>
+          <h2 className="font-heading text-2xl tracking-tight">
+            Plan your holiday
+          </h2>
+        </div>
         <FieldGroup className="gap-4">
           <FieldGroup className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
             <EnquiryInput
@@ -98,7 +115,11 @@ export function HolidayEnquiry({ holiday }: { holiday: HolidayPackage }) {
               placeholder="Tell us your group size, preferred hotels and what you would love to experience."
             />
           </Field>
-          <Button type="submit" size="lg" className="w-full rounded-full">
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full rounded-full shadow-[0_8px_20px_-8px_var(--primary)]"
+          >
             {holiday.cta.label}
           </Button>
           <p className="text-center text-xs leading-relaxed text-muted-foreground">

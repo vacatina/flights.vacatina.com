@@ -53,7 +53,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
     ...new Set([...holiday.attractions, ...holiday.activities]),
   ]
   return (
-    <main className="bg-background">
+    <main className="bg-primary/[0.035] dark:bg-background">
       <HolidayHero
         title={holiday.title}
         category={category?.name}

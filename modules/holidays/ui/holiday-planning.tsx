@@ -1,3 +1,4 @@
+import { holidayAccordionCard } from "./holiday-surfaces"
 import {
   Accordion,
   AccordionContent,
@@ -25,9 +26,11 @@ export function HolidayPlanning({
             <AccordionItem
               key={section.title}
               value={section.title}
-              className="rounded-xl border-0 bg-card px-5"
+              className={holidayAccordionCard}
             >
-              <AccordionTrigger>{section.title}</AccordionTrigger>
+              <AccordionTrigger className="items-center py-5 hover:no-underline aria-expanded:text-primary">
+                {section.title}
+              </AccordionTrigger>
               <AccordionContent>
                 <HolidayRichText body={section.body} />
               </AccordionContent>
@@ -42,9 +45,11 @@ export function HolidayPlanning({
               <AccordionItem
                 key={question.title}
                 value={question.title}
-                className="rounded-xl border-0 bg-card px-5"
+                className={holidayAccordionCard}
               >
-                <AccordionTrigger>{question.title}</AccordionTrigger>
+                <AccordionTrigger className="items-center py-5 hover:no-underline aria-expanded:text-primary">
+                  {question.title}
+                </AccordionTrigger>
                 <AccordionContent>
                   <HolidayRichText body={question.body} />
                 </AccordionContent>

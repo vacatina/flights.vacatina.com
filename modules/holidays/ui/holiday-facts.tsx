@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils"
+import { holidayPanel } from "./holiday-surfaces"
 import type { HolidayPackage } from "../domain/types"
 import { holidayPrice } from "../domain/catalog"
 
@@ -19,9 +21,17 @@ export function HolidayFacts({ holiday }: { holiday: HolidayPackage }) {
     },
   ]
   return (
-    <dl className="grid grid-cols-2 gap-x-5 gap-y-6 sm:grid-cols-3">
+    <dl
+      className={cn(
+        holidayPanel,
+        "grid grid-cols-2 gap-x-5 gap-y-6 p-6 sm:grid-cols-3"
+      )}
+    >
       {facts.map((fact) => (
-        <div key={fact.label} className="flex flex-col gap-1.5">
+        <div
+          key={fact.label}
+          className="flex flex-col gap-1.5 border-l-2 border-primary/25 pl-3"
+        >
           <dt className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
             {fact.label}
           </dt>

@@ -11,7 +11,7 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
     (item) => item.slug === holiday.category
   )
   return (
-    <article className="group min-w-0 text-card-foreground">
+    <article className="group min-w-0 rounded-[26px] border border-primary/10 bg-card p-2.5 text-card-foreground shadow-[0_8px_30px_-18px_rgba(10,19,69,0.24)] transition-[transform,box-shadow,border-color] duration-300 hover:border-primary/25 hover:shadow-[0_20px_45px_-22px_rgba(10,19,69,0.35)] ">
       <Link
         href={`/holiday-packages/${holiday.slug}`}
         className="block rounded-[20px] outline-none focus-visible:ring-3 focus-visible:ring-ring"
@@ -37,7 +37,7 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
             <ArrowUpRight className="size-6" />
           </span>
         </div>
-        <div className="flex flex-col gap-3 px-0.5 pt-5 pb-2">
+        <div className="flex flex-col gap-3 px-2 pt-5 pb-3">
           <div className="flex items-start justify-between gap-3">
             <h2 className="font-heading text-xl leading-snug font-medium">
               {holiday.title}
@@ -47,7 +47,7 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 border-t border-primary/10 pt-3 text-xs text-muted-foreground">
             <span className="flex min-w-0 items-center gap-1">
               <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">
