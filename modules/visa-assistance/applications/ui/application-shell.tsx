@@ -1,6 +1,5 @@
 import Link from "next/link"
 import {
-  ArrowRightIcon,
   CalendarDaysIcon,
   CheckIcon,
   LockKeyholeIcon,
@@ -22,9 +21,9 @@ import {
   VISA_APPLICATION_STEPS,
   type VisaApplicationDetail,
 } from "@/modules/visa-assistance/applications/domain"
-import { getVisaCountry } from "@/modules/visa-assistance/domain"
 import { VisaApplicationPricingEstimate } from "@/modules/visa-assistance/applications/ui/pricing-estimate"
-import { CountryFlag } from "@/modules/visa-assistance/ui/country-flag"
+import { VisaCheckoutHeading } from "./checkout-heading"
+import { visaFormCard } from "./checkout-surfaces"
 
 const stepLabels = {
   trip: "Trip",
@@ -47,43 +46,20 @@ export function VisaApplicationShell({
 }: ApplicationShellProps) {
   const { application } = detail
   const currentIndex = VISA_APPLICATION_STEPS.indexOf(currentStep)
-  const nationality = getVisaCountry(application.nationalityCode)
-  const destination = getVisaCountry(application.destinationCode)
 
   return (
-    <main className="min-h-[calc(100svh-5rem)] bg-muted/30 py-8 md:py-12">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-8">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col gap-2">
-            <Badge className="w-fit" variant="secondary">
-              Request {application.reference}
-            </Badge>
-            <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              {application.visaName}
-            </h1>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              {nationality ? <CountryFlag src={nationality.flagSrc} /> : null}
-              <span>{nationality?.name ?? application.nationalityCode}</span>
-              <ArrowRightIcon className="size-3.5" aria-hidden="true" />
-              {destination ? <CountryFlag src={destination.flagSrc} /> : null}
-              <span>{destination?.name ?? application.destinationCode}</span>
-            </div>
-          </div>
-          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Complete each step at your own pace. Your progress is saved as you
-            continue.
-          </p>
-        </div>
-
+    <main className="min-h-[calc(100svh-5rem)] bg-primary/[0.035] pb-12 md:pb-16">
+      <VisaCheckoutHeading detail={detail} />
+      <div className="relative mx-auto -mt-6 w-full max-w-screen-2xl px-5 sm:px-8">
         <ApplicationProgress
           applicationId={application.id}
           currentIndex={currentIndex}
         />
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="mt-7 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div
             key={currentStep}
-            className="motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
+            className="min-w-0 motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
           >
             {children}
           </div>
@@ -106,7 +82,7 @@ function ApplicationProgress({
   return (
     <nav
       aria-label="Visa request progress"
-      className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10 md:p-5"
+      className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-[0_12px_30px_-22px_rgba(10,19,69,0.35)] md:p-5"
     >
       <div className="mb-3 flex items-center justify-between text-sm">
         <span className="font-medium">
@@ -120,19 +96,19 @@ function ApplicationProgress({
         value={progress}
         aria-label={`${Math.round(progress)}% complete`}
       />
-      <ol className="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:overflow-visible">
+      <ol className="mt-4 grid grid-cols-5 gap-1 md:gap-3">
         {VISA_APPLICATION_STEPS.map((step, index) => {
           const reachable = index <= currentIndex
           const className = cn(
-            "flex min-w-max items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors",
-            index === currentIndex && "bg-primary/5",
+            "flex min-w-0 flex-col items-center gap-2 rounded-xl px-1 py-3 text-[10px] font-medium transition-colors sm:flex-row sm:justify-center sm:text-xs md:px-2",
+            index === currentIndex && "bg-primary/10 ring-1 ring-primary/15",
             reachable ? "text-foreground" : "text-muted-foreground"
           )
           const content = (
             <>
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full border",
+                  "flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/[0.035] text-primary",
                   reachable &&
                     "border-primary bg-primary text-primary-foreground"
                 )}
@@ -173,12 +149,14 @@ function ApplicationProgress({
 function ApplicationSummary({ detail }: { detail: VisaApplicationDetail }) {
   const { application } = detail
   return (
-    <Card className="lg:sticky lg:top-24">
-      <CardHeader>
+    <Card className={cn(visaFormCard, "gap-0 pt-0 lg:sticky lg:top-28")}>
+      <CardHeader className="bg-brand-navy py-6 text-white">
         <CardTitle>Request summary</CardTitle>
-        <CardDescription>Your current application at a glance.</CardDescription>
+        <CardDescription className="text-white/70">
+          Your current application at a glance.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-5 pt-6">
         <dl className="flex flex-col gap-3 text-sm">
           <SummaryRow
             icon={<UsersIcon />}
@@ -200,7 +178,7 @@ function ApplicationSummary({ detail }: { detail: VisaApplicationDetail }) {
           />
         </dl>
         <Separator />
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary/15 bg-primary/[0.05] p-4">
           <VisaApplicationPricingEstimate
             pricing={application.pricingSnapshot}
           />
@@ -208,9 +186,9 @@ function ApplicationSummary({ detail }: { detail: VisaApplicationDetail }) {
             This is an estimate only. No payment is collected in this flow.
           </p>
         </div>
-        <div className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+        <div className="flex gap-3 text-xs leading-relaxed text-muted-foreground">
           <LockKeyholeIcon
-            className="mt-0.5 size-4 shrink-0"
+            className="mt-0.5 size-4 shrink-0 text-primary"
             aria-hidden="true"
           />
           <span>Your submitted details and files are handled securely.</span>

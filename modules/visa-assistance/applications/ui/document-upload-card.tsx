@@ -39,7 +39,7 @@ export function DocumentUploadCard({
   const uploading = Boolean(uploadState?.busy)
 
   return (
-    <div className="rounded-lg bg-card p-4 ring-1 ring-foreground/10">
+    <div className="min-w-0 rounded-2xl border border-primary/10 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium">{option.label}</p>
@@ -56,10 +56,7 @@ export function DocumentUploadCard({
             aria-label="Uploaded"
           />
         ) : (
-          <FileIcon
-            className="size-5 text-muted-foreground"
-            aria-hidden="true"
-          />
+          <FileIcon className="size-5 text-primary" aria-hidden="true" />
         )}
       </div>
 
@@ -114,7 +111,7 @@ export function DocumentUploadCard({
         </div>
       ) : null}
 
-      <div className="mt-4">
+      <div className="mt-4 rounded-xl border border-dashed border-primary/25 bg-primary/[0.035] p-3">
         <input
           id={inputId}
           aria-label={`Upload ${option.label}`}
@@ -133,6 +130,7 @@ export function DocumentUploadCard({
           type="button"
           size="sm"
           variant="outline"
+          className="h-10 w-full rounded-lg border-primary/15 bg-white text-primary"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
         >

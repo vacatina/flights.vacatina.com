@@ -19,18 +19,19 @@ export const LoadingButton = React.forwardRef<HTMLButtonElement, LoadingButtonPr
     useEffect(() => {
       if (isLoading) {
         setPhase("loading")
-      } else if (phase === "loading") {
-        if (isError) {
-          setPhase("idle")
-        } else {
-          setPhase("complete")
-          const t = setTimeout(() => {
-            setPhase("idle")
-          }, 500)
-          return () => clearTimeout(t)
-        }
+      } else {
+        setPhase((current) => {
+          if (isError) return "idle"
+          return current === "loading" ? "complete" : current
+        })
       }
-    }, [isLoading, isError, phase])
+    }, [isLoading, isError])
+
+    useEffect(() => {
+      if (phase !== "complete") return
+      const timer = setTimeout(() => setPhase("idle"), 500)
+      return () => clearTimeout(timer)
+    }, [phase])
 
     return (
       <Button

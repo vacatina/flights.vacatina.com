@@ -10,12 +10,12 @@ export function VisaApplicationPricingEstimate({
     return <p className="text-sm text-muted-foreground">Price unavailable</p>
   return (
     <dl className="flex flex-col gap-3 text-sm">
-      <div className="flex items-center justify-between gap-4 text-base font-semibold">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <dt>
           Estimated total · {pricing.travelerCount}{" "}
           {pricing.travelerCount === 1 ? "traveler" : "travelers"}
         </dt>
-        <dd className="tabular-nums">
+        <dd className="font-heading text-2xl font-medium tracking-tight text-primary tabular-nums">
           <Money money={pricing.totalMoney} />
         </dd>
       </div>

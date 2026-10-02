@@ -24,7 +24,7 @@ export function VisaFormActions({
         <Link
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "w-full sm:w-auto"
+            "h-12 w-full rounded-xl px-5 sm:w-auto"
           )}
           href={backHref}
         >
@@ -32,7 +32,11 @@ export function VisaFormActions({
           Back
         </Link>
       ) : backHref ? (
-        <Button className="w-full sm:w-auto" variant="outline" disabled>
+        <Button
+          className="h-12 w-full rounded-xl px-5 sm:w-auto"
+          variant="outline"
+          disabled
+        >
           <ArrowLeftIcon data-icon="inline-start" />
           Back
         </Button>
@@ -41,7 +45,10 @@ export function VisaFormActions({
       )}
       {nextHref && !disabled && !isPending ? (
         <Link
-          className={cn(buttonVariants(), "w-full sm:w-auto")}
+          className={cn(
+            buttonVariants(),
+            "h-12 w-full rounded-xl px-6 shadow-lg shadow-primary/15 sm:w-auto"
+          )}
           href={nextHref}
         >
           <ArrowRightIcon data-icon="inline-end" />
@@ -49,7 +56,7 @@ export function VisaFormActions({
         </Link>
       ) : (
         <Button
-          className="w-full sm:w-auto"
+          className="h-12 w-full rounded-xl px-6 shadow-lg shadow-primary/15 sm:w-auto"
           type={nextHref ? "button" : "submit"}
           disabled={disabled || isPending}
           aria-busy={isPending}

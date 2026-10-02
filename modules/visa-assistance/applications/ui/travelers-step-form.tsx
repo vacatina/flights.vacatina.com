@@ -1,5 +1,10 @@
 "use client"
 
+import {
+  VisaStepHeader,
+  visaFormCard,
+  visaFormFooter,
+} from "./checkout-surfaces"
 import { useState, useTransition } from "react"
 import { withVisaActionFeedback } from "./action-feedback"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -8,14 +13,7 @@ import { useForm, useWatch } from "react-hook-form"
 import { UserRoundIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import {
   Field,
   FieldError,
@@ -98,13 +96,12 @@ export function TravelersStepForm({
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <Card>
-        <CardHeader className="border-b">
-          <CardTitle className="text-lg">Traveler information</CardTitle>
-          <CardDescription>
-            Enter every name exactly as it appears in the passport.
-          </CardDescription>
-        </CardHeader>
+      <Card className={visaFormCard}>
+        <VisaStepHeader
+          step="travelers"
+          title="Traveler information"
+          description="Enter every name exactly as it appears in the passport."
+        />
         <CardContent>
           <FieldGroup>
             <input type="hidden" {...form.register("applicationId")} />
@@ -121,7 +118,7 @@ export function TravelersStepForm({
                 <FieldSet
                   key={`traveler-${traveler.position}`}
                   disabled={isPending}
-                  className="gap-5 rounded-xl border bg-muted/15 p-4 md:p-5"
+                  className="gap-5 rounded-[22px] border border-primary/10 bg-white p-4 shadow-sm md:p-6"
                 >
                   <FieldLegend className="flex w-full items-center gap-2 border-b pb-4">
                     <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -300,7 +297,7 @@ export function TravelersStepForm({
             })}
           </FieldGroup>
         </CardContent>
-        <CardFooter className="border-t bg-muted/20">
+        <CardFooter className={visaFormFooter}>
           <VisaFormActions
             backHref={`/visa-assistance/applications/${applicationId}/trip`}
             isPending={isPending}

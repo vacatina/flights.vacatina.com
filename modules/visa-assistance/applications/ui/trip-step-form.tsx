@@ -1,19 +1,17 @@
 "use client"
 
+import {
+  VisaStepHeader,
+  visaFormCard,
+  visaFormFooter,
+} from "./checkout-surfaces"
 import { useState, useTransition } from "react"
 import { withVisaActionFeedback } from "./action-feedback"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import {
   Field,
   FieldDescription,
@@ -69,13 +67,12 @@ export function TripStepForm({
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <Card>
-        <CardHeader className="border-b">
-          <CardTitle className="text-lg">Trip details</CardTitle>
-          <CardDescription>
-            Tell us when you plan to enter and who is traveling.
-          </CardDescription>
-        </CardHeader>
+      <Card className={visaFormCard}>
+        <VisaStepHeader
+          step="trip"
+          title="Trip details"
+          description="Tell us when you plan to enter and who is traveling."
+        />
         <CardContent>
           <FieldGroup>
             <input type="hidden" {...form.register("applicationId")} />
@@ -119,7 +116,7 @@ export function TripStepForm({
             </div>
           </FieldGroup>
         </CardContent>
-        <CardFooter className="border-t bg-muted/20">
+        <CardFooter className={visaFormFooter}>
           <VisaFormActions isPending={isPending} />
         </CardFooter>
       </Card>

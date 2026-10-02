@@ -1,5 +1,10 @@
 "use client"
 
+import {
+  VisaStepHeader,
+  visaFormCard,
+  visaFormFooter,
+} from "./checkout-surfaces"
 import { useState, useTransition } from "react"
 import { withVisaActionFeedback } from "./action-feedback"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -8,14 +13,7 @@ import { Controller, useForm } from "react-hook-form"
 
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import {
   Field,
   FieldContent,
@@ -73,19 +71,18 @@ export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <Card>
-        <CardHeader className="border-b">
-          <CardTitle className="text-lg">Review and submit</CardTitle>
-          <CardDescription>
-            Check the request before sending it to the Vacatina visa team.
-          </CardDescription>
-        </CardHeader>
+      <Card className={visaFormCard}>
+        <VisaStepHeader
+          step="review"
+          title="Review and submit"
+          description="Check the request before sending it to the Vacatina visa team."
+        />
         <CardContent className="flex flex-col gap-6">
           <input type="hidden" {...form.register("applicationId")} />
           <input type="hidden" {...form.register("expectedPricedAt")} />
           <VisaFormError message={serverError} />
 
-          <section className="rounded-xl border bg-muted/15 p-4 md:p-5">
+          <section className="rounded-[22px] border border-primary/10 bg-white p-4 md:p-6">
             <h2 className="font-semibold">Application summary</h2>
             <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
               <SummaryRow label="Visa" value={application.visaName} />
@@ -102,7 +99,7 @@ export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
             </dl>
           </section>
 
-          <section className="rounded-xl bg-primary/5 p-4 ring-1 ring-primary/15 md:p-5">
+          <section className="rounded-[22px] bg-primary/5 p-4 ring-1 ring-primary/15 md:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="font-semibold">Estimated pricing</h2>
               <Badge variant="outline">No payment now</Badge>
@@ -145,7 +142,7 @@ export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
             />
           </FieldGroup>
         </CardContent>
-        <CardFooter className="border-t bg-muted/20">
+        <CardFooter className={visaFormFooter}>
           <VisaFormActions
             backHref={`/visa-assistance/applications/${application.id}/documents`}
             isPending={isPending}
@@ -176,7 +173,7 @@ function ConsentField({
         control={control}
         name={name}
         render={({ field }) => (
-          <FieldLabel className="cursor-pointer">
+          <FieldLabel className="cursor-pointer rounded-xl border border-primary/10 bg-primary/[0.025] p-4">
             <Field orientation="horizontal">
               <Checkbox
                 checked={field.value}
