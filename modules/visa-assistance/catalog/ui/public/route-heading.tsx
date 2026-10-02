@@ -6,15 +6,18 @@ export function VisaRouteHeading({
   destination,
   title,
   description,
+  compact = false,
 }: {
   nationality: string
   destination: string
   title: string
   description: string
+  compact?: boolean
 }) {
   return (
     <header>
       <VisaPhotoHero
+        compact={compact}
         title={title}
         description={description}
         image="/img/visa-assistance-travel.png"

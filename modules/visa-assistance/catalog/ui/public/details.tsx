@@ -14,12 +14,13 @@ export function PublicVisaDetails({ listing }: { listing: PublicVisaDetail }) {
   return (
     <main className="bg-primary/[0.035]">
       <VisaRouteHeading
+        compact
         nationality={listing.nationalityCode}
         destination={listing.destinationCode}
         title={listing.title}
         description={listing.shortSummary}
       />
-      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-7 px-4 py-10 md:px-8 md:py-14">
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-5 px-5 py-6 sm:px-8 md:py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             role="link"

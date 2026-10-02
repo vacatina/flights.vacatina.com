@@ -28,12 +28,13 @@ export function PublicVisaResults({
   return (
     <main className="bg-primary/[0.035]">
       <VisaRouteHeading
+        compact
         nationality={passport.code}
         destination={destination.code}
         title={`Visa assistance for ${destination.name}`}
         description={`Explore our available visa services for ${passport.name} passport holders. Review the details and estimated fees before contacting our team.`}
       />
-      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-12 px-5 py-10 sm:px-8 md:py-14">
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-12 px-5 py-7 sm:px-8 md:py-8">
         <section
           aria-labelledby="visa-options-heading"
           className="flex flex-col gap-6"
