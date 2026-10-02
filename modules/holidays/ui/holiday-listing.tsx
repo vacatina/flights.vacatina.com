@@ -17,6 +17,8 @@ import {
   type HolidayFilters as Filters,
 } from "../domain/catalog"
 import { HolidayCard } from "./holiday-card"
+import { HolidayDiscovery } from "./holiday-discovery"
+import { HolidayFeatured } from "./holiday-featured"
 import { HolidayFilters } from "./holiday-filters"
 
 const defaultFilters: Filters = {
@@ -32,12 +34,27 @@ export function HolidayListing() {
   return (
     <section
       aria-label="Explore holiday packages"
-      className="relative mx-auto flex w-full max-w-screen-2xl flex-col gap-7 px-5 pt-20 pb-12 sm:px-8 md:pb-20"
+      className="relative mx-auto flex w-full max-w-screen-2xl flex-col gap-10 px-5 pt-10 pb-12 sm:px-8 md:pb-20"
     >
-      <div className="absolute inset-x-5 top-6 flex items-center justify-between gap-4 sm:inset-x-8">
-        <p className="text-sm text-muted-foreground" role="status">
-          {packages.length} holidays to discover
-        </p>
+      <HolidayDiscovery
+        selected={filters.category}
+        onSelect={(category) => setFilters({ ...filters, category })}
+      />
+      {filters.category === "all" &&
+        filters.duration === "all" &&
+        filters.activity === "all" && <HolidayFeatured />}
+      <div
+        id="all-holidays"
+        className="flex scroll-mt-28 flex-wrap items-end justify-between gap-4 border-t border-border pt-10"
+      >
+        <div>
+          <h2 className="mb-2 font-heading text-3xl tracking-tight sm:text-4xl">
+            Explore holiday packages
+          </h2>
+          <p className="text-sm text-muted-foreground" role="status">
+            {packages.length} holidays to discover
+          </p>
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -55,7 +72,10 @@ export function HolidayListing() {
         </div>
       )}
       {packages.length ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          key={`${filters.category}-${filters.duration}-${filters.activity}`}
+          className="grid gap-x-7 gap-y-12 duration-500 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 sm:grid-cols-2 lg:grid-cols-3"
+        >
           {packages.map((holiday) => (
             <HolidayCard key={holiday.id} holiday={holiday} />
           ))}

@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import type { HolidayMediaItem } from "../domain/types"
+import { cn } from "@/lib/utils"
 import { holidayImage } from "../domain/catalog"
 
 export function HolidayGallery({
@@ -25,12 +26,15 @@ export function HolidayGallery({
   const current = selected === null ? null : images[selected]
   return (
     <>
-      <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {images.map((photo, index) => (
           <button
             type="button"
             key={photo.file}
-            className="group relative aspect-[1.7] overflow-hidden rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring"
+            className={cn(
+              "group relative aspect-square overflow-hidden rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring",
+              index % 3 === 0 && "col-span-2 aspect-[1.8]"
+            )}
             onClick={() => setSelected(index)}
             aria-label={`View ${photo.alt}`}
           >
@@ -39,7 +43,7 @@ export function HolidayGallery({
               alt={photo.alt}
               fill
               sizes="(min-width: 1536px) 790px, (min-width: 1024px) 52vw, 90vw"
-              className="object-cover"
+              className="object-cover transition-transform duration-700 motion-safe:group-hover:scale-105"
             />
             <span
               className="absolute right-4 bottom-4 rounded-full bg-primary p-3 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"

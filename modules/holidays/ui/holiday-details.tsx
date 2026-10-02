@@ -7,6 +7,7 @@ import { holidayExcerpt, holidayImage, holidayLabel } from "../domain/catalog"
 import type { HolidayPackage } from "../domain/types"
 import { holidayPackages, holidayCategories } from "../data"
 import { HolidayHero } from "./holiday-hero"
+import { HolidayRoute } from "./holiday-route"
 import { HolidayFacts } from "./holiday-facts"
 import { HolidaySection, HolidayBulletList } from "./holiday-section"
 import { HolidayRichText } from "./holiday-rich-text"
@@ -52,7 +53,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
     ...new Set([...holiday.attractions, ...holiday.activities]),
   ]
   return (
-    <main className="bg-primary/5">
+    <main className="bg-background">
       <HolidayHero
         title={holiday.title}
         category={category?.name}
@@ -94,9 +95,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
             <HolidayGallery title={holiday.title} images={[featurePhoto]} />
           )}
           <HolidaySection title="Your route">
-            <p className="text-base leading-relaxed">
-              {holiday.route.join(" → ")}
-            </p>
+            <HolidayRoute stops={holiday.route} />
             {map && (
               <div className="relative aspect-[1.3] overflow-hidden rounded-2xl bg-card">
                 <Image
@@ -152,7 +151,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
               <ArrowRight className="size-4" />
             </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
             {related.map((item) => (
               <HolidayCard key={item.id} holiday={item} />
             ))}

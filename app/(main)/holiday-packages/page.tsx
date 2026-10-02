@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function HolidayPackagesPage() {
   return (
-    <main className="bg-primary/5">
+    <main className="bg-background">
       <HolidayHero
         title="Holiday packages"
         description="Explore Sri Lanka's extraordinary places, with thoughtfully planned journeys for your kind of adventure."

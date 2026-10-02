@@ -25,10 +25,15 @@ export function HolidayItinerary({
           <AccordionItem
             key={day.day}
             value={day.day}
-            className="rounded-xl border-0 bg-card px-5"
+            className="rounded-xl border border-border/60 bg-card px-5"
           >
             <AccordionTrigger>
-              Day {day.day}: {day.title}
+              <span className="flex items-center gap-4">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+                  {String(day.day).padStart(2, "0")}
+                </span>
+                <span>{day.title}</span>
+              </span>
             </AccordionTrigger>
             <AccordionContent>
               <HolidayRichText body={days[index]?.body ?? day.description} />
