@@ -1,0 +1,243 @@
+import type { HolidayPackage } from "../../../types/holiday";
+
+export const easternCoastBlueEscape: HolidayPackage = {
+  "id": "eastern-coast-blue-escape",
+  "slug": "eastern-coast-blue-escape",
+  "title": "Eastern Coast Blue Escape",
+  "category": "beach-tours",
+  "summary": "Eastern Coast Blue Escape is a 12-day, 11-night Sri Lanka itinerary designed for beach lovers, couples, and east-coast travellers. It follows a practical route through Negombo, Habarana, Trincomalee, Pasikudah, Arugam Bay, Yala, Galle, and Colombo. The page is written as a complete planning and enquiry resource: it explains the daily route, the type of traveller it suits, what needs to be confirmed before booking, and how Vacatina can tailor the same core journey around season, hotel level and travel pace.",
+  "duration": {
+    "days": 12,
+    "nights": 11
+  },
+  "price": {
+    "mode": "on-request",
+    "currency": "USD",
+    "amount": null,
+    "note": "Final price depends on dates, party size, hotel level and confirmed inclusions."
+  },
+  "bestFor": [
+    "beach lovers",
+    "couples",
+    "east-coast travellers"
+  ],
+  "activityLevel": "moderate",
+  "seasonNote": "Best matched to east-coast conditions, commonly May to September; verify current sea and weather conditions.",
+  "route": [
+    "Negombo",
+    "Habarana",
+    "Trincomalee",
+    "Pasikudah",
+    "Arugam Bay",
+    "Yala",
+    "Galle",
+    "Colombo"
+  ],
+  "destinations": [
+    "habarana",
+    "yala",
+    "galle"
+  ],
+  "attractions": [
+    "sigiriya-rock-fortress",
+    "yala-national-park"
+  ],
+  "activities": [],
+  "itinerary": [
+    {
+      "day": 1,
+      "title": "Arrival in Negombo",
+      "base": "Negombo",
+      "overnight": "Negombo",
+      "description": "Arrive and recover near the airport with optional beach, market or lagoon time.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 2,
+      "title": "Negombo to Habarana and Sigiriya",
+      "base": "Habarana",
+      "overnight": "Habarana",
+      "description": "Travel to the Cultural Triangle and visit Sigiriya toward evening.",
+      "destinations": [
+        "habarana"
+      ],
+      "attractions": [
+        "sigiriya-rock-fortress"
+      ],
+      "activities": []
+    },
+    {
+      "day": 3,
+      "title": "Habarana to Trincomalee",
+      "base": "Trincomalee",
+      "overnight": "Trincomalee",
+      "description": "Continue to the north-east coast and settle into Trincomalee.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 4,
+      "title": "Trincomalee marine and heritage day",
+      "base": "Trincomalee",
+      "overnight": "Trincomalee",
+      "description": "A full day for the coast, Pigeon Island area and Koneswaram/Swami Rock experiences.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 5,
+      "title": "Trincomalee to Pasikudah",
+      "base": "Pasikudah",
+      "overnight": "Pasikudah",
+      "description": "Travel south along the east coast to Pasikudah.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 6,
+      "title": "Pasikudah beach day",
+      "base": "Pasikudah",
+      "overnight": "Pasikudah",
+      "description": "A full day for shallow-water swimming and beach leisure.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 7,
+      "title": "Pasikudah to Arugam Bay",
+      "base": "Arugam Bay",
+      "overnight": "Arugam Bay",
+      "description": "Continue to Arugam Bay and settle into the surf-oriented east-coast atmosphere.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 8,
+      "title": "Arugam Bay beach and surf day",
+      "base": "Arugam Bay",
+      "overnight": "Arugam Bay",
+      "description": "A full day for surfing, beach time and local exploration.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 9,
+      "title": "Arugam Bay to Yala",
+      "base": "Yala",
+      "overnight": "Yala",
+      "description": "Travel south and take an evening safari in Yala.",
+      "destinations": [
+        "yala"
+      ],
+      "attractions": [
+        "yala-national-park"
+      ],
+      "activities": []
+    },
+    {
+      "day": 10,
+      "title": "Yala to Galle",
+      "base": "Galle",
+      "overnight": "Galle",
+      "description": "Continue to Galle and explore the historic fort area.",
+      "destinations": [
+        "galle"
+      ],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 11,
+      "title": "Galle to Colombo via Kosgoda",
+      "base": "Colombo",
+      "overnight": "Colombo",
+      "description": "Travel toward Colombo with a sea-turtle conservation stop near Kosgoda.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 12,
+      "title": "Departure",
+      "base": "Departure",
+      "overnight": "Departure",
+      "description": "Airport transfer for departure.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    }
+  ],
+  "inclusions": [
+    "Accommodation for the stated number of nights, with hotel class confirmed in the quotation",
+    "Private air-conditioned ground transport for the itinerary",
+    "English-speaking chauffeur-guide or guide as confirmed in the quotation",
+    "Airport arrival and departure transfers",
+    "Scheduled sightseeing and entrance fees only where explicitly confirmed in the final quotation",
+    "Applicable government taxes included in the confirmed quotation"
+  ],
+  "exclusions": [
+    "International and domestic airfares unless explicitly quoted",
+    "Sri Lanka visa or ETA fees",
+    "Travel insurance",
+    "Tips, gratuities and personal expenses",
+    "Alcoholic drinks and meals or snacks not stated in the confirmed meal plan",
+    "Optional activities and entrance fees not explicitly included",
+    "Early check-in and late check-out unless confirmed"
+  ],
+  "customizable": true,
+  "cta": {
+    "type": "enquiry",
+    "label": "Enquire about Eastern Coast Blue Escape"
+  },
+  "contentFile": "src/content/holidays/eastern-coast-blue-escape.md",
+  "media": {
+    "alt": "Eastern Coast Blue Escape Sri Lanka tour",
+    "heroImage": "media/photos/2025-09-Mirissa-scaled.jpg",
+    "thumbnailImage": "media/photos/2025-09-Mirissa-scaled.jpg",
+    "images": [
+      {
+        "role": "thumbnail",
+        "file": "media/photos/2025-09-Mirissa-scaled.jpg",
+        "alt": "Eastern Coast Blue Escape — cover"
+      },
+      {
+        "role": "hero",
+        "file": "media/photos/2025-09-Mirissa-scaled.jpg",
+        "alt": "Eastern Coast Blue Escape — hero"
+      },
+      {
+        "role": "gallery",
+        "file": "media/photos/2025-09-Bentota-1.jpg",
+        "alt": "Eastern Coast Blue Escape — gallery"
+      },
+      {
+        "role": "gallery",
+        "file": "media/photos/2025-09-Galle-Fort-2.jpg",
+        "alt": "Eastern Coast Blue Escape — gallery"
+      },
+      {
+        "role": "gallery",
+        "file": "media/photos/2025-09-Safari-02-scaled.jpg",
+        "alt": "Eastern Coast Blue Escape — gallery"
+      },
+      {
+        "role": "map",
+        "file": "media/photos/2025-09-Eastern-Blue-Bliss@3x.png",
+        "alt": "Eastern Coast Blue Escape — map"
+      },
+      {
+        "role": "faq",
+        "file": "media/photos/2025-08-sample-img-1-2.png",
+        "alt": "Eastern Coast Blue Escape — faq"
+      }
+    ]
+  }
+};

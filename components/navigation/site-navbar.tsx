@@ -34,7 +34,7 @@ const addOnItems: NavLinkItem[] = [
   { href: "#", label: "Activities" },
   { href: "#", label: "Rails" },
   { href: "#", label: "Sightseeing Tours" },
-  { href: "#", label: "Holiday Packages" },
+  { href: "/holiday-packages", label: "Holiday Packages" },
   { href: "#", label: "Travel Insurance" },
 ]
 
@@ -190,7 +190,11 @@ function matchesTransparentNavbarRoute(pathname: string | null) {
     return false
   }
 
-  return transparentNavbarRoutes.includes(pathname)
+  return (
+    transparentNavbarRoutes.includes(pathname) ||
+    pathname === "/holiday-packages" ||
+    pathname.startsWith("/holiday-packages/")
+  )
 }
 
 function subscribeToScrollPosition(onStoreChange: () => void) {
