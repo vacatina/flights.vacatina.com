@@ -41,7 +41,7 @@ export function HolidayHero(props: HolidayHeroProps) {
             ) : (
               <>
                 <span className="block">Holiday</span>
-                <span className="block text-white/80 italic">packages</span>
+                <span className="block text-white/80">packages</span>
               </>
             )}
           </h1>
