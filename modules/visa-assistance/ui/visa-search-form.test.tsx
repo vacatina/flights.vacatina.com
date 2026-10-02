@@ -14,18 +14,18 @@ describe("VisaSearchForm", () => {
     render(<VisaSearchForm />)
 
     const button = screen.getByRole("button", {
-      name: "Check Visa Requirements",
+      name: "Search Visa Services",
     })
 
     expect(button.className).toContain("overflow-hidden")
     expect(button.querySelector('div[style*="width"]')).toBeTruthy()
   })
 
-  test("keeps the compact check-again action unchanged", () => {
+  test("uses the shared loading action for compact searches too", () => {
     render(<VisaSearchForm compact />)
 
-    const button = screen.getByRole("button", { name: "Check again" })
+    const button = screen.getByRole("button", { name: "Search visa services" })
 
-    expect(button.className).not.toContain("overflow-hidden")
+    expect(button.className).toContain("overflow-hidden")
   })
 })

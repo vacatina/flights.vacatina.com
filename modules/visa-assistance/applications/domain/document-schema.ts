@@ -3,15 +3,12 @@ import { z } from "zod"
 import {
   VISA_DOCUMENT_MAX_FILE_SIZE,
   VISA_DOCUMENT_MIME_TYPES,
-  VISA_DOCUMENT_TYPES,
 } from "@/modules/visa-assistance/applications/domain/constants"
-
-export const visaDocumentTypeSchema = z.enum(VISA_DOCUMENT_TYPES)
 
 export const documentMetadataSchema = z.object({
   applicationId: z.string().trim().min(1),
-  travelerId: z.string().trim().min(1),
-  documentType: visaDocumentTypeSchema,
+  travelerId: z.string().trim().min(1).nullable().default(null),
+  requirementId: z.uuid(),
   originalFilename: z.string().trim().min(1).max(255),
   mimeType: z.enum(VISA_DOCUMENT_MIME_TYPES),
   sizeBytes: z.number().int().positive().max(VISA_DOCUMENT_MAX_FILE_SIZE),
@@ -22,4 +19,4 @@ export const completeDocumentUploadSchema = z.object({
   documentId: z.string().trim().min(1),
 })
 
-export type VisaDocumentType = z.infer<typeof visaDocumentTypeSchema>
+export type VisaDocumentMetadata = z.input<typeof documentMetadataSchema>

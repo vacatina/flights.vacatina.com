@@ -132,10 +132,8 @@ export function AdminVisaApplicationList({
                   </TableCell>
                   <TableCell>{application.travelerCount}</TableCell>
                   <TableCell>
-                    {application.pricingSnapshot?.totalSellMoney ? (
-                      <Money
-                        money={application.pricingSnapshot.totalSellMoney}
-                      />
+                    {application.pricingSnapshot?.totalMoney ? (
+                      <Money money={application.pricingSnapshot.totalMoney} />
                     ) : (
                       "Unavailable"
                     )}

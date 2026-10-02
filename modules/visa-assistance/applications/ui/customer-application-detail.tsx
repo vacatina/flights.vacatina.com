@@ -1,11 +1,10 @@
 import Link from "next/link"
+import { VisaDocumentSummary } from "./document-summary"
 import {
   AlertCircleIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   CalendarDaysIcon,
-  DownloadIcon,
-  FileTextIcon,
   MailIcon,
   PhoneIcon,
   UserRoundIcon,
@@ -39,13 +38,10 @@ export function CustomerVisaApplicationDetail({
 }: {
   detail: VisaApplicationDetail
 }) {
-  const { application, travelers, documents } = detail
+  const { application, travelers } = detail
   const status = getCustomerVisaStatus(application.status)
   const nationality = getVisaCountry(application.nationalityCode)
   const destination = getVisaCountry(application.destinationCode)
-  const uploadedDocuments = documents.filter(
-    (document) => document.status === "uploaded"
-  )
   const isDraft = application.status === "draft"
 
   return (
@@ -199,43 +195,7 @@ export function CustomerVisaApplicationDetail({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              {uploadedDocuments.map((document) => (
-                <div
-                  key={document.id}
-                  className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/40 p-3"
-                >
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-background ring-1 ring-foreground/10">
-                    <FileTextIcon className="size-4" aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {document.originalFilename}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDocumentType(document.documentType)} ·{" "}
-                      {formatFileSize(document.sizeBytes)}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    nativeButton={false}
-                    render={
-                      <a
-                        href={`/api/visa-applications/${application.id}/documents/${document.id}`}
-                      />
-                    }
-                  >
-                    <DownloadIcon data-icon="inline-start" />
-                    Download
-                  </Button>
-                </div>
-              ))}
-              {uploadedDocuments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No documents have been uploaded yet.
-                </p>
-              ) : null}
+              <VisaDocumentSummary detail={detail} />
             </CardContent>
           </Card>
         </div>
@@ -324,20 +284,6 @@ function CompactDetail({
 function maskPassport(passportNumber: string) {
   const visible = passportNumber.slice(-4)
   return `${"•".repeat(Math.max(passportNumber.length - 4, 4))}${visible}`
-}
-
-function formatDocumentType(value: string) {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-function formatFileSize(sizeBytes: number) {
-  if (sizeBytes < 1024 * 1024) {
-    return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`
-  }
-
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatDate(value: Date) {

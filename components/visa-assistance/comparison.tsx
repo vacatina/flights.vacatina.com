@@ -66,7 +66,7 @@ const pros = [
 
 export default function Comparison() {
   return (
-    <div className="grid gap-6 md:mt-20 pb-14 md:grid-cols-4 md:gap-0  mx-auto max-w-6xl">
+    <div className="w-full grid gap-6 md:mt-20 pb-14 md:grid-cols-4 md:gap-0  mx-auto max-w-screen-2xl">
       <div className="rounded-md flex flex-col justify-between space-y-8  border-dashed border-1 p-6 md:col-span-2 md:my-2 md:rounded-r-none md:border-r-0 lg:p-10">
         <div className="space-y-6">
           <h3 className="!text-2xl font-bold !mb-6 text-muted-foreground">

@@ -22,7 +22,7 @@ export default async function FlightChangeLayout({
     <>
       <SiteNavbar clerkEnabled={clerkEnabled} />
       <div className="border-b border-[#dfe4ec] bg-white">
-        <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto flex min-h-14 max-w-screen-2xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <nav
             aria-label="Flight change breadcrumb"
             className="flex min-w-0 items-center gap-2 text-sm"

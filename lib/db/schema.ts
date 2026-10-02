@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core"
 
 import type { VisaApplicationPricingSnapshot } from "@/modules/visa-assistance/applications/domain/pricing-snapshot"
+import type { VisaListingSnapshot } from "@/modules/visa-assistance/applications/domain/listing-snapshot"
 
 export const pricingAdjustmentTypeEnum = pgEnum("pricing_adjustment_type", [
   "percent",
@@ -546,6 +547,157 @@ export const visaPricingRuleEvents = pgTable(
   })
 )
 
+export const visaListingStatusEnum = pgEnum("visa_listing_status", [
+  "draft",
+  "published",
+])
+
+export const visaListingDocumentScopeEnum = pgEnum(
+  "visa_listing_document_scope",
+  ["per_traveler", "per_application"]
+)
+
+export const visaListings = pgTable(
+  "visa_listings",
+  {
+    id: text("id").primaryKey(),
+    nationalityCode: text("nationality_code").notNull(),
+    destinationCode: text("destination_code").notNull(),
+    code: text("code").notNull(),
+    title: text("title").notNull().default(""),
+    shortSummary: text("short_summary").notNull().default(""),
+    fullDescription: text("full_description").notNull().default(""),
+    eligibilityNotes: text("eligibility_notes"),
+    processingTimeText: text("processing_time_text"),
+    validityText: text("validity_text"),
+    maxStayText: text("max_stay_text"),
+    entriesText: text("entries_text"),
+    passportValidityText: text("passport_validity_text"),
+    additionalNotes: text("additional_notes"),
+    feeCurrency: text("fee_currency"),
+    governmentFeeMinor: numeric("government_fee_minor", {
+      precision: 30,
+      scale: 0,
+    }),
+    processingFeeMinor: numeric("processing_fee_minor", {
+      precision: 30,
+      scale: 0,
+    }),
+    status: visaListingStatusEnum("status").notNull().default("draft"),
+    documentsReviewed: boolean("documents_reviewed").notNull().default(false),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: text("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    routeCodeUniqueIdx: uniqueIndex("visa_listings_route_code_unique_idx").on(
+      table.nationalityCode,
+      table.destinationCode,
+      table.code
+    ),
+    publicRouteIdx: index("visa_listings_public_route_idx").on(
+      table.status,
+      table.nationalityCode,
+      table.destinationCode
+    ),
+    nationalityCheck: check(
+      "visa_listings_nationality_check",
+      sql`${table.nationalityCode} ~ '^[A-Z]{2}$'`
+    ),
+    destinationCheck: check(
+      "visa_listings_destination_check",
+      sql`${table.destinationCode} ~ '^[A-Z]{2}$' and ${table.destinationCode} <> ${table.nationalityCode}`
+    ),
+    codeCheck: check(
+      "visa_listings_code_check",
+      sql`${table.code} ~ '^[A-Z0-9_-]{2,40}$'`
+    ),
+    currencyCheck: check(
+      "visa_listings_currency_check",
+      sql`${table.feeCurrency} is null or ${table.feeCurrency} ~ '^[A-Z]{3}$'`
+    ),
+    feesCheck: check(
+      "visa_listings_fees_check",
+      sql`(${table.governmentFeeMinor} is null or ${table.governmentFeeMinor} >= 0) and (${table.processingFeeMinor} is null or ${table.processingFeeMinor} >= 0)`
+    ),
+  })
+)
+
+export const visaListingDocuments = pgTable(
+  "visa_listing_documents",
+  {
+    id: text("id").primaryKey(),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => visaListings.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    instructions: text("instructions"),
+    required: boolean("required").notNull().default(true),
+    scope: visaListingDocumentScopeEnum("scope").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    orderUniqueIdx: uniqueIndex("visa_listing_documents_order_unique_idx").on(
+      table.listingId,
+      table.sortOrder
+    ),
+    sortOrderCheck: check(
+      "visa_listing_documents_sort_order_check",
+      sql`${table.sortOrder} >= 0`
+    ),
+    labelCheck: check(
+      "visa_listing_documents_label_check",
+      sql`length(trim(${table.label})) > 0`
+    ),
+  })
+)
+
+export const visaListingEvents = pgTable(
+  "visa_listing_events",
+  {
+    id: text("id").primaryKey(),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => visaListings.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    eventType: text("event_type")
+      .$type<"created" | "updated" | "published" | "unpublished">()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    timelineIdx: index("visa_listing_events_timeline_idx").on(
+      table.listingId,
+      table.createdAt
+    ),
+    eventTypeCheck: check(
+      "visa_listing_events_type_check",
+      sql`${table.eventType} in ('created', 'updated', 'published', 'unpublished')`
+    ),
+  })
+)
+
 export const visaApplications = pgTable(
   "visa_applications",
   {
@@ -556,8 +708,12 @@ export const visaApplications = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     nationalityCode: text("nationality_code").notNull(),
     destinationCode: text("destination_code").notNull(),
-    visaTypeId: text("visa_type_id").notNull(),
-    providerProductId: text("provider_product_id"),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => visaListings.id, { onDelete: "restrict" }),
+    listingSnapshot: jsonb("listing_snapshot")
+      .$type<VisaListingSnapshot>()
+      .notNull(),
     visaName: text("visa_name").notNull(),
     entryDate: date("entry_date"),
     travelerCount: integer("traveler_count").notNull().default(1),
@@ -565,8 +721,8 @@ export const visaApplications = pgTable(
     contactPhone: text("contact_phone"),
     status: visaApplicationStatusEnum("status").notNull().default("draft"),
     pricingSnapshot: jsonb("pricing_snapshot")
-      .$type<VisaApplicationPricingSnapshot | null>()
-      .default(null),
+      .$type<VisaApplicationPricingSnapshot>()
+      .notNull(),
     internalNotes: text("internal_notes"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -584,6 +740,7 @@ export const visaApplications = pgTable(
       table.ownerUserId,
       table.updatedAt
     ),
+    listingIdx: index("visa_applications_listing_idx").on(table.listingId),
     statusSubmittedIdx: index("visa_applications_status_submitted_idx").on(
       table.status,
       table.submittedAt
@@ -638,12 +795,13 @@ export const visaApplicationDocuments = pgTable(
     applicationId: text("application_id")
       .notNull()
       .references(() => visaApplications.id, { onDelete: "cascade" }),
-    travelerId: text("traveler_id")
-      .notNull()
-      .references(() => visaApplicationTravelers.id, {
+    travelerId: text("traveler_id").references(
+      () => visaApplicationTravelers.id,
+      {
         onDelete: "cascade",
-      }),
-    documentType: visaDocumentTypeEnum("document_type").notNull(),
+      }
+    ),
+    requirementId: text("requirement_id").notNull(),
     status: visaDocumentStatusEnum("status")
       .notNull()
       .default("pending_upload"),
@@ -673,6 +831,18 @@ export const visaApplicationDocuments = pgTable(
     objectKeyUniqueIdx: uniqueIndex(
       "visa_application_documents_object_key_unique_idx"
     ).on(table.objectKey),
+    uploadedTravelerSlotIdx: uniqueIndex(
+      "visa_documents_uploaded_traveler_slot_idx"
+    )
+      .on(table.applicationId, table.requirementId, table.travelerId)
+      .where(
+        sql`${table.status} = 'uploaded' and ${table.travelerId} is not null`
+      ),
+    uploadedSharedSlotIdx: uniqueIndex(
+      "visa_documents_uploaded_shared_slot_idx"
+    )
+      .on(table.applicationId, table.requirementId)
+      .where(sql`${table.status} = 'uploaded' and ${table.travelerId} is null`),
     sizeCheck: check(
       "visa_application_documents_size_check",
       sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 10485760`
@@ -1711,6 +1881,10 @@ export type NewPricingRuleRow = typeof pricingRules.$inferInsert
 export type VisaPricingRuleRow = typeof visaPricingRules.$inferSelect
 export type NewVisaPricingRuleRow = typeof visaPricingRules.$inferInsert
 export type VisaPricingRuleEventRow = typeof visaPricingRuleEvents.$inferSelect
+
+export type VisaListingRow = typeof visaListings.$inferSelect
+export type NewVisaListingRow = typeof visaListings.$inferInsert
+export type VisaListingDocumentRow = typeof visaListingDocuments.$inferSelect
 
 export type VisaApplicationRow = typeof visaApplications.$inferSelect
 export type NewVisaApplicationRow = typeof visaApplications.$inferInsert

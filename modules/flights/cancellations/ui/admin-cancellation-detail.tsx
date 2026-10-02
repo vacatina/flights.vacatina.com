@@ -82,7 +82,7 @@ export function AdminCancellationDetail({
     : "No PayPal capture ID is available. Support must complete this refund manually."
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="w-full mx-auto max-w-screen-2xl space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 rounded-md border border-[#dfe4ec] bg-white p-5 shadow-sm md:p-6">
         <div className="space-y-2">

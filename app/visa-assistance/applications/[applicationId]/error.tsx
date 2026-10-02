@@ -11,7 +11,7 @@ export default function VisaApplicationError({
   reset: () => void
 }) {
   return (
-    <main className="mx-auto flex min-h-[60svh] max-w-lg items-center px-4">
+    <main className="w-full mx-auto flex min-h-[60svh] max-w-screen-2xl items-center px-4">
       <div className="w-full rounded-xl border bg-card p-6 text-center">
         <AlertCircleIcon className="mx-auto size-8 text-destructive" />
         <h1 className="mt-4 text-xl font-semibold">

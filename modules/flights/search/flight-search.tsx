@@ -13,7 +13,7 @@ export function FlightSearch({ initialValues }: FlightSearchProps) {
         <div className="absolute inset-0 bg-[url('/img/hero.jpg')] bg-cover bg-center bg-no-repeat" />
         <div className="absolute inset-0 bg-[#05103680]" />
 
-        <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center px-4 md:px-8 lg:px-12">
+        <div className="relative mx-auto flex w-full max-w-screen-2xl flex-1 flex-col justify-center px-4 md:px-8 lg:px-12">
           <div className="mx-auto max-w-4xl shrink-0 text-center text-white">
             <h1 className="text-[54px] font-semibold tracking-[-0.02em] leading-14 text-balance md:text-[56px]">
               Book Everything in One Place
@@ -24,7 +24,7 @@ export function FlightSearch({ initialValues }: FlightSearchProps) {
             </p>
           </div>
 
-          <div className="mx-auto mt-8 flex w-full max-w-7xl flex-col md:mt-10">
+          <div className="mx-auto mt-8 flex w-full max-w-screen-2xl flex-col md:mt-10">
             <FlightSearchForm initialValues={initialValues} />
           </div>
         </div>

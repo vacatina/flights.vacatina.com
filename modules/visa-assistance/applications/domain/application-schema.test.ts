@@ -61,7 +61,7 @@ describe("visa application schemas", () => {
     const baseDocument = {
       applicationId: "va_123",
       travelerId: "vat_123",
-      documentType: "passport_bio_page",
+      requirementId: "550e8400-e29b-41d4-a716-446655440001",
       originalFilename: "passport.pdf",
       mimeType: "application/pdf",
       sizeBytes: 1024,

@@ -25,7 +25,7 @@ export function HeroSection({
       />
       <HeroVideoBackground />
       <div className="absolute inset-0 bg-[#05103680]" />
-      <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pt-10 md:px-8 md:pt-16 lg:px-12">
+      <div className="relative mx-auto flex w-full max-w-screen-2xl flex-1 flex-col px-4 pt-10 md:px-8 md:pt-16 lg:px-12">
         <div className="mx-auto max-w-4xl text-center text-white">
           <h1
             id="home-title"

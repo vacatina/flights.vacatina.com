@@ -36,7 +36,7 @@ export function TravelServicesSection() {
   return (
     <section
       aria-labelledby="travel-services-title"
-      className="mx-auto max-w-7xl px-4 pb-16 md:px-8 md:pb-20 lg:px-12"
+      className="w-full mx-auto max-w-screen-2xl px-4 pb-16 md:px-8 md:pb-20 lg:px-12"
     >
       <div className="rounded-2xl bg-[#f1f5fa] p-6 md:p-10 dark:bg-card">
         <h2

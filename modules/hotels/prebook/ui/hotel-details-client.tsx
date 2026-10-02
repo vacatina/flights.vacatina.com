@@ -73,7 +73,7 @@ export function HotelDetailsClient({ hotel, ratesData, summary, searchParams }: 
 
   return (
     <main className="min-h-svh bg-muted/40 py-7 md:py-10">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-7 px-4 md:px-8">
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-7 px-4 md:px-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>

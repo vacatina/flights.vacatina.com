@@ -17,7 +17,7 @@ export default function ResultsSegmentLoading() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[calc(100dvh-100px)] w-full max-w-4xl flex-col items-center justify-center px-6">
+    <main className="mx-auto flex min-h-[calc(100dvh-100px)] w-full max-w-screen-2xl flex-col items-center justify-center px-6">
       <TravelProgressLoader message={loadingText} />
     </main>
   )

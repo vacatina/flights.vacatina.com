@@ -1,5 +1,16 @@
 # Visa Application Phase 1 Implementation Plan
 
+> **Historical plan — superseded by Manual Visa Listing V7.**
+> Follow [the V7 plan](manual-visa-listing-v7-implementation-plan.md) for active
+> implementation and [release verification](manual-visa-v7-release-checklist.md)
+> for outstanding checks. The API-backed selection, markup rules, fixed document
+> types, and live price refresh described below are no longer active.
+> Current requests use published database listings, final admin-entered unit
+> fees, and a frozen listing/document checklist. Documents are configured per
+> listing and uploaded per traveler or once per request. No payment is collected.
+> This file is retained to explain the original implementation, not to define
+> current behavior.
+
 ## 1. Objective
 
 Build a Vacatina-owned visa request flow that collects the information and

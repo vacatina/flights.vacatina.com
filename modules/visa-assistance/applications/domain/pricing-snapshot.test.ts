@@ -1,52 +1,56 @@
-import { describe, expect, test } from "vitest"
-
+import { describe, expect, it } from "vitest"
+import { applicationFixture } from "../testing/application-fixture"
 import {
+  createApplicationPricing,
   areVisaApplicationPricesEquivalent,
-  type VisaApplicationPricingSnapshot,
-} from "@/modules/visa-assistance/applications/domain"
+} from "./pricing-snapshot"
+import { visaListingSnapshotSchema } from "./listing-snapshot"
 
-const baseSnapshot: VisaApplicationPricingSnapshot = {
-  processingFee: null,
-  governmentFee: null,
-  totalSellMoney: { amount: "10000", currency: "USD", scale: 2 },
-  pricedAt: "2026-09-11T00:00:00.000Z",
-}
-
-describe("visa application pricing snapshots", () => {
-  test("ignores timestamp-only refreshes", () => {
-    expect(
-      areVisaApplicationPricesEquivalent(baseSnapshot, {
-        ...baseSnapshot,
-        pricedAt: "2026-09-11T00:05:00.000Z",
-      })
-    ).toBe(true)
+describe("frozen manual visa estimates", () => {
+  it("multiplies both exact fees by traveler count", () => {
+    const snapshot = applicationFixture().application.listingSnapshot
+    const pricing = createApplicationPricing(snapshot, 3)
+    expect(pricing.governmentFee.amount).toBe("7500")
+    expect(pricing.processingFee.amount).toBe("3705")
+    expect(pricing.totalMoney.amount).toBe("11205")
+    expect(pricing.travelerCount).toBe(3)
   })
-
-  test("detects a changed estimated amount", () => {
+  it("compares amounts without treating time as a price change", () => {
+    const snapshot = applicationFixture().application.listingSnapshot
     expect(
-      areVisaApplicationPricesEquivalent(baseSnapshot, {
-        ...baseSnapshot,
-        totalSellMoney: { amount: "11000", currency: "USD", scale: 2 },
-      })
+      areVisaApplicationPricesEquivalent(
+        createApplicationPricing(snapshot, 1, "2026-09-30T00:00:00Z"),
+        createApplicationPricing(snapshot, 1, "2026-10-01T00:00:00Z")
+      )
+    ).toBe(true)
+    expect(
+      areVisaApplicationPricesEquivalent(
+        createApplicationPricing(snapshot, 1),
+        createApplicationPricing(snapshot, 2)
+      )
     ).toBe(false)
   })
-
-  test("ignores JSONB object-key ordering", () => {
-    const databaseSnapshot = JSON.parse(
-      JSON.stringify({
-        pricedAt: baseSnapshot.pricedAt,
-        totalSellMoney: {
-          scale: 2,
-          currency: "USD",
-          amount: "10000",
-        },
-        governmentFee: null,
-        processingFee: null,
-      })
-    ) as VisaApplicationPricingSnapshot
-
+  it("supports zero fees and rejects invalid counts and snapshots", () => {
+    const snapshot = applicationFixture().application.listingSnapshot
     expect(
-      areVisaApplicationPricesEquivalent(baseSnapshot, databaseSnapshot)
-    ).toBe(true)
+      createApplicationPricing(
+        { ...snapshot, governmentFeeMinor: "0", processingFeeMinor: "0" },
+        2
+      ).totalMoney.amount
+    ).toBe("0")
+    for (const count of [0, 11, 1.5, NaN])
+      expect(() => createApplicationPricing(snapshot, count)).toThrow()
+    expect(
+      visaListingSnapshotSchema.safeParse({
+        ...snapshot,
+        governmentFeeMinor: "-1",
+      }).success
+    ).toBe(false)
+    expect(
+      visaListingSnapshotSchema.safeParse({
+        ...snapshot,
+        documents: [snapshot.documents[0], snapshot.documents[0]],
+      }).success
+    ).toBe(false)
   })
 })

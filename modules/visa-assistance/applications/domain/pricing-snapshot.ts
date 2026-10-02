@@ -1,63 +1,70 @@
 import { z } from "zod"
+import {
+  getCurrencyPrecision,
+  isDisplayCurrencyCode,
+} from "@/modules/currency/domain/registry"
+import type { VisaListingSnapshot } from "./listing-snapshot"
 
-const moneySchema = z.object({
-  amount: z.string(),
-  currency: z.string().regex(/^[A-Z]{3}$/),
-  scale: z.number().int().min(0).max(12),
-})
-
-const feeSchema = z.object({
-  feeComponent: z.enum(["processing_fee", "government_fee"]),
-  sourceMoney: moneySchema,
-  markupMoney: moneySchema,
-  sellMoney: moneySchema,
-  appliedRuleId: z.string().nullable(),
-  appliedRuleName: z.string().nullable(),
-  appliedRuleSpecificity: z.number().int().nullable(),
-})
+const moneySchema = z
+  .object({
+    amount: z.string().regex(/^\d+$/),
+    currency: z.string().refine(isDisplayCurrencyCode),
+    scale: z.number().int().min(0).max(3),
+  })
+  .refine(
+    (money) => money.scale === getCurrencyPrecision(money.currency),
+    "Invalid currency precision"
+  )
 
 export const visaApplicationPricingSnapshotSchema = z.object({
-  processingFee: feeSchema.nullable(),
-  governmentFee: feeSchema.nullable(),
-  totalSellMoney: moneySchema.nullable(),
-  pricedAt: z.string().datetime(),
+  governmentFee: moneySchema,
+  processingFee: moneySchema,
+  totalMoney: moneySchema,
+  travelerCount: z.number().int().min(1).max(10),
+  pricedAt: z.iso.datetime(),
 })
 
 export type VisaApplicationPricingSnapshot = z.infer<
   typeof visaApplicationPricingSnapshotSchema
 >
 
+export function createApplicationPricing(
+  snapshot: VisaListingSnapshot,
+  travelerCount: number,
+  pricedAt = new Date().toISOString()
+): VisaApplicationPricingSnapshot {
+  z.number().int().min(1).max(10).parse(travelerCount)
+  const currency = snapshot.feeCurrency
+  const scale = getCurrencyPrecision(currency)
+  const government = BigInt(snapshot.governmentFeeMinor) * BigInt(travelerCount)
+  const processing = BigInt(snapshot.processingFeeMinor) * BigInt(travelerCount)
+  return visaApplicationPricingSnapshotSchema.parse({
+    governmentFee: { amount: government.toString(), currency, scale },
+    processingFee: { amount: processing.toString(), currency, scale },
+    totalMoney: {
+      amount: (government + processing).toString(),
+      currency,
+      scale,
+    },
+    travelerCount,
+    pricedAt,
+  })
+}
+
 export function areVisaApplicationPricesEquivalent(
   left: VisaApplicationPricingSnapshot,
   right: VisaApplicationPricingSnapshot
 ) {
-  const leftPricing = pricingComponents(left)
-  const rightPricing = pricingComponents(right)
-
-  return stableJson(leftPricing) === stableJson(rightPricing)
-}
-
-function pricingComponents(snapshot: VisaApplicationPricingSnapshot) {
-  return {
-    processingFee: snapshot.processingFee,
-    governmentFee: snapshot.governmentFee,
-    totalSellMoney: snapshot.totalSellMoney,
-  }
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableJson).join(",")}]`
-  }
-
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value).sort(([left], [right]) =>
-      left.localeCompare(right)
-    )
-    return `{${entries
-      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
-      .join(",")}}`
-  }
-
-  return JSON.stringify(value)
+  return (
+    left.travelerCount === right.travelerCount &&
+    (["governmentFee", "processingFee", "totalMoney"] as const).every((key) => {
+      const a = left[key]
+      const b = right[key]
+      return (
+        a.amount === b.amount &&
+        a.currency === b.currency &&
+        a.scale === b.scale
+      )
+    })
+  )
 }

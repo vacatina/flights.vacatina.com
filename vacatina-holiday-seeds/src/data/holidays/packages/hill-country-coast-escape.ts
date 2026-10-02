@@ -1,0 +1,229 @@
+import type { HolidayPackage } from "../../../types/holiday";
+
+export const hillCountryCoastEscape: HolidayPackage = {
+  "id": "hill-country-coast-escape",
+  "slug": "hill-country-coast-escape",
+  "title": "Hill Country & Coast Escape",
+  "category": "hill-country-tours",
+  "summary": "Hill Country & Coast Escape is a 9-day, 8-night Sri Lanka itinerary designed for rail enthusiasts, hill country, and scenic landscapes. It follows a practical route through Negombo, Kandy, Nuwara Eliya, Ella, and Colombo. The page is written as a complete planning and enquiry resource: it explains the daily route, the type of traveller it suits, what needs to be confirmed before booking, and how Vacatina can tailor the same core journey around season, hotel level and travel pace.",
+  "duration": {
+    "days": 9,
+    "nights": 8
+  },
+  "price": {
+    "mode": "on-request",
+    "currency": "USD",
+    "amount": null,
+    "note": "Final price depends on dates, party size, hotel level and confirmed inclusions."
+  },
+  "bestFor": [
+    "rail enthusiasts",
+    "hill country",
+    "scenic landscapes"
+  ],
+  "activityLevel": "moderate",
+  "seasonNote": "Year-round route; confirm coast, wildlife and activity conditions for the travel month.",
+  "route": [
+    "Negombo",
+    "Kandy",
+    "Nuwara Eliya",
+    "Ella",
+    "Colombo"
+  ],
+  "destinations": [
+    "kandy",
+    "nuwara-eliya",
+    "ella",
+    "galle"
+  ],
+  "attractions": [
+    "peradeniya-royal-botanical-gardens",
+    "tea-factories-and-estates",
+    "hakgala-botanical-gardens",
+    "nine-arch-bridge",
+    "little-adams-peak",
+    "ravana-falls"
+  ],
+  "activities": [
+    "temple-rituals-tour"
+  ],
+  "itinerary": [
+    {
+      "day": 1,
+      "title": "Arrival in Negombo",
+      "base": "Negombo",
+      "overnight": "Negombo",
+      "description": "Arrival and leisure.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 2,
+      "title": "Negombo to Kandy",
+      "base": "Kandy",
+      "overnight": "Kandy",
+      "description": "Travel to Kandy, visit the Temple of the Tooth area and viewpoint.",
+      "destinations": [
+        "kandy"
+      ],
+      "attractions": [],
+      "activities": [
+        "temple-rituals-tour"
+      ]
+    },
+    {
+      "day": 3,
+      "title": "Kandy views and gardens",
+      "base": "Kandy",
+      "overnight": "Kandy",
+      "description": "Ambuluwawa area and Peradeniya Botanical Gardens.",
+      "destinations": [
+        "kandy"
+      ],
+      "attractions": [
+        "peradeniya-royal-botanical-gardens"
+      ],
+      "activities": []
+    },
+    {
+      "day": 4,
+      "title": "Scenic rail to Nuwara Eliya",
+      "base": "Nuwara Eliya",
+      "overnight": "Nuwara Eliya",
+      "description": "Train through tea country, tea factory visit and town exploration.",
+      "destinations": [
+        "nuwara-eliya"
+      ],
+      "attractions": [
+        "tea-factories-and-estates"
+      ],
+      "activities": []
+    },
+    {
+      "day": 5,
+      "title": "Nuwara Eliya nature day",
+      "base": "Nuwara Eliya",
+      "overnight": "Nuwara Eliya",
+      "description": "Hakgala Botanical Gardens and Ambewela Farm area.",
+      "destinations": [
+        "nuwara-eliya"
+      ],
+      "attractions": [
+        "hakgala-botanical-gardens"
+      ],
+      "activities": []
+    },
+    {
+      "day": 6,
+      "title": "Scenic rail to Ella",
+      "base": "Ella",
+      "overnight": "Ella",
+      "description": "Train to Ella and visit Nine Arch Bridge.",
+      "destinations": [
+        "ella"
+      ],
+      "attractions": [
+        "nine-arch-bridge"
+      ],
+      "activities": []
+    },
+    {
+      "day": 7,
+      "title": "Ella hikes and waterfalls",
+      "base": "Ella",
+      "overnight": "Ella",
+      "description": "Little Adam’s Peak, Ravana Falls and Ella Gap.",
+      "destinations": [
+        "ella"
+      ],
+      "attractions": [
+        "little-adams-peak",
+        "ravana-falls"
+      ],
+      "activities": []
+    },
+    {
+      "day": 8,
+      "title": "Ella to Colombo via Galle",
+      "base": "Colombo",
+      "overnight": "Colombo",
+      "description": "Travel to Colombo with a stop at Galle Fort.",
+      "destinations": [
+        "galle"
+      ],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 9,
+      "title": "Departure",
+      "base": "Departure",
+      "overnight": "Departure",
+      "description": "Airport transfer for departure.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    }
+  ],
+  "inclusions": [
+    "Accommodation for the stated number of nights, with hotel class confirmed in the quotation",
+    "Private air-conditioned ground transport for the itinerary",
+    "English-speaking chauffeur-guide or guide as confirmed in the quotation",
+    "Airport arrival and departure transfers",
+    "Scheduled sightseeing and entrance fees only where explicitly confirmed in the final quotation",
+    "Applicable government taxes included in the confirmed quotation"
+  ],
+  "exclusions": [
+    "International and domestic airfares unless explicitly quoted",
+    "Sri Lanka visa or ETA fees",
+    "Travel insurance",
+    "Tips, gratuities and personal expenses",
+    "Alcoholic drinks and meals or snacks not stated in the confirmed meal plan",
+    "Optional activities and entrance fees not explicitly included",
+    "Early check-in and late check-out unless confirmed"
+  ],
+  "customizable": true,
+  "cta": {
+    "type": "enquiry",
+    "label": "Enquire about Hill Country & Coast Escape"
+  },
+  "contentFile": "src/content/holidays/hill-country-coast-escape.md",
+  "media": {
+    "alt": "Hill Country & Coast Escape Sri Lanka tour",
+    "heroImage": "media/photos/2025-09-Ella-1.jpg",
+    "thumbnailImage": "media/photos/2025-09-Ella-1.jpg",
+    "images": [
+      {
+        "role": "thumbnail",
+        "file": "media/photos/2025-09-Ella-1.jpg",
+        "alt": "Hill Country & Coast Escape — cover"
+      },
+      {
+        "role": "hero",
+        "file": "media/photos/2025-09-Ella-1.jpg",
+        "alt": "Hill Country & Coast Escape — hero"
+      },
+      {
+        "role": "gallery",
+        "file": "media/photos/2025-09-Tea.jpg",
+        "alt": "Hill Country & Coast Escape — gallery"
+      },
+      {
+        "role": "gallery",
+        "file": "media/photos/2025-09-Kandy-1.jpg",
+        "alt": "Hill Country & Coast Escape — gallery"
+      },
+      {
+        "role": "gallery",
+        "file": "media/photos/2025-09-Horton-Plains-1.jpg",
+        "alt": "Hill Country & Coast Escape — gallery"
+      },
+      {
+        "role": "map",
+        "file": "media/photos/2025-09-Scenic-Hill-Country-Exploration-and-Southern-Wonders@3x.png",
+        "alt": "Hill Country & Coast Escape — map"
+      }
+    ]
+  }
+};

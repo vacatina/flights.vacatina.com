@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { VisaApplicationShell } from "@/modules/visa-assistance/applications"
-import { loadOwnedVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
+import { loadEditableVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
 import { ContactStepForm } from "@/modules/visa-assistance/applications/ui/contact-step-form"
 
 export default async function VisaApplicationContactPage({
@@ -12,7 +12,7 @@ export default async function VisaApplicationContactPage({
   const { applicationId } = await params
   const basePath = `/visa-assistance/applications/${applicationId}`
   const path = `${basePath}/contact`
-  const { detail } = await loadOwnedVisaApplicationPage(applicationId, path)
+  const { detail } = await loadEditableVisaApplicationPage(applicationId, path)
 
   if (detail.travelers.length !== detail.application.travelerCount) {
     redirect(`${basePath}/travelers`)

@@ -42,7 +42,7 @@ export function VisaProductFaq({
   ]
 
   return (
-    <section aria-labelledby="visa-faq-heading" className="max-w-4xl">
+    <section aria-labelledby="visa-faq-heading" className="w-full max-w-screen-2xl">
       <h2
         id="visa-faq-heading"
         className="font-heading text-2xl font-semibold tracking-[-0.025em] md:text-3xl"

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { withVisaActionFeedback } from "./action-feedback"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { Controller, useForm } from "react-hook-form"
@@ -33,6 +34,7 @@ import { submitVisaApplicationAction } from "@/modules/visa-assistance/applicati
 import { VisaFormActions } from "@/modules/visa-assistance/applications/ui/form-actions"
 import { VisaFormError } from "@/modules/visa-assistance/applications/ui/form-feedback"
 import { VisaApplicationPricingEstimate } from "@/modules/visa-assistance/applications/ui/pricing-estimate"
+import { VisaDocumentSummary } from "./document-summary"
 
 export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
   const router = useRouter()
@@ -53,7 +55,9 @@ export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
   const onSubmit = form.handleSubmit((values) => {
     setServerError(null)
     startTransition(async () => {
-      const result = await submitVisaApplicationAction(values)
+      const result = await withVisaActionFeedback(() =>
+        submitVisaApplicationAction(values)
+      )
 
       if (!result.ok) {
         setServerError(result.message)
@@ -107,9 +111,15 @@ export function ReviewStepForm({ detail }: { detail: VisaApplicationDetail }) {
               pricing={application.pricingSnapshot}
             />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Includes Vacatina&apos;s current service markup. This is not a
-              payment request, and the final amount may change after review.
+              Includes government and Vacatina processing fees for all
+              travelers. No payment now. Our team will confirm the final quote
+              after review.
             </p>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="font-semibold">Document checklist</h2>
+            <VisaDocumentSummary detail={detail} />
           </section>
 
           <FieldGroup className="gap-3">

@@ -73,7 +73,7 @@ export default async function HotelResultsPage({ searchParams }: HotelResultsPag
 
   return (
     <div className="min-h-screen bg-muted/30 pb-20 pt-8">
-      <div className="mx-auto max-w-7xl px-4 md:px-8 lg:px-12">
+      <div className="w-full mx-auto max-w-screen-2xl px-4 md:px-8 lg:px-12">
         {/* Header Summary */}
         <div className="mb-8 flex flex-col gap-2 rounded-xl bg-white p-6 shadow-sm ring-1 ring-border">
           <h1 className="text-2xl font-semibold text-foreground">

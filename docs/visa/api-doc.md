@@ -1,5 +1,11 @@
 # Visa API Reference
 
+> **Inactive integration reference.** The manual V7 visa journey reads the
+> database only. These API clients and their markup implementation are retained,
+> but are not imported by active visa routes or application services. A missing
+> listing never triggers an API fallback. See
+> [the V7 plan](manual-visa-listing-v7-implementation-plan.md).
+
 This reference covers the Vacatina read-only fallback API and the two original iVisa endpoints whose successful response bodies it preserves.
 
 > The iVisa section describes behavior observed during authorized testing in August 2026. It is not official iVisa API documentation, and undocumented behavior may change.

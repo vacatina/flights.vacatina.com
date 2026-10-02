@@ -1,4 +1,5 @@
 import type { VisaApplicationDetail } from "@/modules/visa-assistance/applications/domain/application-types"
+import { getMissingRequiredDocuments } from "./document-checklist"
 import type { VisaApplicationStatus } from "@/modules/visa-assistance/applications/domain/status"
 
 export type CustomerVisaStatusTone =
@@ -58,23 +59,13 @@ export function getCustomerVisaStatus(status: VisaApplicationStatus) {
 }
 
 export function getVisaApplicationResumeStep(detail: VisaApplicationDetail) {
-  const { application, travelers, documents } = detail
+  const { application, travelers } = detail
 
   if (!application.entryDate) return "trip"
   if (travelers.length !== application.travelerCount) return "travelers"
   if (!application.contactEmail || !application.contactPhone) return "contact"
 
-  const passportTravelerIds = new Set(
-    documents
-      .filter(
-        (document) =>
-          document.status === "uploaded" &&
-          document.documentType === "passport_bio_page"
-      )
-      .map((document) => document.travelerId)
-  )
-
-  if (travelers.some((traveler) => !passportTravelerIds.has(traveler.id))) {
+  if (getMissingRequiredDocuments(detail).length > 0) {
     return "documents"
   }
 

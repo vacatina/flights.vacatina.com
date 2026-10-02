@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import type { VisaDocumentType } from "@/modules/visa-assistance/applications/domain"
+import type { VisaDocumentMetadata } from "@/modules/visa-assistance/applications/domain"
 import { requireVisaApplicationActor } from "@/modules/visa-assistance/applications/server/authorization"
 import {
   completeVisaDocumentUpload,
@@ -22,19 +22,14 @@ export type CreateUploadIntentResult =
       message: string
     }
 
-export async function createVisaDocumentUploadIntentAction(input: {
-  applicationId: string
-  travelerId: string
-  documentType: VisaDocumentType
-  originalFilename: string
-  mimeType: "application/pdf" | "image/jpeg" | "image/png"
-  sizeBytes: number
-}): Promise<CreateUploadIntentResult> {
+export async function createVisaDocumentUploadIntentAction(
+  input: VisaDocumentMetadata
+): Promise<CreateUploadIntentResult> {
   try {
     const actor = await requireVisaApplicationActor()
     const result = await createVisaDocumentUpload({
-      actorUserId: actor.appUserId,
       ...input,
+      actorUserId: actor.appUserId,
     })
 
     return {
@@ -53,12 +48,12 @@ export async function completeVisaDocumentUploadAction(input: {
 }) {
   try {
     const actor = await requireVisaApplicationActor()
-    await completeVisaDocumentUpload({
-      actorUserId: actor.appUserId,
+    const document = await completeVisaDocumentUpload({
       ...input,
+      actorUserId: actor.appUserId,
     })
     revalidateDocuments(input.applicationId)
-    return { ok: true } as const
+    return { ok: true, document } as const
   } catch (error) {
     return toVisaApplicationActionError(error)
   }
@@ -71,8 +66,8 @@ export async function deleteVisaDocumentAction(input: {
   try {
     const actor = await requireVisaApplicationActor()
     await deleteVisaApplicationDocument({
-      actorUserId: actor.appUserId,
       ...input,
+      actorUserId: actor.appUserId,
     })
     revalidateDocuments(input.applicationId)
     return { ok: true } as const

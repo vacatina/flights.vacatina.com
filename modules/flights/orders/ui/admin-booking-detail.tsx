@@ -43,7 +43,7 @@ export function AdminBookingDetail({
     cancellation.status === "failed"
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5">
+    <div className="w-full mx-auto flex max-w-screen-2xl flex-col gap-5">
       <div className="flex flex-col gap-4 rounded-md border bg-card p-5 shadow-xs md:flex-row md:items-start md:justify-between md:p-6">
         <div className="flex flex-col gap-3">
           <Button

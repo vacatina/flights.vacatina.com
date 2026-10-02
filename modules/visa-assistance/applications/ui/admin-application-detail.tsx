@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { VisaDocumentSummary } from "./document-summary"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -33,7 +34,7 @@ export function AdminVisaApplicationDetail({
 }: {
   detail: AdminDetail
 }) {
-  const { application, travelers, documents, events } = detail
+  const { application, travelers, events } = detail
 
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -61,8 +62,8 @@ export function AdminVisaApplicationDetail({
               <Detail
                 label="Estimated total"
                 value={
-                  application.pricingSnapshot?.totalSellMoney ? (
-                    <Money money={application.pricingSnapshot.totalSellMoney} />
+                  application.pricingSnapshot?.totalMoney ? (
+                    <Money money={application.pricingSnapshot.totalMoney} />
                   ) : (
                     "Unavailable"
                   )
@@ -74,16 +75,10 @@ export function AdminVisaApplicationDetail({
 
         <Card>
           <CardHeader className="border-b">
-            <CardTitle>Travelers and documents</CardTitle>
+            <CardTitle>Travelers</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             {travelers.map((traveler, index) => {
-              const travelerDocuments = documents.filter(
-                (document) =>
-                  document.travelerId === traveler.id &&
-                  document.status === "uploaded"
-              )
-
               return (
                 <section key={traveler.id} className="rounded-lg border p-4">
                   <h3 className="font-semibold">
@@ -108,31 +103,18 @@ export function AdminVisaApplicationDetail({
                       value={traveler.passportExpiryDate}
                     />
                   </dl>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {travelerDocuments.map((document) => (
-                      <Button
-                        key={document.id}
-                        size="sm"
-                        variant="outline"
-                        nativeButton={false}
-                        render={
-                          <a
-                            href={`/api/visa-applications/${application.id}/documents/${document.id}`}
-                          />
-                        }
-                      >
-                        {formatLabel(document.documentType)}
-                      </Button>
-                    ))}
-                    {travelerDocuments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No uploaded documents.
-                      </p>
-                    ) : null}
-                  </div>
                 </section>
               )
             })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Documents</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <VisaDocumentSummary detail={detail} />
           </CardContent>
         </Card>
 
@@ -173,7 +155,9 @@ export function AdminVisaApplicationDetail({
                   defaultValue={application.status}
                   className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
-                  {VISA_APPLICATION_STATUSES.map((status) => (
+                  {VISA_APPLICATION_STATUSES.filter(
+                    (status) => status !== "draft" || !application.submittedAt
+                  ).map((status) => (
                     <option key={status} value={status}>
                       {getVisaApplicationStatusLabel(status)}
                     </option>

@@ -12,7 +12,6 @@ import {
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import { PendingSubmitButton } from "@/components/ui/pending-submit-button"
 import type { SerializedMoney } from "@/modules/currency/domain"
 import {
   DecimalMoney,
@@ -24,13 +23,10 @@ import {
   type VisaProductOption,
 } from "@/modules/visa-assistance/domain"
 import { addVisaMoney } from "@/modules/visa-assistance/pricing/domain"
-import { createVisaApplicationDraftAction } from "@/modules/visa-assistance/applications/server/actions"
 
 export function VisaOptionsSection({
   documents,
   outcome,
-  nationalityCode,
-  destinationCode,
 }: {
   documents: VisaDocumentResult[]
   outcome: string
@@ -58,8 +54,6 @@ export function VisaOptionsSection({
           <VisaOption
             key={`${documentResult.document.visa_type_id ?? index}`}
             documentResult={documentResult}
-            nationalityCode={nationalityCode}
-            destinationCode={destinationCode}
           />
         ))}
       </div>
@@ -69,23 +63,12 @@ export function VisaOptionsSection({
 
 function VisaOption({
   documentResult,
-  nationalityCode,
-  destinationCode,
 }: {
   documentResult: VisaDocumentResult
-  nationalityCode?: string
-  destinationCode?: string
 }) {
   const { document, product } = documentResult
   const validity = product?.validity ?? document.validity
   const fees = getVisibleFees(documentResult)
-  const visaTypeId = normalizeIdentifier(document.visa_type_id ?? product?.id)
-  const providerProductId = normalizeIdentifier(
-    product?.product_id ?? document.product_id
-  )
-  const canStart = Boolean(
-    product && nationalityCode && destinationCode && visaTypeId
-  )
 
   return (
     <article className="overflow-hidden rounded-2xl border bg-card">
@@ -208,28 +191,6 @@ function VisaOption({
             </div>
           )}
         </div>
-      ) : null}
-
-      {canStart ? (
-        <form
-          action={createVisaApplicationDraftAction}
-          className="flex flex-col gap-3 border-t px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-7"
-        >
-          <input type="hidden" name="nationalityCode" value={nationalityCode} />
-          <input type="hidden" name="destinationCode" value={destinationCode} />
-          <input type="hidden" name="visaTypeId" value={visaTypeId ?? ""} />
-          <input
-            type="hidden"
-            name="providerProductId"
-            value={providerProductId ?? ""}
-          />
-          <p className="text-sm text-muted-foreground">
-            Start now and submit the details to Vacatina. No payment is needed.
-          </p>
-          <PendingSubmitButton pendingAnimation="flight-progress">
-            Start visa request
-          </PendingSubmitButton>
-        </form>
       ) : null}
     </article>
   )
@@ -448,11 +409,6 @@ function normalizeMoneyValue(value: unknown) {
   return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(normalized)
     ? normalized
     : undefined
-}
-
-function normalizeIdentifier(value: unknown) {
-  if (typeof value !== "string" && typeof value !== "number") return null
-  return String(value).trim() || null
 }
 
 function formatPassportRequirement(product: VisaProductOption) {

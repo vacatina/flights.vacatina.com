@@ -17,7 +17,7 @@ export async function PopularFlightsSection() {
   return (
     <section
       aria-labelledby="popular-flights-title"
-      className="mx-auto max-w-7xl px-4 py-16 md:px-8 md:py-20 lg:px-12"
+      className="w-full mx-auto max-w-screen-2xl px-4 py-16 md:px-8 md:py-20 lg:px-12"
     >
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
@@ -107,7 +107,7 @@ export function PopularFlightsSkeleton() {
     <section
       aria-label="Loading popular flights"
       aria-busy="true"
-      className="mx-auto max-w-7xl px-4 py-16 md:px-8 lg:px-12"
+      className="w-full mx-auto max-w-screen-2xl px-4 py-16 md:px-8 lg:px-12"
     >
       <div className="h-9 w-3/4 max-w-xl rounded-lg bg-muted motion-safe:animate-pulse" />
       <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">

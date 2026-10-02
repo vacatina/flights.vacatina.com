@@ -1,5 +1,5 @@
 import { VisaApplicationShell } from "@/modules/visa-assistance/applications"
-import { loadOwnedVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
+import { loadEditableVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
 import { TripStepForm } from "@/modules/visa-assistance/applications/ui/trip-step-form"
 
 export default async function VisaApplicationTripPage({
@@ -9,7 +9,7 @@ export default async function VisaApplicationTripPage({
 }) {
   const { applicationId } = await params
   const path = `/visa-assistance/applications/${applicationId}/trip`
-  const { detail } = await loadOwnedVisaApplicationPage(applicationId, path)
+  const { detail } = await loadEditableVisaApplicationPage(applicationId, path)
 
   return (
     <VisaApplicationShell detail={detail} currentStep="trip">

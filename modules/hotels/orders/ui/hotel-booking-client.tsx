@@ -58,7 +58,7 @@ export function HotelBookingClient({ data, clerkEnabled }: HotelBookingClientPro
 
   return (
     <main className="min-h-svh bg-muted/30 py-8 text-foreground md:py-12">
-      <div className="mx-auto w-full max-w-3xl px-4 md:px-8">
+      <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-8">
         
         {/* Success Header */}
         <div className="flex flex-col items-center justify-center text-center space-y-4 mb-8">

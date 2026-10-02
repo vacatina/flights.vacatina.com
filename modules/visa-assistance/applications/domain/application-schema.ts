@@ -11,10 +11,7 @@ const isoCountryCodeSchema = z
 const isoDateSchema = z.string().date("Enter a valid date")
 
 export const createVisaApplicationSchema = z.object({
-  nationalityCode: isoCountryCodeSchema,
-  destinationCode: isoCountryCodeSchema,
-  visaTypeId: z.string().trim().min(1),
-  providerProductId: z.string().trim().min(1).nullable(),
+  listingId: z.uuid("Choose an available visa listing"),
 })
 
 export const tripStepSchema = z.object({
@@ -47,6 +44,13 @@ export const travelerSchema = z
     passportExpiryDate: isoDateSchema,
   })
   .superRefine((traveler, context) => {
+    if (new Date(`${traveler.dateOfBirth}T00:00:00Z`) > startOfTodayUtc()) {
+      context.addIssue({
+        code: "custom",
+        path: ["dateOfBirth"],
+        message: "Date of birth cannot be in the future",
+      })
+    }
     if (traveler.passportExpiryDate <= traveler.dateOfBirth) {
       context.addIssue({
         code: "custom",
@@ -56,10 +60,23 @@ export const travelerSchema = z
     }
   })
 
-export const travelersStepSchema = z.object({
-  applicationId: z.string().trim().min(1),
-  travelers: z.array(travelerSchema).min(1).max(VISA_APPLICATION_MAX_TRAVELERS),
-})
+export const travelersStepSchema = z
+  .object({
+    applicationId: z.string().trim().min(1),
+    travelers: z
+      .array(travelerSchema)
+      .min(1)
+      .max(VISA_APPLICATION_MAX_TRAVELERS),
+  })
+  .superRefine(({ travelers }, context) => {
+    if (travelers.some((traveler, index) => traveler.position !== index)) {
+      context.addIssue({
+        code: "custom",
+        path: ["travelers"],
+        message: "Traveler positions must be consecutive and unique",
+      })
+    }
+  })
 
 export const contactStepSchema = z.object({
   applicationId: z.string().trim().min(1),

@@ -1,0 +1,156 @@
+import type { HolidayPackage } from "../../../types/holiday";
+
+export const sriLankaExtendedDiscovery: HolidayPackage = {
+  "id": "sri-lanka-extended-discovery",
+  "slug": "sri-lanka-extended-discovery",
+  "title": "Sri Lanka Extended Discovery",
+  "category": "short-escapes",
+  "summary": "Sri Lanka Extended Discovery is a 7-day, 6-night Sri Lanka itinerary designed for couples, leisure travellers, and first-time visitors. It follows a practical route through Colombo, Kandy, and Bentota. The page is written as a complete planning and enquiry resource: it explains the daily route, the type of traveller it suits, what needs to be confirmed before booking, and how Vacatina can tailor the same core journey around season, hotel level and travel pace.",
+  "duration": {
+    "days": 7,
+    "nights": 6
+  },
+  "price": {
+    "mode": "on-request",
+    "currency": "USD",
+    "amount": null,
+    "note": "Final price depends on dates, party size, hotel level and confirmed inclusions."
+  },
+  "bestFor": [
+    "couples",
+    "leisure travellers",
+    "first-time visitors"
+  ],
+  "activityLevel": "easy",
+  "seasonNote": "Year-round route; confirm coast, wildlife and activity conditions for the travel month.",
+  "route": [
+    "Colombo",
+    "Kandy",
+    "Bentota"
+  ],
+  "destinations": [
+    "kandy"
+  ],
+  "attractions": [],
+  "activities": [
+    "temple-rituals-tour"
+  ],
+  "itinerary": [
+    {
+      "day": 1,
+      "title": "Arrival in Colombo",
+      "base": "Colombo",
+      "overnight": "Colombo",
+      "description": "Arrival, transfer and a gentle introduction to Colombo.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 2,
+      "title": "Explore Colombo",
+      "base": "Colombo",
+      "overnight": "Colombo",
+      "description": "A full city day for heritage, food, shopping and oceanfront experiences.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 3,
+      "title": "Colombo to Kandy",
+      "base": "Kandy",
+      "overnight": "Kandy",
+      "description": "Travel inland to Kandy and settle into the hill capital.",
+      "destinations": [
+        "kandy"
+      ],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 4,
+      "title": "Kandy culture and leisure",
+      "base": "Kandy",
+      "overnight": "Kandy",
+      "description": "A second day in Kandy for cultural experiences and a relaxed pace.",
+      "destinations": [
+        "kandy"
+      ],
+      "attractions": [],
+      "activities": [
+        "temple-rituals-tour"
+      ]
+    },
+    {
+      "day": 5,
+      "title": "Kandy to Bentota",
+      "base": "Bentota",
+      "overnight": "Bentota",
+      "description": "Travel from Kandy to the coast for beach leisure and optional watersports.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 6,
+      "title": "Bentota river and coast",
+      "base": "Bentota",
+      "overnight": "Bentota",
+      "description": "Coastal leisure with a river safari and optional watersports.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    },
+    {
+      "day": 7,
+      "title": "Departure",
+      "base": "Departure",
+      "overnight": "Departure",
+      "description": "Airport transfer for departure.",
+      "destinations": [],
+      "attractions": [],
+      "activities": []
+    }
+  ],
+  "inclusions": [
+    "Accommodation for the stated number of nights, with hotel class confirmed in the quotation",
+    "Private air-conditioned ground transport for the itinerary",
+    "English-speaking chauffeur-guide or guide as confirmed in the quotation",
+    "Airport arrival and departure transfers",
+    "Scheduled sightseeing and entrance fees only where explicitly confirmed in the final quotation",
+    "Applicable government taxes included in the confirmed quotation"
+  ],
+  "exclusions": [
+    "International and domestic airfares unless explicitly quoted",
+    "Sri Lanka visa or ETA fees",
+    "Travel insurance",
+    "Tips, gratuities and personal expenses",
+    "Alcoholic drinks and meals or snacks not stated in the confirmed meal plan",
+    "Optional activities and entrance fees not explicitly included",
+    "Early check-in and late check-out unless confirmed"
+  ],
+  "customizable": true,
+  "cta": {
+    "type": "enquiry",
+    "label": "Enquire about Sri Lanka Extended Discovery"
+  },
+  "contentFile": "src/content/holidays/sri-lanka-extended-discovery.md",
+  "media": {
+    "alt": "Sri Lanka Extended Discovery Sri Lanka tour",
+    "heroImage": "media/photos/2025-09-Bentota-1.jpg",
+    "thumbnailImage": "media/photos/2025-09-Bentota-1.jpg",
+    "images": [
+      {
+        "role": "thumbnail",
+        "file": "media/photos/2025-09-Bentota-1.jpg",
+        "alt": "Sri Lanka Extended Discovery — cover"
+      },
+      {
+        "role": "hero",
+        "file": "media/photos/2025-09-Bentota-1.jpg",
+        "alt": "Sri Lanka Extended Discovery — hero"
+      }
+    ]
+  }
+};
