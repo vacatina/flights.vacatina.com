@@ -26,7 +26,7 @@ export function HolidayDiscovery({
           All experiences
         </button>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-3 md:grid md:grid-cols-4 xl:grid-cols-8">
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pt-2 pb-3 md:grid md:grid-cols-4 xl:grid-cols-8">
         {holidayCategories.map((category) => (
           <button
             type="button"

@@ -8,6 +8,7 @@ import type { HolidayPackage } from "../domain/types"
 import { holidayPackages, holidayCategories } from "../data"
 import { HolidayHero } from "./holiday-hero"
 import { HolidayRoute } from "./holiday-route"
+import { HolidayHighlights } from "./holiday-highlights"
 import { HolidayFacts } from "./holiday-facts"
 import { HolidaySection, HolidayBulletList } from "./holiday-section"
 import { HolidayRichText } from "./holiday-rich-text"
@@ -85,7 +86,7 @@ export function HolidayDetails({ holiday }: { holiday: HolidayPackage }) {
             {overview && <HolidayRichText body={overview.body} />}
           </HolidaySection>
           <HolidaySection title="Trip highlights">
-            <HolidayBulletList
+            <HolidayHighlights
               items={
                 highlights.length ? highlights.map(holidayLabel) : holiday.route
               }

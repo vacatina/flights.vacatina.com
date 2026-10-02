@@ -11,7 +11,7 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
     (item) => item.slug === holiday.category
   )
   return (
-    <article className="group min-w-0 rounded-[26px] border border-primary/10 bg-card p-2.5 text-card-foreground shadow-[0_8px_30px_-18px_rgba(10,19,69,0.24)] transition-[transform,box-shadow,border-color] duration-300 hover:border-primary/25 hover:shadow-[0_20px_45px_-22px_rgba(10,19,69,0.35)] ">
+    <article className="group h-full min-w-0 rounded-[26px] border border-primary/10 bg-card p-2.5 text-card-foreground shadow-[0_8px_30px_-18px_rgba(10,19,69,0.24)] transition-[transform,box-shadow,border-color] duration-300 hover:border-primary/25 hover:shadow-[0_20px_45px_-22px_rgba(10,19,69,0.35)]">
       <Link
         href={`/holiday-packages/${holiday.slug}`}
         className="block rounded-[20px] outline-none focus-visible:ring-3 focus-visible:ring-ring"
@@ -25,11 +25,19 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
             sizes="(min-width: 1536px) 485px, (min-width: 1024px) 32vw, (min-width: 640px) 45vw, 90vw"
             className="object-cover transition-transform duration-700 motion-safe:group-hover:scale-105"
           />
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-brand-navy/45 via-transparent to-transparent" />
           <div className="absolute top-3 left-3">
-            <Badge variant="secondary" className="rounded-full">
+            <Badge
+              variant="secondary"
+              className="rounded-full border border-white/50 bg-white/90 px-3 py-1 text-brand-navy shadow-sm backdrop-blur-md"
+            >
               {category?.name}
             </Badge>
           </div>
+          <span className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full border border-white/35 bg-white/15 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-md">
+            <Clock3 className="size-3.5" aria-hidden="true" />
+            {holiday.duration.days} days / {holiday.duration.nights} nights
+          </span>
           <span
             className="absolute right-4 bottom-4 flex size-12 items-center justify-center rounded-full bg-white text-brand-navy transition-all duration-300 motion-safe:group-hover:-rotate-45"
             aria-hidden="true"
@@ -54,9 +62,9 @@ export function HolidayCard({ holiday }: { holiday: HolidayPackage }) {
                 {holiday.route.slice(0, 2).join(" & ")}
               </span>
             </span>
-            <span className="flex shrink-0 items-center gap-1">
-              <Clock3 className="size-3.5" aria-hidden="true" />
-              {holiday.duration.days} days / {holiday.duration.nights} nights
+            <span className="flex shrink-0 items-center gap-1 font-medium text-primary">
+              Explore journey
+              <ArrowUpRight className="size-3.5" aria-hidden="true" />
             </span>
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
   filterHolidays,
   type HolidayFilters as Filters,
 } from "../domain/catalog"
+import { HolidayReveal } from "./holiday-reveal"
 import { HolidayCard } from "./holiday-card"
 import { HolidayDiscovery } from "./holiday-discovery"
 import { HolidayFeatured } from "./holiday-featured"
@@ -36,13 +37,19 @@ export function HolidayListing() {
       aria-label="Explore holiday packages"
       className="relative mx-auto flex w-full max-w-screen-2xl flex-col gap-10 px-5 pt-10 pb-12 sm:px-8 md:pb-20"
     >
-      <HolidayDiscovery
-        selected={filters.category}
-        onSelect={(category) => setFilters({ ...filters, category })}
-      />
+      <div id="holiday-experiences" className="scroll-mt-28">
+        <HolidayDiscovery
+          selected={filters.category}
+          onSelect={(category) => setFilters({ ...filters, category })}
+        />
+      </div>
       {filters.category === "all" &&
         filters.duration === "all" &&
-        filters.activity === "all" && <HolidayFeatured />}
+        filters.activity === "all" && (
+          <HolidayReveal>
+            <HolidayFeatured />
+          </HolidayReveal>
+        )}
       <div
         id="all-holidays"
         className="flex scroll-mt-28 flex-wrap items-end justify-between gap-4 border-t border-border pt-10"
@@ -77,7 +84,9 @@ export function HolidayListing() {
           className="grid gap-x-7 gap-y-12 duration-500 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 sm:grid-cols-2 lg:grid-cols-3"
         >
           {packages.map((holiday) => (
-            <HolidayCard key={holiday.id} holiday={holiday} />
+            <HolidayReveal key={holiday.id} className="h-full">
+              <HolidayCard holiday={holiday} />
+            </HolidayReveal>
           ))}
         </div>
       ) : (
