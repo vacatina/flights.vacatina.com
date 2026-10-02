@@ -1,45 +1,39 @@
 "use server"
 
 import { redirect } from "next/navigation"
-
-import { getVisaApplicationActor } from "@/modules/visa-assistance/applications/server/authorization"
-import { createVisaApplicationDraft } from "@/modules/visa-assistance/applications/server/application-service"
+import { getVisaApplicationActor } from "../authorization"
+import { createVisaApplicationDraft } from "../application-service"
+import { createVisaApplicationSchema } from "../../domain"
+import { getPublishedVisaListing } from "@/modules/visa-assistance/catalog/server/repository"
+import {
+  publicListingPath,
+  toPublicVisaListing,
+} from "@/modules/visa-assistance/catalog/domain/public-listing"
+import { toVisaApplicationActionError } from "./action-result"
 
 export async function createVisaApplicationDraftAction(formData: FormData) {
-  const nationalityCode = requiredValue(formData, "nationalityCode")
-  const destinationCode = requiredValue(formData, "destinationCode")
-  const visaTypeId = requiredValue(formData, "visaTypeId")
-  const providerProductId = optionalValue(formData, "providerProductId")
+  const parsed = createVisaApplicationSchema.safeParse({
+    listingId: formData.get("listingId"),
+  })
+  if (!parsed.success)
+    return { ok: false, message: "Choose an available visa listing." } as const
   const actor = await getVisaApplicationActor()
-
   if (!actor) {
-    const returnPath = `/visa-assistance/${nationalityCode}/${destinationCode}`
+    const listing = await getPublishedVisaListing(parsed.data.listingId)
+    const returnPath = listing
+      ? publicListingPath(toPublicVisaListing(listing))
+      : "/visa-assistance"
     redirect(`/sign-in?redirect_url=${encodeURIComponent(returnPath)}`)
   }
-
-  const application = await createVisaApplicationDraft({
-    actorUserId: actor.appUserId,
-    contactEmail: actor.email,
-    nationalityCode,
-    destinationCode,
-    visaTypeId,
-    providerProductId,
-  })
-
-  redirect(`/visa-assistance/applications/${application.id}/trip`)
-}
-
-function requiredValue(formData: FormData, name: string) {
-  const value = formData.get(name)
-
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`Missing ${name}.`)
+  let application
+  try {
+    application = await createVisaApplicationDraft({
+      actorUserId: actor.appUserId,
+      contactEmail: actor.email,
+      listingId: parsed.data.listingId,
+    })
+  } catch (error) {
+    return toVisaApplicationActionError(error)
   }
-
-  return value.trim()
-}
-
-function optionalValue(formData: FormData, name: string) {
-  const value = formData.get(name)
-  return typeof value === "string" && value.trim() ? value.trim() : null
+  redirect(`/visa-assistance/applications/${application.id}/trip`)
 }

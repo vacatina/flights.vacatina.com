@@ -18,7 +18,7 @@ import { toVisaApplicationActionError } from "@/modules/visa-assistance/applicat
 export async function saveVisaTripStepAction(input: TripStepValues) {
   try {
     const actor = await requireVisaApplicationActor()
-    await saveVisaApplicationTrip({ actorUserId: actor.appUserId, ...input })
+    await saveVisaApplicationTrip({ ...input, actorUserId: actor.appUserId })
     revalidateApplication(input.applicationId)
     return { ok: true } as const
   } catch (error) {
@@ -30,8 +30,8 @@ export async function saveVisaTravelersStepAction(input: TravelersStepValues) {
   try {
     const actor = await requireVisaApplicationActor()
     await saveVisaApplicationTravelerDetails({
-      actorUserId: actor.appUserId,
       ...input,
+      actorUserId: actor.appUserId,
     })
     revalidateApplication(input.applicationId)
     return { ok: true } as const
@@ -43,7 +43,7 @@ export async function saveVisaTravelersStepAction(input: TravelersStepValues) {
 export async function saveVisaContactStepAction(input: ContactStepValues) {
   try {
     const actor = await requireVisaApplicationActor()
-    await saveVisaApplicationContact({ actorUserId: actor.appUserId, ...input })
+    await saveVisaApplicationContact({ ...input, actorUserId: actor.appUserId })
     revalidateApplication(input.applicationId)
     return { ok: true } as const
   } catch (error) {

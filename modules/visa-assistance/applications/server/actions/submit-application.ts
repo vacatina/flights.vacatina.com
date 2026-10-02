@@ -10,7 +10,7 @@ import { toVisaApplicationActionError } from "@/modules/visa-assistance/applicat
 export async function submitVisaApplicationAction(input: ReviewStepValues) {
   try {
     const actor = await requireVisaApplicationActor()
-    await submitVisaApplication({ actorUserId: actor.appUserId, ...input })
+    await submitVisaApplication({ ...input, actorUserId: actor.appUserId })
     revalidatePath(`/visa-assistance/applications/${input.applicationId}`)
     revalidatePath("/admin/visa-applications")
     return { ok: true } as const

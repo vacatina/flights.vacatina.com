@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
 
-import { VisaAssistanceLanding } from "@/modules/visa-assistance/ui"
+import { VisaAssistanceLanding } from "@/modules/visa-assistance/ui/visa-assistance-landing"
 
 export const metadata: Metadata = {
   title: "Visa Assistance | Vacatina",
   description:
-    "Check visa and travel-document requirements for your passport and destination.",
+    "Explore Vacatina visa assistance services, document checklists, and estimated fees for your passport and destination.",
 }
 
 export default function VisaAssistancePage() {

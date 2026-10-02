@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core"
 
 import type { VisaApplicationPricingSnapshot } from "@/modules/visa-assistance/applications/domain/pricing-snapshot"
+import type { VisaListingSnapshot } from "@/modules/visa-assistance/applications/domain/listing-snapshot"
 
 export const pricingAdjustmentTypeEnum = pgEnum("pricing_adjustment_type", [
   "percent",
@@ -707,8 +708,12 @@ export const visaApplications = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     nationalityCode: text("nationality_code").notNull(),
     destinationCode: text("destination_code").notNull(),
-    visaTypeId: text("visa_type_id").notNull(),
-    providerProductId: text("provider_product_id"),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => visaListings.id, { onDelete: "restrict" }),
+    listingSnapshot: jsonb("listing_snapshot")
+      .$type<VisaListingSnapshot>()
+      .notNull(),
     visaName: text("visa_name").notNull(),
     entryDate: date("entry_date"),
     travelerCount: integer("traveler_count").notNull().default(1),
@@ -716,8 +721,8 @@ export const visaApplications = pgTable(
     contactPhone: text("contact_phone"),
     status: visaApplicationStatusEnum("status").notNull().default("draft"),
     pricingSnapshot: jsonb("pricing_snapshot")
-      .$type<VisaApplicationPricingSnapshot | null>()
-      .default(null),
+      .$type<VisaApplicationPricingSnapshot>()
+      .notNull(),
     internalNotes: text("internal_notes"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -735,6 +740,7 @@ export const visaApplications = pgTable(
       table.ownerUserId,
       table.updatedAt
     ),
+    listingIdx: index("visa_applications_listing_idx").on(table.listingId),
     statusSubmittedIdx: index("visa_applications_status_submitted_idx").on(
       table.status,
       table.submittedAt
@@ -789,12 +795,13 @@ export const visaApplicationDocuments = pgTable(
     applicationId: text("application_id")
       .notNull()
       .references(() => visaApplications.id, { onDelete: "cascade" }),
-    travelerId: text("traveler_id")
-      .notNull()
-      .references(() => visaApplicationTravelers.id, {
+    travelerId: text("traveler_id").references(
+      () => visaApplicationTravelers.id,
+      {
         onDelete: "cascade",
-      }),
-    documentType: visaDocumentTypeEnum("document_type").notNull(),
+      }
+    ),
+    requirementId: text("requirement_id").notNull(),
     status: visaDocumentStatusEnum("status")
       .notNull()
       .default("pending_upload"),
@@ -824,6 +831,18 @@ export const visaApplicationDocuments = pgTable(
     objectKeyUniqueIdx: uniqueIndex(
       "visa_application_documents_object_key_unique_idx"
     ).on(table.objectKey),
+    uploadedTravelerSlotIdx: uniqueIndex(
+      "visa_documents_uploaded_traveler_slot_idx"
+    )
+      .on(table.applicationId, table.requirementId, table.travelerId)
+      .where(
+        sql`${table.status} = 'uploaded' and ${table.travelerId} is not null`
+      ),
+    uploadedSharedSlotIdx: uniqueIndex(
+      "visa_documents_uploaded_shared_slot_idx"
+    )
+      .on(table.applicationId, table.requirementId)
+      .where(sql`${table.status} = 'uploaded' and ${table.travelerId} is null`),
     sizeCheck: check(
       "visa_application_documents_size_check",
       sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 10485760`

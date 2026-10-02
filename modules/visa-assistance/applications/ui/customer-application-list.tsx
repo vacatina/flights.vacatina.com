@@ -184,8 +184,8 @@ function VisaRequestCard({ application }: { application: VisaApplication }) {
             icon={FilesIcon}
             label="Estimated total"
             value={
-              application.pricingSnapshot?.totalSellMoney ? (
-                <Money money={application.pricingSnapshot.totalSellMoney} />
+              application.pricingSnapshot?.totalMoney ? (
+                <Money money={application.pricingSnapshot.totalMoney} />
               ) : (
                 "Unavailable"
               )

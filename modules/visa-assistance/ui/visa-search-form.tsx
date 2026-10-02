@@ -1,12 +1,11 @@
 "use client"
 
-import { useTransition } from "react"
+import { useId, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { SearchIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 
-import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Field,
@@ -32,6 +31,7 @@ export function VisaSearchForm({
   compact = false,
 }: VisaSearchFormProps) {
   const router = useRouter()
+  const formId = useId()
   const [isNavigating, startTransition] = useTransition()
   const form = useForm<VisaSearchValues>({
     resolver: zodResolver(visaSearchSchema),
@@ -75,6 +75,7 @@ export function VisaSearchForm({
               className={cn("gap-2", !compact && "gap-1")}
             >
               <FieldLabel
+                htmlFor={`${formId}-nationality`}
                 className={cn(
                   !compact &&
                     "text-[13px] font-medium tracking-[0.08em] text-muted-foreground uppercase"
@@ -83,6 +84,9 @@ export function VisaSearchForm({
                 {compact ? "Your passport country" : "My passport"}
               </FieldLabel>
               <CountrySearchField
+                id={`${formId}-nationality`}
+                buttonRef={field.ref}
+                onBlur={field.onBlur}
                 value={field.value}
                 onChange={field.onChange}
                 placeholder={
@@ -110,6 +114,7 @@ export function VisaSearchForm({
               className={cn("gap-2", !compact && "gap-1")}
             >
               <FieldLabel
+                htmlFor={`${formId}-destination`}
                 className={cn(
                   !compact &&
                     "text-[13px] font-medium tracking-[0.08em] text-muted-foreground uppercase"
@@ -118,6 +123,9 @@ export function VisaSearchForm({
                 {compact ? "Where are you going?" : "My destination"}
               </FieldLabel>
               <CountrySearchField
+                id={`${formId}-destination`}
+                buttonRef={field.ref}
+                onBlur={field.onBlur}
                 value={field.value}
                 onChange={field.onChange}
                 placeholder="Select destination"
@@ -135,17 +143,21 @@ export function VisaSearchForm({
         />
 
         {compact ? (
-          <Button type="submit" className={submitButtonClassName}>
+          <LoadingButton
+            type="submit"
+            isLoading={isNavigating}
+            className={submitButtonClassName}
+          >
             <SearchIcon data-icon="inline-start" />
-            Check again
-          </Button>
+            Search visa services
+          </LoadingButton>
         ) : (
           <LoadingButton
             type="submit"
             isLoading={isNavigating}
             className={submitButtonClassName}
           >
-            Check Visa Requirements
+            Search Visa Services
           </LoadingButton>
         )}
       </FieldGroup>

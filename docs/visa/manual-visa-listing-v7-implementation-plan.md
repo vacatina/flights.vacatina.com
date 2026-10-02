@@ -231,10 +231,15 @@ double submit.
 
 ### Implementation checkpoint — 30 September 2026
 
-- Phase 1 catalog foundation and Phase 2 admin code are implemented.
+- Phase 1 catalog foundation, Phase 2 admin code, Phase 3 public catalog,
+  and Phase 4 snapshot checkout and dynamic documents are implemented.
 - Migration `0011_manual_visa_listings` adds the catalog. Migration
   `0012_visa_listing_audit` adds its audit history. Both are applied to the
-  configured database; existing visa applications are preserved.
+  configured database. Phase 4 migration `0013_manual_visa_applications` is
+  also applied after the owner's explicit development-reset approval.
+  It archives 6 applications, 8 travelers, 9 documents, and 37 events in
+  private schema `visa_dev_backup_20260930`, then clears active visa requests.
+  R2 objects, catalog rows, API/markup modules, and all non-visa data remain.
 - Admins use `/admin/visa-listings`, `/admin/visa-listings/new`, and
   `/admin/visa-listings/[listingId]`. The editor uses the installed Base UI
   shadcn components, React Hook Form, and shared Zod validation.
@@ -256,8 +261,83 @@ modules/visa-assistance/catalog/server/repository.integration.test.ts`.
 - TypeScript, focused lint, regression tests, and production build are the
   code verification gates. Browser/authenticated visual acceptance is not
   claimed; browser testing was omitted at the user's request.
-- Next is Phase 3: public search and details read published database listings.
-  Checkout snapshot selection and dynamic document uploads remain Phase 4.
+- Phase 3 search at `/visa-assistance/[nationality]/[destination]` reads
+  published catalog rows only. Multiple visa types have separate cards and
+  stable `/visa-assistance/[nationality]/[destination]/[listingId]` detail links.
+  Detail reads verify both publication status and the country pair, including
+  metadata; hidden or missing records return 404. Request-time reads use
+  `connection()` and route loading boundaries with Next.js Cache Components.
+- Public details render admin-authored copy, facts, reviewed date, ordered
+  document requirements and scopes, and exact government/processing fees.
+  Existing `Money` components convert for display only. Missing routes show
+  "not offered" without implying visa-free entry. Admin identity/audit fields
+  are excluded from public view models. No visa API/fallback/markup calls are
+  made by these pages; legacy modules remain unchanged.
+- Public details now start a request by stable listing ID, with the existing
+  flight-progress loading button. Sign-in returns to the exact listing.
+  Draft creation locks the published listing while freezing public content,
+  exact unit fees, currency, and ordered document requirements.
+- Estimates multiply both frozen unit fees by traveler count. Only count
+  changes revise pricing; review and submission do not fetch catalog/API
+  prices or apply markup rules. Display conversion still uses shared Money.
+- Document requirements come exclusively from the frozen checklist:
+  required/optional, per traveler/shared, one verified file per slot, or a
+  reviewed empty checklist. The same helper gates Continue, dashboard resume,
+  review, and final submission. Customer/admin/review views show saved labels.
+- Uploads retain signed R2 PUTs and HEAD size/MIME verification, progress,
+  replacement, removal, and retry states. Application row locks serialize
+  editing, upload completion, and submission. Server actions derive identity
+  after input spreading; requirement, traveler, owner, and draft guards run
+  before signing or mutation. Partial unique indexes enforce uploaded slots.
+- Replacements retain the old verified file until the new one verifies.
+  Failed object cleanup remains deletion_pending with its key preserved;
+  retired traveler keys are retained in private application audit events.
+  No background cleanup worker or payment step is introduced.
+- Phase 3 checks cover the public view model and exact fees, country-route
+  normalization, published-only reads, detail/metadata 404s, multiple-card and
+  document-scope rendering, accessible loading states, and a PostgreSQL test
+  of the public read path. Live fixtures remain in a rolled-back transaction.
+- Phase 4 checks include exact-money and document-gate tests, upload interaction
+  tests, and an opt-in real PostgreSQL lifecycle run with storage/notifications
+  mocked. Database fixtures roll back; no provider fetch is made. The remote
+  application lifecycle took about 157 seconds, so its timeout is 240 seconds.
+  Browser/authenticated UI, live R2 transfer/CORS, and email delivery are not
+  claimed as verified.
+- Phase 5 integration cleanup is implemented. Automated and outstanding live
+  checks are tracked in [the release checklist](manual-visa-v7-release-checklist.md).
+  Browser/live-service acceptance remains open; it was not silently replaced
+  by a claim of end-to-end browser verification.
+
+#### Phase 4 verification results
+
+- Focused visa/currency suite: 96 tests passed; the two opt-in database tests
+  are skipped unless a migrated test database URL is supplied.
+- Real PostgreSQL runs: catalog lifecycle and manual application lifecycle
+  both passed. Fixture writes/publications were rolled back.
+- TypeScript and focused ESLint passed; production build passed (existing
+  Google Sans Flex fallback-font warning remains).
+- The visa-only development archive/reset and migration were verified:
+  active application count is zero; backup counts match the original rows.
+- Live R2/CORS, authenticated browser interaction, and notification delivery
+  remain release-verification boundaries, not completed checks.
+
+#### Phase 5 verification results
+
+- Visa/currency suite: 109 passed; two opt-in database tests skipped in the
+  default run. Both real PostgreSQL lifecycle tests passed separately with
+  fixture transactions rolled back. The expanded application run took about
+  154 seconds with R2 and notifications mocked.
+- TypeScript, visa-scoped ESLint, formatting, diff checks, and production
+  build passed. The runtime-import graph guard prevents active routes,
+  layouts, and UI exports from reaching retained API/markup modules.
+- Checkout now redirects read-only requests to confirmation, reports
+  transport failures inline, disables busy navigation, and removes future
+  progress links from keyboard navigation. Submitted requests cannot return
+  to draft through admin updates.
+- The repository-wide run found two unrelated payment script failures;
+  details and outstanding live-service checks are in the release checklist.
+- No additional migration/reset, storage deletion, payment integration, or
+  deployment was performed in Phase 5.
 
 ### Phase 1 — Catalog foundation
 

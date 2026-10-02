@@ -1,10 +1,7 @@
 import { redirect } from "next/navigation"
-
 import { VisaApplicationShell } from "@/modules/visa-assistance/applications"
-import {
-  loadOwnedVisaApplicationPage,
-  refreshVisaApplicationPricing,
-} from "@/modules/visa-assistance/applications/server"
+import { getVisaApplicationResumeStep } from "@/modules/visa-assistance/applications/domain"
+import { loadEditableVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
 import { ReviewStepForm } from "@/modules/visa-assistance/applications/ui/review-step-form"
 
 export default async function VisaApplicationReviewPage({
@@ -14,33 +11,16 @@ export default async function VisaApplicationReviewPage({
 }) {
   const { applicationId } = await params
   const basePath = `/visa-assistance/applications/${applicationId}`
-  const path = `${basePath}/review`
-  const loaded = await loadOwnedVisaApplicationPage(applicationId, path)
-  const passportTravelerIds = new Set(
-    loaded.detail.documents
-      .filter(
-        (document) =>
-          document.status === "uploaded" &&
-          document.documentType === "passport_bio_page"
-      )
-      .map((document) => document.travelerId)
+  const { detail } = await loadEditableVisaApplicationPage(
+    applicationId,
+    `${basePath}/review`
   )
-
-  if (
-    loaded.detail.travelers.some(
-      (traveler) => !passportTravelerIds.has(traveler.id)
-    )
-  ) {
-    redirect(`${basePath}/documents`)
-  }
-
-  await refreshVisaApplicationPricing(applicationId, loaded.actor.appUserId)
-  const { detail } = await loadOwnedVisaApplicationPage(applicationId, path)
-
+  const step = getVisaApplicationResumeStep(detail)
+  if (step !== "review") redirect(`${basePath}/${step}`)
   return (
     <VisaApplicationShell detail={detail} currentStep="review">
       <ReviewStepForm
-        key={detail.application.pricingSnapshot?.pricedAt}
+        key={detail.application.pricingSnapshot.pricedAt}
         detail={detail}
       />
     </VisaApplicationShell>

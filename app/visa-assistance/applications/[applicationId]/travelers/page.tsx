@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { VisaApplicationShell } from "@/modules/visa-assistance/applications"
-import { loadOwnedVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
+import { loadEditableVisaApplicationPage } from "@/modules/visa-assistance/applications/server"
 import { TravelersStepForm } from "@/modules/visa-assistance/applications/ui/travelers-step-form"
 
 export default async function VisaApplicationTravelersPage({
@@ -12,7 +12,7 @@ export default async function VisaApplicationTravelersPage({
   const { applicationId } = await params
   const basePath = `/visa-assistance/applications/${applicationId}`
   const path = `${basePath}/travelers`
-  const { detail } = await loadOwnedVisaApplicationPage(applicationId, path)
+  const { detail } = await loadEditableVisaApplicationPage(applicationId, path)
 
   if (!detail.application.entryDate) {
     redirect(`${basePath}/trip`)

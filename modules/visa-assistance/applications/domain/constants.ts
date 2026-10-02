@@ -7,14 +7,6 @@ export const VISA_DOCUMENT_MIME_TYPES = [
   "image/png",
 ] as const
 
-export const VISA_DOCUMENT_TYPES = [
-  "passport_bio_page",
-  "passport_photo",
-  "national_id_front",
-  "national_id_back",
-  "additional",
-] as const
-
 export const VISA_APPLICATION_STEPS = [
   "trip",
   "travelers",

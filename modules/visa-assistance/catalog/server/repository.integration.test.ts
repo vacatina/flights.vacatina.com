@@ -28,6 +28,8 @@ import {
   unpublishVisaListing,
   updateVisaListing,
 } from "./repository"
+import { getPublicVisaDetail, getPublicVisaResults } from "./public-catalog"
+import { publicListingFees } from "../domain/public-listing"
 
 // Opt-in integration run. Every fixture stays in one outer transaction that
 // rolls back, including publications, so no test listings become visible.
@@ -73,6 +75,7 @@ describe.skipIf(!process.env.VISA_CATALOG_TEST_DATABASE_URL)(
             )
             expect(draft.status).toBe("draft")
             expect(await getPublishedVisaListing(draft.id)).toBeNull()
+            expect(await getPublicVisaDetail("LK", "IN", draft.id)).toBeNull()
             await expect(publishVisaListing(draft.id, actorId)).rejects.toThrow(
               "Add a public title"
             )
@@ -148,8 +151,38 @@ describe.skipIf(!process.env.VISA_CATALOG_TEST_DATABASE_URL)(
             expect(filtered.total).toBe(1)
             expect(filtered.rows[0].documentCount).toBe(2)
 
+            const second = await saveVisaListing(
+              {
+                ...toListingFormValues(published, true),
+                code: `${code}-SECOND`,
+                title: "Business visa",
+                documentsReviewed: true,
+              },
+              actorId,
+              { publish: true }
+            )
+            const publicResults = await getPublicVisaResults("lk", "in")
+            expect(publicResults?.listings.map((row) => row.id)).toEqual(
+              expect.arrayContaining([draft.id, second.id])
+            )
+            expect(
+              publicResults?.listings.some((row) => row.id === duplicate.id)
+            ).toBe(false)
+            const publicDetail = await getPublicVisaDetail("LK", "IN", draft.id)
+            expect(
+              publicDetail?.documents.map((document) => document.id)
+            ).toEqual(published.documents.map((document) => document.id))
+            expect(publicListingFees(publicDetail!).total.amount).toBe("1235")
+            expect(await getPublicVisaDetail("US", "IN", draft.id)).toBeNull()
+
             await unpublishVisaListing(draft.id, actorId)
             expect(await getPublishedVisaListing(draft.id)).toBeNull()
+            expect(await getPublicVisaDetail("LK", "IN", draft.id)).toBeNull()
+            expect(
+              (await getPublicVisaResults("LK", "IN"))?.listings.some(
+                (row) => row.id === draft.id
+              )
+            ).toBe(false)
             const events = await listVisaListingEvents(draft.id)
             expect(new Set(events.map((event) => event.eventType))).toEqual(
               new Set(["created", "updated", "published", "unpublished"])

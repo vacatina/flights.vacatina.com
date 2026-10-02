@@ -74,9 +74,9 @@ export default async function VisaApplicationConfirmationPage({
               <ConfirmationDetail
                 label="Submitted estimate"
                 value={
-                  detail.application.pricingSnapshot?.totalSellMoney ? (
+                  detail.application.pricingSnapshot?.totalMoney ? (
                     <Money
-                      money={detail.application.pricingSnapshot.totalSellMoney}
+                      money={detail.application.pricingSnapshot.totalMoney}
                     />
                   ) : (
                     "Unavailable"

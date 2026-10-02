@@ -23,7 +23,7 @@ export function VisaAssistanceLanding() {
 
           <Card className="mx-auto mt-10 w-full max-w-7xl gap-0 overflow-visible rounded-[12px] border border-border bg-background p-4 shadow-xl ring-0 transition-all duration-300 ease-in-out md:mt-12 md:p-8">
             <CardHeader className="sr-only">
-              <CardTitle>Check your visa requirements</CardTitle>
+              <CardTitle>Search our visa services</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <VisaSearchForm />

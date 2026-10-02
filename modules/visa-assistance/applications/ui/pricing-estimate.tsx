@@ -1,43 +1,32 @@
 import { Money } from "@/modules/currency/ui"
 import { Separator } from "@/components/ui/separator"
-import type { VisaApplicationPricingSnapshot } from "@/modules/visa-assistance/applications/domain"
-import { addVisaMoney } from "@/modules/visa-assistance/pricing/domain"
+import type { VisaApplicationPricingSnapshot } from "../domain"
 
 export function VisaApplicationPricingEstimate({
   pricing,
 }: {
   pricing: VisaApplicationPricingSnapshot | null
 }) {
-  if (!pricing) {
+  if (!pricing)
     return <p className="text-sm text-muted-foreground">Price unavailable</p>
-  }
-
-  const processing = addVisaMoney(
-    pricing.processingFee?.sellMoney ?? null,
-    pricing.governmentFee?.markupMoney ?? null
-  )
-  const government = pricing.governmentFee?.sourceMoney ?? null
-
   return (
     <dl className="flex flex-col gap-3 text-sm">
-      {processing ? (
-        <PriceRow
-          label="Vacatina processing fee"
-          value={<Money money={processing} />}
-        />
-      ) : null}
-      {government ? (
-        <PriceRow label="Government fee" value={<Money money={government} />} />
-      ) : null}
+      <PriceRow
+        label="Government fee"
+        value={<Money money={pricing.governmentFee} />}
+      />
+      <PriceRow
+        label="Vacatina processing fee"
+        value={<Money money={pricing.processingFee} />}
+      />
       <Separator />
       <div className="flex items-center justify-between gap-4 text-base font-semibold">
-        <dt>Estimated total</dt>
+        <dt>
+          Estimated total · {pricing.travelerCount}{" "}
+          {pricing.travelerCount === 1 ? "traveler" : "travelers"}
+        </dt>
         <dd className="tabular-nums">
-          {pricing.totalSellMoney ? (
-            <Money money={pricing.totalSellMoney} />
-          ) : (
-            "Unavailable"
-          )}
+          <Money money={pricing.totalMoney} />
         </dd>
       </div>
     </dl>

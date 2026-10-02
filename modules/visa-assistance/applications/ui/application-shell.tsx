@@ -123,35 +123,45 @@ function ApplicationProgress({
       <ol className="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:overflow-visible">
         {VISA_APPLICATION_STEPS.map((step, index) => {
           const reachable = index <= currentIndex
+          const className = cn(
+            "flex min-w-max items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors",
+            index === currentIndex && "bg-primary/5",
+            reachable ? "text-foreground" : "text-muted-foreground"
+          )
+          const content = (
+            <>
+              <span
+                className={cn(
+                  "flex size-6 items-center justify-center rounded-full border",
+                  reachable &&
+                    "border-primary bg-primary text-primary-foreground"
+                )}
+              >
+                {index < currentIndex ? (
+                  <CheckIcon className="size-3.5" aria-hidden="true" />
+                ) : (
+                  index + 1
+                )}
+              </span>
+              {stepLabels[step]}
+            </>
+          )
 
           return (
             <li key={step}>
-              <Link
-                href={`/visa-assistance/applications/${applicationId}/${step}`}
-                aria-current={index === currentIndex ? "step" : undefined}
-                className={cn(
-                  "flex min-w-max items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors",
-                  index === currentIndex && "bg-primary/5",
-                  reachable
-                    ? "text-foreground"
-                    : "pointer-events-none text-muted-foreground"
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex size-6 items-center justify-center rounded-full border",
-                    index <= currentIndex &&
-                      "border-primary bg-primary text-primary-foreground"
-                  )}
+              {reachable ? (
+                <Link
+                  href={`/visa-assistance/applications/${applicationId}/${step}`}
+                  aria-current={index === currentIndex ? "step" : undefined}
+                  className={className}
                 >
-                  {index < currentIndex ? (
-                    <CheckIcon className="size-3.5" aria-hidden="true" />
-                  ) : (
-                    index + 1
-                  )}
+                  {content}
+                </Link>
+              ) : (
+                <span aria-disabled="true" className={className}>
+                  {content}
                 </span>
-                {stepLabels[step]}
-              </Link>
+              )}
             </li>
           )
         })}

@@ -1,4 +1,9 @@
 import { describe, expect, test } from "vitest"
+import {
+  applicationFixture,
+  documentFixture,
+  requirementId,
+} from "../testing/application-fixture"
 
 import type { VisaApplicationDetail } from "@/modules/visa-assistance/applications/domain/application-types"
 import {
@@ -61,6 +66,13 @@ function createDetail(
 
   return {
     application: {
+      ...applicationFixture().application,
+      listingSnapshot: {
+        ...applicationFixture().application.listingSnapshot,
+        documents: [
+          applicationFixture().application.listingSnapshot.documents[0],
+        ],
+      },
       entryDate: input.entryDate ?? null,
       travelerCount: 1,
       contactEmail: input.includeContact ? "traveler@example.com" : null,
@@ -70,9 +82,10 @@ function createDetail(
     documents: input.includePassport
       ? [
           {
+            ...documentFixture(),
             travelerId: traveler.id,
             status: "uploaded",
-            documentType: "passport_bio_page",
+            requirementId,
           } as VisaApplicationDetail["documents"][number],
         ]
       : [],

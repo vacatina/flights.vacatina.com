@@ -99,6 +99,13 @@
       "when": 1790726401000,
       "tag": "0012_visa_listing_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790726402000,
+      "tag": "0013_manual_visa_applications",
+      "breakpoints": true
     }
   ]
 }

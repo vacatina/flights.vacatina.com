@@ -97,8 +97,8 @@ describe("VisaOptionsSection currency display", () => {
     expect(screen.getByText("$110.00")).toBeTruthy()
     expect(screen.getByText("$193.09")).toBeTruthy()
     expect(
-      screen.getByRole("button", { name: "Start visa request" }).className
-    ).toContain("overflow-hidden")
+      screen.queryByRole("button", { name: "Start visa request" })
+    ).toBeNull()
 
     fireEvent.click(screen.getByRole("button", { name: "Use JPY" }))
 

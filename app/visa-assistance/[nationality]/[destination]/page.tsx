@@ -1,9 +1,10 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
+import { connection } from "next/server"
 
 import { getVisaCountry } from "@/modules/visa-assistance/domain"
-import { getVisaAssistanceResult } from "@/modules/visa-assistance/server"
-import { VisaDetails } from "@/modules/visa-assistance/ui"
+import { getPublicVisaResults } from "@/modules/visa-assistance/catalog/server/public-catalog"
+import { PublicVisaResults } from "@/modules/visa-assistance/catalog/ui/public/results"
 
 interface VisaDetailsPageProps {
   params: Promise<{
@@ -25,19 +26,17 @@ export async function generateMetadata({
 
   return {
     title: `${nationalityCountry.name} to ${destinationCountry.name} visa | Vacatina`,
-    description: `Visa and travel-document requirements for ${nationalityCountry.name} passport holders traveling to ${destinationCountry.name}.`,
+    description: `Explore Vacatina visa assistance services and estimated fees for ${nationalityCountry.name} passport holders traveling to ${destinationCountry.name}.`,
   }
 }
 
 export default async function VisaDetailsPage({
   params,
 }: VisaDetailsPageProps) {
+  await connection()
   const { nationality, destination } = await params
 
-  if (!getVisaCountry(nationality) || !getVisaCountry(destination)) {
-    notFound()
-  }
-
-  const result = await getVisaAssistanceResult(nationality, destination)
-  return <VisaDetails result={result} />
+  const result = await getPublicVisaResults(nationality, destination)
+  if (!result) notFound()
+  return <PublicVisaResults {...result} />
 }

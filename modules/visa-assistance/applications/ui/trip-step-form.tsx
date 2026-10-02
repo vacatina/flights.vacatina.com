@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { withVisaActionFeedback } from "./action-feedback"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -53,7 +54,9 @@ export function TripStepForm({
   const onSubmit = form.handleSubmit((values) => {
     setServerError(null)
     startTransition(async () => {
-      const result = await saveVisaTripStepAction(values)
+      const result = await withVisaActionFeedback(() =>
+        saveVisaTripStepAction(values)
+      )
 
       if (!result.ok) {
         setServerError(result.message)

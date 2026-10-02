@@ -5,9 +5,11 @@ import { useCurrency } from "@/modules/currency/ui/currency-provider"
 export function FxEstimateDisclosure({
   sourceCurrencies,
   className,
+  finalChargeNote = "Final charges use the currency confirmed at checkout.",
 }: {
   sourceCurrencies: readonly string[]
   className?: string
+  finalChargeNote?: string
 }) {
   const { fxSnapshot, selectedCurrency } = useCurrency()
 
@@ -34,8 +36,7 @@ export function FxEstimateDisclosure({
   return (
     <p className={className ?? "text-xs text-muted-foreground"}>
       Estimated exchange rates as of {updatedAt}
-      {fxSnapshot.stale ? " (stale — last known rate)" : ""}. Final charges use the
-      currency confirmed at checkout.
+      {fxSnapshot.stale ? " (stale — last known rate)" : ""}. {finalChargeNote}
     </p>
   )
 }
