@@ -34,16 +34,16 @@ export function CurrencySelector({
             className={cn(
               "inline-flex items-center gap-1.5 rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               variant === "navbar"
-                ? "text-primary-foreground transition-opacity hover:opacity-80 focus-visible:ring-offset-[#13357b]"
+                ? "text-primary-foreground transition-opacity hover:opacity-80 focus-visible:ring-offset-[#1B1464]"
                 : "text-foreground underline underline-offset-3",
               className
             )}
-            aria-label={`Display currency: ${selectedCurrency}`}
+            aria-label={`Language English, display currency: ${selectedCurrency}`}
             aria-busy={preferencePending}
           />
         }
       >
-        {selectedCurrency}
+        EN · {selectedCurrency}
         <ChevronDownIcon aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="w-72">

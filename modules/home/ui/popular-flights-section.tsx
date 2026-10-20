@@ -21,7 +21,7 @@ export async function PopularFlightsSection() {
     >
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#1B1464] dark:text-blue-300">
             <PlaneTakeoffIcon aria-hidden="true" className="size-4" />
             Departing from Colombo
           </div>
@@ -40,7 +40,7 @@ export async function PopularFlightsSection() {
         <Link
           href={selection?.fareOptionsHref ?? fallbackHref}
           prefetch={false}
-          className="group inline-flex shrink-0 items-center gap-2 text-sm font-medium text-[#13357b] underline-offset-4 hover:underline dark:text-blue-300"
+          className="group inline-flex shrink-0 items-center gap-2 text-sm font-medium text-[#1B1464] underline-offset-4 hover:underline dark:text-blue-300"
         >
           Search more flights
           <ArrowRightIcon

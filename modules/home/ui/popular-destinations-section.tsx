@@ -14,7 +14,7 @@ export async function PopularDestinationsSection() {
       className="w-full mx-auto max-w-screen-2xl px-4 py-16 md:px-8 md:py-20 lg:px-12"
     >
       <div className="mb-8">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#1B1464] dark:text-blue-300">
           <MapPinnedIcon aria-hidden="true" className="size-4" />
           Departing from Colombo
         </div>
@@ -39,7 +39,7 @@ export async function PopularDestinationsSection() {
             key={destination.code}
             href={destinationSearchHref(destination)}
             prefetch={false}
-            className="group min-w-0 snap-start rounded-2xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-[#13357b]"
+            className="group min-w-0 snap-start rounded-2xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-[#1B1464]"
           >
             <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
               <Image
@@ -62,7 +62,7 @@ export async function PopularDestinationsSection() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {destination.description}
               </p>
-              <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-sm font-medium text-[#13357b] dark:text-blue-300">
+              <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-sm font-medium text-[#1B1464] dark:text-blue-300">
                 <span>Find flights</span>
                 <ArrowRightIcon
                   aria-hidden="true"
