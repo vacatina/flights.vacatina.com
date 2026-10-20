@@ -17,6 +17,7 @@ import { TravelConfidenceSection } from "@/modules/home/ui/travel-confidence-sec
 import { TravelServicesSection } from "@/modules/home/ui/travel-services-section"
 import { ExtendedTravelDiscoverySection } from "@/modules/home/ui/extended-travel-discovery-section"
 import { SeasonalGuideSection } from "@/modules/home/ui/seasonal-guide-section"
+import { NewsletterSection } from "@/modules/home/ui/newsletter-section"
 import { parseSearchPrefillToken } from "@/modules/flights/search/domain"
 
 interface HomePageProps {
@@ -51,6 +52,7 @@ export default async function Page({ searchParams }: HomePageProps) {
       <SeasonalGuideSection />
       <TravelConfidenceSection />
       <TravelServicesSection />
+      <NewsletterSection />
     </main>
   )
 }
