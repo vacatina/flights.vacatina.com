@@ -1,7 +1,13 @@
 "use client"
 
 import { Show } from "@clerk/nextjs"
-import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react"
+import {
+  ChevronDownIcon,
+  HeartIcon,
+  MenuIcon,
+  ShoppingBagIcon,
+  XIcon,
+} from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -23,26 +29,26 @@ type NavLinkItem = {
 
 const primaryNavItems: NavLinkItem[] = [
   { href: "/", label: "Home" },
-  { href: "#", label: "Flights" },
+  { href: "/#search-command-center", label: "Flights" },
   { href: "/hotels", label: "Hotels" },
-  { href: "#", label: "Cars" },
   { href: "/visa-assistance", label: "Visa Assistance" },
   { href: "/holiday-packages", label: "Holiday Packages" },
+  { href: "/#search-command-center", label: "Cars & Transfers" },
 ]
 
-const addOnItems: NavLinkItem[] = [
-  { href: "#", label: "Activities" },
-  { href: "#", label: "Rails" },
-  { href: "#", label: "Sightseeing Tours" },
-    { href: "#", label: "Cruises" },
-  { href: "#", label: "Travel Insurance" },
+const moreItems: NavLinkItem[] = [
+  { href: "/#search-command-center", label: "Activities" },
+  { href: "/#travel-inspiration", label: "Sightseeing Tours" },
+  { href: "/#search-command-center", label: "Rails" },
+  { href: "/#search-command-center", label: "Cruises" },
+  { href: "/#travel-confidence", label: "Travel Insurance" },
 ]
 
 const resourceItems: NavLinkItem[] = [
-  { href: "#", label: "Blog" },
-  { href: "#", label: "About Us" },
-  { href: "#", label: "FAQ" },
-  { href: "#", label: "Contact Us" },
+  { href: "/blog", label: "Blog" },
+  { href: "/about-us", label: "About Us" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/contact-us", label: "Contact Us" },
 ]
 
 const transparentNavbarRoutes = ["/", "/visa-assistance", "/hotels"]
@@ -52,7 +58,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileOpenSection, setMobileOpenSection] = useState<
-    "addons" | "resources" | null
+    "more" | "resources" | null
   >(null)
   const scrollY = useSyncExternalStore(
     subscribeToScrollPosition,
@@ -67,11 +73,13 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 text-primary-foreground transition-colors duration-200",
-        shouldShowTransparentNavbar ? "bg-transparent" : "bg-brand-navy"
+        "sticky top-0 z-40 text-white transition-colors duration-200",
+        shouldShowTransparentNavbar
+          ? "bg-transparent"
+          : "border-b border-white/10 bg-[#1B1464]"
       )}
     >
-      <div className="mx-auto flex h-[90px] w-full items-center px-4 lg:px-8">
+      <div className="mx-auto flex h-[76px] w-full max-w-[1440px] items-center px-4 sm:px-6 lg:px-8">
         <Link href="/" className="shrink-0" aria-label="Vacatina home">
           <Image
             src="/img/logo-light.svg"
@@ -79,49 +87,55 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
             width={230}
             height={50}
             priority
-            className="h-[26px] w-auto lg:h-[40px]"
+            className="h-[28px] w-auto lg:h-[34px]"
           />
         </Link>
 
-        <nav className="ml-10 hidden items-center gap-8 text-[15px] font-medium xl:flex">
+        <nav
+          aria-label="Primary navigation"
+          className="ml-8 hidden items-center gap-5 text-[14px] font-semibold 2xl:flex"
+        >
           {primaryNavItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              className="whitespace-nowrap transition-opacity hover:opacity-80"
+              className="whitespace-nowrap rounded-md px-1 py-2 transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
             >
               {item.label}
             </Link>
           ))}
-
-          <DesktopDropdown label="Add-Ons" items={addOnItems} />
-          <DesktopDropdown
-            label="Resources"
-            items={resourceItems}
-            highlightFirst
-          />
+          <DesktopDropdown label="More" items={moreItems} />
+          <DesktopDropdown label="Resources" items={resourceItems} />
         </nav>
 
-        <div className="ml-auto hidden items-center gap-4 xl:flex">
-          <CurrencySelector className="text-[14px] leading-none tracking-[0.01em]" />
-
-          <div
-            className="h-8 w-px bg-primary-foreground/20"
-            aria-hidden="true"
-          />
-
+        <div className="ml-auto hidden items-center gap-3 2xl:flex">
+          <CurrencySelector className="min-h-11 px-2 text-[14px]" />
+          <Link
+            href="/bookings"
+            aria-label="Saved trips and favorites"
+            className="inline-flex min-h-11 items-center gap-2 rounded-[10px] px-2 text-sm font-semibold hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white"
+          >
+            <HeartIcon className="size-4" aria-hidden="true" />
+            Favorites
+          </Link>
+          <Link
+            href="/bookings"
+            aria-label="Trip Bucket"
+            className="inline-flex min-h-11 items-center gap-2 rounded-[10px] px-2 text-sm font-semibold hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white"
+          >
+            <ShoppingBagIcon className="size-4" aria-hidden="true" />
+            Trip Bucket
+          </Link>
           <AuthButtons clerkEnabled={clerkEnabled} />
         </div>
 
         <button
           type="button"
-          className="ml-auto inline-flex size-11 items-center justify-center rounded-lg border border-primary-foreground/20 text-primary-foreground transition-colors hover:bg-primary-foreground/10 xl:hidden"
+          className="ml-auto inline-flex size-11 items-center justify-center rounded-[10px] border border-white/25 text-white transition-colors hover:bg-white/10 2xl:hidden"
           onClick={() => setMobileMenuOpen((current) => !current)}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-navbar-menu"
-          aria-label={
-            mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
-          }
+          aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
         >
           {mobileMenuOpen ? <XIcon /> : <MenuIcon />}
         </button>
@@ -130,32 +144,28 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
       {mobileMenuOpen ? (
         <div
           id="mobile-navbar-menu"
-          className="border-t border-primary-foreground/15 bg-brand-navy px-4 pt-4 pb-6 xl:hidden"
+          className="border-t border-white/15 bg-[#1B1464] px-4 pt-4 pb-6 2xl:hidden"
         >
-          <div className="flex flex-col gap-3 text-[16px] font-medium">
+          <div className="flex flex-col gap-2 text-[15px] font-semibold">
             {primaryNavItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="rounded-md px-3 py-2 transition-colors hover:bg-primary-foreground/10"
+                className="min-h-11 rounded-[10px] px-3 py-3 hover:bg-white/10"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {item.label}
               </Link>
             ))}
-
             <MobileSection
-              label="Add-Ons"
-              isOpen={mobileOpenSection === "addons"}
+              label="More"
+              isOpen={mobileOpenSection === "more"}
               onToggle={() =>
-                setMobileOpenSection((current) =>
-                  current === "addons" ? null : "addons"
-                )
+                setMobileOpenSection((current) => (current === "more" ? null : "more"))
               }
-              items={addOnItems}
+              items={moreItems}
               onNavigate={() => setMobileMenuOpen(false)}
             />
-
             <MobileSection
               label="Resources"
               isOpen={mobileOpenSection === "resources"}
@@ -169,14 +179,26 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
             />
           </div>
 
-          <div
-            className="my-4 h-px bg-primary-foreground/15"
-            aria-hidden="true"
-          />
-
-          <CurrencySelector className="mb-4 px-3 text-[16px]" />
+          <div className="my-4 h-px bg-white/15" aria-hidden="true" />
 
           <div className="flex flex-col gap-3">
+            <CurrencySelector className="min-h-11 px-3 text-[15px]" />
+            <Link
+              href="/bookings"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex min-h-11 items-center gap-2 rounded-[10px] px-3 py-3 hover:bg-white/10"
+            >
+              <HeartIcon className="size-4" aria-hidden="true" />
+              Favorites
+            </Link>
+            <Link
+              href="/bookings"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex min-h-11 items-center gap-2 rounded-[10px] px-3 py-3 hover:bg-white/10"
+            >
+              <ShoppingBagIcon className="size-4" aria-hidden="true" />
+              Trip Bucket
+            </Link>
             <AuthButtons clerkEnabled={clerkEnabled} mobile />
           </div>
         </div>
@@ -186,10 +208,7 @@ export function SiteNavbar({ clerkEnabled }: SiteNavbarProps) {
 }
 
 function matchesTransparentNavbarRoute(pathname: string | null) {
-  if (!pathname) {
-    return false
-  }
-
+  if (!pathname) return false
   return (
     transparentNavbarRoutes.includes(pathname) ||
     pathname === "/holiday-packages" ||
@@ -199,9 +218,7 @@ function matchesTransparentNavbarRoute(pathname: string | null) {
 
 function subscribeToScrollPosition(onStoreChange: () => void) {
   window.addEventListener("scroll", onStoreChange, { passive: true })
-  return () => {
-    window.removeEventListener("scroll", onStoreChange)
-  }
+  return () => window.removeEventListener("scroll", onStoreChange)
 }
 
 function readScrollPosition() {
@@ -215,43 +232,35 @@ function readServerScrollPosition() {
 function DesktopDropdown({
   label,
   items,
-  highlightFirst = false,
 }: {
   label: string
   items: NavLinkItem[]
-  highlightFirst?: boolean
 }) {
   return (
     <div className="group relative">
       <button
         type="button"
-        className="inline-flex items-center gap-1.5 whitespace-nowrap transition-opacity outline-none hover:opacity-80"
+        className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-md px-1 outline-none transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        aria-haspopup="menu"
       >
         {label}
         <ChevronDownIcon className="size-4" aria-hidden="true" />
       </button>
 
       <div
-        className="invisible absolute top-full left-1/2 z-50 mt-3 w-[250px] -translate-x-1/2 rounded-[4px] border border-border bg-popover p-3 text-[16px] text-popover-foreground opacity-0 shadow-md group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+        className="invisible absolute top-full left-1/2 z-50 mt-2 w-[250px] -translate-x-1/2 rounded-[12px] border border-border bg-white p-2 text-[#111] opacity-0 shadow-xl group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
         role="menu"
       >
-        <div className="flex flex-col gap-1">
-          {items.map((item, index) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={cn(
-                "rounded-[4px] px-3 py-2.5 text-[16px] font-medium text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-                highlightFirst && index === 0
-                  ? "bg-accent text-accent-foreground"
-                  : ""
-              )}
-              role="menuitem"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
+        {items.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="block min-h-11 rounded-[10px] px-3 py-3 text-sm font-semibold text-[#262626] hover:bg-[#F5F5F5] focus-visible:outline-2 focus-visible:outline-[#1B1464]"
+            role="menuitem"
+          >
+            {item.label}
+          </Link>
+        ))}
       </div>
     </div>
   )
@@ -271,29 +280,26 @@ function MobileSection({
   onNavigate: () => void
 }) {
   return (
-    <div className="rounded-md bg-primary-foreground/5">
+    <div className="rounded-[10px] bg-white/5">
       <button
         type="button"
-        className="flex w-full items-center justify-between px-3 py-2 text-left"
+        className="flex min-h-11 w-full items-center justify-between px-3 py-3 text-left"
         onClick={onToggle}
+        aria-expanded={isOpen}
       >
         <span>{label}</span>
         <ChevronDownIcon
-          className={cn(
-            "size-4 transition-transform",
-            isOpen ? "rotate-180" : ""
-          )}
+          className={cn("size-4 transition-transform", isOpen && "rotate-180")}
           aria-hidden="true"
         />
       </button>
-
       {isOpen ? (
         <div className="flex flex-col gap-1 px-2 pb-2">
           {items.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              className="rounded-md px-3 py-2 text-primary-foreground/90 hover:bg-primary-foreground/10"
+              className="min-h-11 rounded-[10px] px-3 py-3 text-white/90 hover:bg-white/10"
               onClick={onNavigate}
             >
               {item.label}
@@ -312,18 +318,13 @@ function AuthButtons({
   clerkEnabled: boolean
   mobile?: boolean
 }) {
-  const size: "sm" | "default" = mobile ? "sm" : "default"
   const signInClassName = cn(
-    "border-border bg-secondary text-secondary-foreground hover:bg-secondary/90",
-    mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
+    "border-white/30 bg-white text-[#1B1464] hover:bg-white/90",
+    mobile ? "h-11 px-5 text-[15px]" : "h-11 px-5 text-[14px]"
   )
   const signUpClassName = cn(
-    "border-primary-foreground/45 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground",
-    mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
-  )
-  const dashboardClassName = cn(
-    "border-border bg-secondary text-secondary-foreground hover:bg-secondary/90",
-    mobile ? "h-10 px-5 text-[15px]" : "h-12 px-7 text-[16px]"
+    "border-white/45 bg-transparent text-white hover:bg-white/10 hover:text-white",
+    mobile ? "h-11 px-5 text-[15px]" : "h-11 px-5 text-[14px]"
   )
 
   if (!clerkEnabled) {
@@ -331,7 +332,6 @@ function AuthButtons({
       <>
         <Button
           variant="secondary"
-          size={size}
           className={signInClassName}
           render={<Link href="/sign-in" />}
           nativeButton={false}
@@ -340,12 +340,11 @@ function AuthButtons({
         </Button>
         <Button
           variant="outline"
-          size={size}
           className={signUpClassName}
           render={<Link href="/sign-up" />}
           nativeButton={false}
         >
-          Sign Up for Free
+          Sign Up
         </Button>
       </>
     )
@@ -356,7 +355,6 @@ function AuthButtons({
       <Show when="signed-out">
         <Button
           variant="secondary"
-          size={size}
           className={signInClassName}
           render={<Link href="/sign-in" />}
           nativeButton={false}
@@ -365,25 +363,14 @@ function AuthButtons({
         </Button>
         <Button
           variant="outline"
-          size={size}
           className={signUpClassName}
           render={<Link href="/sign-up" />}
           nativeButton={false}
         >
-          Sign Up for Free
+          Sign Up
         </Button>
       </Show>
-
       <Show when="signed-in">
-        <Button
-          variant="secondary"
-          size={size}
-          className={dashboardClassName}
-          render={<Link href="/bookings" />}
-          nativeButton={false}
-        >
-          Dashboard
-        </Button>
         <CustomUserButton />
       </Show>
     </>
