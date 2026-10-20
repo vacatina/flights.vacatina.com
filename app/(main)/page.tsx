@@ -15,6 +15,8 @@ import { HolidayPackagesHomeSection } from "@/modules/home/ui/holiday-packages-h
 import { HotelDiscoveryHomeSection } from "@/modules/home/ui/hotel-discovery-home-section"
 import { TravelConfidenceSection } from "@/modules/home/ui/travel-confidence-section"
 import { TravelServicesSection } from "@/modules/home/ui/travel-services-section"
+import { ExtendedTravelDiscoverySection } from "@/modules/home/ui/extended-travel-discovery-section"
+import { SeasonalGuideSection } from "@/modules/home/ui/seasonal-guide-section"
 import { parseSearchPrefillToken } from "@/modules/flights/search/domain"
 
 interface HomePageProps {
@@ -45,6 +47,8 @@ export default async function Page({ searchParams }: HomePageProps) {
       <VisaAssistanceHomeSection />
       <HolidayPackagesHomeSection />
       <HotelDiscoveryHomeSection />
+      <ExtendedTravelDiscoverySection />
+      <SeasonalGuideSection />
       <TravelConfidenceSection />
       <TravelServicesSection />
     </main>
