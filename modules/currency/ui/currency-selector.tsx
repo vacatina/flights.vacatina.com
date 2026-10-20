@@ -38,12 +38,12 @@ export function CurrencySelector({
                 : "text-foreground underline underline-offset-3",
               className
             )}
-            aria-label={`Display currency: ${selectedCurrency}`}
+            aria-label={`Language English, display currency: ${selectedCurrency}`}
             aria-busy={preferencePending}
           />
         }
       >
-        {selectedCurrency}
+        EN · {selectedCurrency}
         <ChevronDownIcon aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="w-72">
