@@ -16,6 +16,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { FlightSearchForm } from "@/modules/flights/search/ui"
+import type { FlightSearchFormValues } from "@/modules/flights/search/domain"
 import { HotelSearchForm } from "@/modules/hotels/search/ui/hotel-search-form"
 import { VisaSearchForm } from "@/modules/visa-assistance/ui/visa-search-form"
 
@@ -42,7 +43,11 @@ const tabs = [
   { id: "activities", label: "Activities", icon: FerrisWheelIcon },
 ] as const
 
-export function SearchCommandCenter() {
+export function SearchCommandCenter({
+  initialFlightValues,
+}: {
+  initialFlightValues?: FlightSearchFormValues
+}) {
   const [activeTab, setActiveTab] = useState<SearchTab>("flights")
 
   function onTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -109,7 +114,7 @@ export function SearchCommandCenter() {
             aria-labelledby="vacatina-search-tab-flights"
             hidden={activeTab !== "flights"}
           >
-            {activeTab === "flights" ? <FlightSearchForm /> : null}
+            {activeTab === "flights" ? <FlightSearchForm initialValues={initialFlightValues} /> : null}
           </div>
 
           <div
