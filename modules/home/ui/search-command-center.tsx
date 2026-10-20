@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import {
   BedDoubleIcon,
@@ -50,7 +50,7 @@ export function SearchCommandCenter({
 }) {
   const [activeTab, setActiveTab] = useState<SearchTab>("flights")
 
-  function onTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex = index
     if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length
     else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length
