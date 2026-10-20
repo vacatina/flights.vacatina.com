@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-page-custom-font */
-import { Google_Sans_Flex as Figtree, Geist_Mono } from "next/font/google"
+import { Geist_Mono, Inter, Plus_Jakarta_Sans } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 import { shadcn } from "@clerk/ui/themes"
 import { cookies } from "next/headers"
@@ -18,27 +18,31 @@ import {
 import { getDisplayFxSnapshot } from "@/modules/currency/server"
 import { CurrencyProvider } from "@/modules/currency/ui"
 
-const figtreeHeading = Figtree({
+const headingFont = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-heading",
-  adjustFontFallback: false,
+  display: "swap",
 })
 
-const inter = Figtree({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
-  adjustFontFallback: false,
+  display: "swap",
 })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  display: "swap",
 })
 
 export const metadata: Metadata = {
-  title: "Vacatina Flights",
+  title: {
+    default: "Vacatina | Flights, Hotels, Visa Assistance & Holidays",
+    template: "%s | Vacatina",
+  },
   description:
-    "Search, compare, and book international flights with flexible fare options and streamlined checkout.",
+    "Plan flights, stays, visa assistance and holiday experiences with Vacatina.",
 }
 
 export default function RootLayout({
@@ -53,9 +57,8 @@ export default function RootLayout({
       className={cn(
         "antialiased",
         fontMono.variable,
-        "font-sans",
         inter.variable,
-        figtreeHeading.variable
+        headingFont.variable
       )}
     >
       <head>
