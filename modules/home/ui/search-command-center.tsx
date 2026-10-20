@@ -206,13 +206,12 @@ function SimplePanel({
   href: string
   onAction?: () => void
 }) {
-  if (activeTab !== id) return null
-
   return (
     <div
       id={`vacatina-search-panel-${id}`}
       role="tabpanel"
       aria-labelledby={`vacatina-search-tab-${id}`}
+      hidden={activeTab !== id}
       className="grid gap-6 rounded-2xl bg-[#FAFAFA] p-6 lg:grid-cols-[1fr_auto] lg:items-center"
     >
       <div>
