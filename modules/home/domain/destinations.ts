@@ -95,6 +95,6 @@ export function destinationSearchHref(
   }
   const token = createSearchPrefillToken(values)
   return token
-    ? `/?prefill=${encodeURIComponent(token)}#flight-search`
-    : "/#flight-search"
+    ? `/?prefill=${encodeURIComponent(token)}#search-command-center`
+    : "/#search-command-center"
 }
