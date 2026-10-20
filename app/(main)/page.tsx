@@ -15,12 +15,22 @@ import { HolidayPackagesHomeSection } from "@/modules/home/ui/holiday-packages-h
 import { HotelDiscoveryHomeSection } from "@/modules/home/ui/hotel-discovery-home-section"
 import { TravelConfidenceSection } from "@/modules/home/ui/travel-confidence-section"
 import { TravelServicesSection } from "@/modules/home/ui/travel-services-section"
+import { parseSearchPrefillToken } from "@/modules/flights/search/domain"
 
-export default function Page() {
+interface HomePageProps {
+  searchParams: Promise<{
+    prefill?: string
+  }>
+}
+
+export default async function Page({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = await searchParams
+  const initialFlightValues = parseSearchPrefillToken(resolvedSearchParams.prefill)
+
   return (
     <main id="main-content" className="bg-white">
       <HeroSection />
-      <SearchCommandCenter />
+      <SearchCommandCenter initialFlightValues={initialFlightValues ?? undefined} />
 
       <div id="travel-inspiration">
         <Suspense fallback={<PopularDestinationsSkeleton />}>
