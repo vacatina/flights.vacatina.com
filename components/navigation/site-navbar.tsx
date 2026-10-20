@@ -45,10 +45,10 @@ const moreItems: NavLinkItem[] = [
 ]
 
 const resourceItems: NavLinkItem[] = [
-  { href: "/blog", label: "Blog" },
-  { href: "/about-us", label: "About Us" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/contact-us", label: "Contact Us" },
+  { href: "https://www.vacatina.com/blog", label: "Blog" },
+  { href: "https://www.vacatina.com/about-us", label: "About Us" },
+  { href: "https://www.vacatina.com/faq", label: "FAQ" },
+  { href: "https://www.vacatina.com/contact-us", label: "Contact Us" },
 ]
 
 const transparentNavbarRoutes = ["/", "/visa-assistance", "/hotels"]
