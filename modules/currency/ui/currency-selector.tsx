@@ -34,7 +34,7 @@ export function CurrencySelector({
             className={cn(
               "inline-flex items-center gap-1.5 rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               variant === "navbar"
-                ? "text-primary-foreground transition-opacity hover:opacity-80 focus-visible:ring-offset-[#13357b]"
+                ? "text-primary-foreground transition-opacity hover:opacity-80 focus-visible:ring-offset-[#1B1464]"
                 : "text-foreground underline underline-offset-3",
               className
             )}
