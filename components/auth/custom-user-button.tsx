@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useUser, useClerk } from "@clerk/nextjs"
 import {
+  type LucideIcon,
   CircleHelpIcon,
   HeartIcon,
   LogOutIcon,
@@ -179,7 +180,7 @@ function MenuItem({
   onClick,
 }: {
   label: string
-  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>
+  icon: LucideIcon
   onClick: () => void
 }) {
   return (
