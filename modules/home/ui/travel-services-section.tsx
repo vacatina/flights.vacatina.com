@@ -1,71 +1,72 @@
 import Link from "next/link"
 import {
   ArrowUpRightIcon,
+  HeadphonesIcon,
   LuggageIcon,
-  PlaneIcon,
   StampIcon,
 } from "lucide-react"
 
-import { contactData } from "@/lib/shared/contact-data"
-
 const services = [
   {
-    title: "Find your flight",
-    description: "Your dates. Your destination. Your next adventure.",
-    action: "Search flights",
-    href: "#flight-search",
-    icon: PlaneIcon,
-  },
-  {
-    title: "Visa assistance",
-    description: "A little guidance before you cross the border.",
-    action: "Enquire about visas",
-    href: `mailto:${contactData.email}?subject=Visa%20assistance%20enquiry`,
-    icon: StampIcon,
-  },
-  {
-    title: "Already booked?",
-    description: "Your itinerary and booking details, all together.",
+    title: "Manage a booking",
+    description: "Open an existing flight booking and review the self-service options available for that order.",
     action: "Manage booking",
     href: "/booking/lookup",
     icon: LuggageIcon,
+  },
+  {
+    title: "Track a visa application",
+    description: "Return to your Vacatina visa request and review its current application status.",
+    action: "Visa applications",
+    href: "/visa-requests",
+    icon: StampIcon,
+  },
+  {
+    title: "Contact support",
+    description: "Need help planning or managing a journey? Contact the Vacatina team.",
+    action: "Contact support",
+    href: "mailto:info@vacatina.com",
+    icon: HeadphonesIcon,
   },
 ] as const
 
 export function TravelServicesSection() {
   return (
     <section
-      aria-labelledby="travel-services-title"
-      className="w-full mx-auto max-w-screen-2xl px-4 pb-16 md:px-8 md:pb-20 lg:px-12"
+      aria-labelledby="journey-management-title"
+      className="mx-auto w-full max-w-[1320px] px-4 py-16 sm:px-6 md:py-20 lg:px-8"
     >
-      <div className="rounded-2xl bg-[#f1f5fa] p-6 md:p-10 dark:bg-card">
+      <div className="rounded-[24px] border border-[#E5E5E5] bg-[#FAFAFA] p-6 md:p-10">
+        <p className="text-xs font-bold tracking-[0.16em] text-[#1B1464] uppercase">
+          Manage Your Journey
+        </p>
         <h2
-          id="travel-services-title"
-          className="text-2xl font-semibold tracking-[-0.025em] md:text-[30px]"
+          id="journey-management-title"
+          className="mt-3 font-heading text-3xl font-bold tracking-[-0.03em] text-[#111]"
         >
-          A little help, wherever you are.
+          Your journey, in one place
         </h2>
-        <div className="mt-8 grid divide-y divide-[#13357b]/10 md:grid-cols-3 md:divide-x md:divide-y-0 dark:divide-border">
+        <div className="mt-8 grid divide-y divide-[#E5E5E5] md:grid-cols-3 md:divide-x md:divide-y-0">
           {services.map(({ title, description, action, href, icon: Icon }) => (
             <Link
               key={title}
               href={href}
-              className="group flex flex-col py-6 first:pt-0 last:pb-0 focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#13357b] md:px-7 md:py-0 md:first:pl-0 md:last:pr-0"
+              className="group flex min-h-52 flex-col py-6 first:pt-0 last:pb-0 focus-visible:rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1B1464] md:px-7 md:py-0 md:first:pl-0 md:last:pr-0"
             >
               <Icon
                 aria-hidden="true"
-                strokeWidth={1.5}
-                className="mb-5 size-7 text-[#13357b] dark:text-blue-300"
+                strokeWidth={1.6}
+                className="mb-5 size-7 text-[#1B1464]"
               />
-              <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-              <p className="mt-2 max-w-60 text-sm leading-relaxed text-muted-foreground">
+              <h3 className="font-heading text-lg font-semibold">{title}</h3>
+              <p className="mt-2 max-w-72 text-sm leading-6 text-[#525252]">
                 {description}
               </p>
-              <span className="mt-6 flex items-center gap-2 text-sm font-medium text-[#13357b] dark:text-blue-300">
+              <span className="mt-auto flex items-center gap-2 pt-6 text-sm font-semibold text-[#1B1464]">
                 {action}
                 <ArrowUpRightIcon
                   aria-hidden="true"
-                  className="size-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5"
+                  className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
                 />
               </span>
             </Link>
