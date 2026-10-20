@@ -26,12 +26,12 @@ const inspirationLinks = [
 ] as const
 
 const companyLinks = [
-  ["About Vacatina", "/about-us"],
-  ["Careers", "/contact-us"],
-  ["Corporate Travel", "/contact-us"],
-  ["Travel Agency Partners", "/contact-us"],
-  ["Sustainability", "/about-us"],
-  ["Press & Media", "/contact-us"],
+  ["About Vacatina", "https://www.vacatina.com/about-us"],
+  ["Careers", "https://www.vacatina.com/contact-us"],
+  ["Corporate Travel", "https://www.vacatina.com/contact-us"],
+  ["Travel Agency Partners", "https://www.vacatina.com/contact-us"],
+  ["Sustainability", "https://www.vacatina.com/about-us"],
+  ["Press & Media", "https://www.vacatina.com/contact-us"],
 ] as const
 
 const accountLinks = [
@@ -39,8 +39,8 @@ const accountLinks = [
   ["Saved / Favorites", "/bookings"],
   ["Trip Bucket", "/bookings"],
   ["Visa Applications", "/visa-requests"],
-  ["Help Center & FAQ", "/faq"],
-  ["Contact Support", "/contact-us"],
+  ["Help Center & FAQ", "https://www.vacatina.com/faq"],
+  ["Contact Support", "https://www.vacatina.com/contact-us"],
 ] as const
 
 export function SiteFooter() {
@@ -96,16 +96,16 @@ export function SiteFooter() {
           <div className="flex flex-col gap-4 text-sm text-white/70 md:flex-row md:items-center md:justify-between">
             <p>All rights by Vacatina.</p>
             <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-3">
-              <Link href="/privacy" className="hover:text-white hover:underline">
+              <Link href="https://www.vacatina.com/privacy" className="hover:text-white hover:underline">
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="hover:text-white hover:underline">
+              <Link href="https://www.vacatina.com/terms" className="hover:text-white hover:underline">
                 Terms & Conditions
               </Link>
-              <Link href="/accessibility" className="hover:text-white hover:underline">
+              <Link href="https://www.vacatina.com/accessibility" className="hover:text-white hover:underline">
                 Accessibility
               </Link>
-              <Link href="/site-map" className="hover:text-white hover:underline">
+              <Link href="https://www.vacatina.com/site-map" className="hover:text-white hover:underline">
                 Site Map
               </Link>
             </nav>
